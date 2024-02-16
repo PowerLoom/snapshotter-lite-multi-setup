@@ -1,3 +1,4 @@
+from operator import index
 import os
 import json
 from web3 import Web3
@@ -99,23 +100,56 @@ def main():
         return
     elif len(slot_ids) > 1:
         kill_screen_sessions()
-        batch_size = input('Enter batch size into which you wish to split the deployment : ')
-        try:
-            batch_size = int(batch_size)
-        except ValueError:
-            print('Invalid batch size')
-            return
-        if batch_size < 1:
-            print('Invalid batch size')
-            return
-        if batch_size > len(slot_ids):
-            print('Batch size is greater than total slots')
-            return
-        slot_ids_batched = [slot_ids[i:i + batch_size] for i in range(0, len(slot_ids), batch_size)]
-        os.chdir('..')
-        for idx, batch in enumerate(slot_ids_batched):
-            print(f'Cloning for batch {idx + 1} of {len(slot_ids_batched)}')
-            for idx, each_slot in enumerate(batch):
+        custom_deploy_index = input('Do you want to deploy a custom index of slot IDs \n'
+                                    '(indices begin at 0, enter in the format [begin, end])? (indices/n) : ')
+        if custom_deploy_index.lower() == 'n':
+            batch_size = input('Enter batch size into which you wish to split the deployment : ')
+            try:
+                batch_size = int(batch_size)
+            except ValueError:
+                print('Invalid batch size')
+                return
+            if batch_size < 1:
+                print('Invalid batch size')
+                return
+            if batch_size > len(slot_ids):
+                print('Batch size is greater than total slots')
+                return
+            slot_ids_batched = [slot_ids[i:i + batch_size] for i in range(0, len(slot_ids), batch_size)]
+            os.chdir('..')
+            for idx, batch in enumerate(slot_ids_batched):
+                print(f'Cloning for batch {idx + 1} of {len(slot_ids_batched)}')
+                for idx, each_slot in enumerate(batch):
+                    if idx > 0:
+                        os.chdir('..')
+                    print(f'Cloning for slot {each_slot}')
+                    env_contents = env_file_template(
+                        source_rpc_url=source_rpc_url,
+                        signer_addr=signer_addr,
+                        signer_pkey=signer_pkey,
+                        prost_chain_id=prost_chain_id,
+                        prost_rpc_url=prost_rpc_url,
+                        protocol_state_contract=protocol_state_contract,
+                        namespace=namespace,
+                        relayer_host=relayer_host,
+                        powerloom_reporting_url=powerloom_reporting_url,
+                        slot_id=each_slot
+                    )
+                    clone_lite_repo_with_slot(env_contents, each_slot)
+        else:
+            index_str = custom_deploy_index.strip('[]')
+            begin, end = index_str.split(',')
+            try:
+                begin = int(begin)
+                end = int(end)
+            except ValueError:
+                print('Invalid indices')
+                return
+            if begin < 0 or end < 0 or begin > end or end >= len(slot_ids):
+                print('Invalid indices')
+                return
+            os.chdir('..')
+            for idx, each_slot in enumerate(slot_ids[begin:end+1]):
                 if idx > 0:
                     os.chdir('..')
                 print(f'Cloning for slot {each_slot}')
