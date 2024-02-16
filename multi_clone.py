@@ -48,6 +48,12 @@ WEB3_STORAGE_TOKEN={web3_storage_token}
     """
 
 
+def kill_screen_sessions():
+    kill_screens = input('Do you want to kill all existing screen sessions of testnet nodes? (y/n) : ')
+    if kill_screens.lower() == 'y':
+        os.system("screen -ls | grep powerloom-testnet | cut -d. -f1 | awk '{print $1}' | xargs kill")
+
+
 def clone_lite_repo_with_slot(env_contents: str, slot_id):
     repo_name = f'powerloom-testnet-{slot_id}'
     if os.path.exists(repo_name):
@@ -92,6 +98,7 @@ def main():
         print('No slots found against wallet holder address')
         return
     elif len(slot_ids) > 1:
+        kill_screen_sessions()
         batch_size = input('Enter batch size into which you wish to split the deployment : ')
         try:
             batch_size = int(batch_size)
@@ -126,6 +133,7 @@ def main():
                 )
                 clone_lite_repo_with_slot(env_contents, each_slot)
     else:
+        kill_screen_sessions()
         env_contents = env_file_template(
             source_rpc_url=source_rpc_url,
             signer_addr=signer_addr,
