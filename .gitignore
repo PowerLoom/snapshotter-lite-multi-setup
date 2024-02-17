@@ -1,2 +1,3 @@
 powerloom-testnet-*/
 .env*
+.python-version

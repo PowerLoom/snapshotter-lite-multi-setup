@@ -1,6 +1,7 @@
 from operator import index
 import os
 import json
+import time
 from web3 import Web3
 from dotenv import load_dotenv
 from os import environ
@@ -50,8 +51,13 @@ WEB3_STORAGE_TOKEN={web3_storage_token}
 
 
 def kill_screen_sessions():
-    kill_screens = input('Do you want to kill all existing screen sessions of testnet nodes? (y/n) : ')
+    kill_screens = input('Do you want to kill all running containers and screen sessions of testnet nodes? (y/n) : ')
     if kill_screens.lower() == 'y':
+        print('Killing running containers....')
+        os.system('docker container ls | grep powerloom-testnet | cut  -d ' ' -f1 | xargs docker container stop')
+        print('Sleeping for 10...')
+        time.sleep(10)
+        print('Killing running screen sessions....')
         os.system("screen -ls | grep powerloom-testnet | cut -d. -f1 | awk '{print $1}' | xargs kill")
 
 
