@@ -32,6 +32,5 @@ if [ ! -f .env ]; then
         read WALLET_HOLDER_ADDRESS;
         sed -i'.backup' "s#<wallet-holder-address>#$WALLET_HOLDER_ADDRESS#" .env
     fi
-else
-    echo ".env file found! Run python multi_clone.py next";
 fi
+echo ".env file populated! Run python multi_clone.py next";

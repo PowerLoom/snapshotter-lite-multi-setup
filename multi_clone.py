@@ -54,7 +54,7 @@ def kill_screen_sessions():
     kill_screens = input('Do you want to kill all running containers and screen sessions of testnet nodes? (y/n) : ')
     if kill_screens.lower() == 'y':
         print('Killing running containers....')
-        os.system('docker container ls | grep powerloom-testnet | cut  -d ' ' -f1 | xargs docker container stop')
+        os.system("docker container ls | grep powerloom-testnet | cut  -d ' ' -f1 | xargs docker container stop")
         print('Sleeping for 10...')
         time.sleep(10)
         print('Killing running screen sessions....')
@@ -66,7 +66,7 @@ def clone_lite_repo_with_slot(env_contents: str, slot_id):
     if os.path.exists(repo_name):
         print(f'Deleting existing dir {repo_name}')
         os.system(f'rm -rf {repo_name}')
-    os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite {repo_name}')
+    os.system(f'cp -R snapshotter-lite {repo_name}')
     with open(f'{repo_name}/.env', 'w+') as f:
         f.write(env_contents)
     os.chdir(repo_name)
@@ -105,6 +105,9 @@ def main():
         print('No slots found against wallet holder address')
         return
     elif len(slot_ids) > 1:
+        if os.path.exists('snapshotter-lite'):
+            os.system('rm -rf snapshotter-lite')
+        os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite')
         kill_screen_sessions()
         custom_deploy_index = input('Do you want to deploy a custom index of slot IDs \n'
                                     '(indices begin at 0, enter in the format [begin, end])? (indices/n) : ')
@@ -122,7 +125,6 @@ def main():
                 print('Batch size is greater than total slots')
                 return
             slot_ids_batched = [slot_ids[i:i + batch_size] for i in range(0, len(slot_ids), batch_size)]
-            os.chdir('..')
             for idx, batch in enumerate(slot_ids_batched):
                 print(f'Cloning for batch {idx + 1} of {len(slot_ids_batched)}')
                 for idx, each_slot in enumerate(batch):
@@ -154,7 +156,6 @@ def main():
             if begin < 0 or end < 0 or begin > end or end >= len(slot_ids):
                 print('Invalid indices')
                 return
-            os.chdir('..')
             for idx, each_slot in enumerate(slot_ids[begin:end+1]):
                 if idx > 0:
                     os.chdir('..')
@@ -174,6 +175,9 @@ def main():
                 clone_lite_repo_with_slot(env_contents, each_slot)
     else:
         kill_screen_sessions()
+        if os.path.exists('snapshotter-lite'):
+            os.system('rm -rf snapshotter-lite')
+        os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite')
         env_contents = env_file_template(
             source_rpc_url=source_rpc_url,
             signer_addr=signer_addr,
