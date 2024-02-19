@@ -92,13 +92,16 @@ def main():
     namespace = os.getenv("NAMESPACE")
     powerloom_reporting_url = os.getenv("POWERLOOM_REPORTING_URL")
     prost_chain_id = os.getenv("PROST_CHAIN_ID")
+    if not all([source_rpc_url, signer_addr, signer_pkey, slot_rpc_url, prost_rpc_url, protocol_state_contract, slot_contract_addr, relayer_host, namespace, powerloom_reporting_url, prost_chain_id]):
+        print('Missing environment variables')
+        return
     w3 = Web3(Web3.HTTPProvider(slot_rpc_url))
     with open('MintContract.json', 'r') as f:
         protocol_abi = json.load(f)
 
-    wallet_holder_address = Web3.toChecksumAddress(wallet_holder_address)
-    protocol_state_contract = Web3.toChecksumAddress(protocol_state_contract)
-    slot_contract_addr = Web3.toChecksumAddress(slot_contract_addr)
+    wallet_holder_address = Web3.to_checksum_address(wallet_holder_address)
+    protocol_state_contract = Web3.to_checksum_address(protocol_state_contract)
+    slot_contract_addr = Web3.to_checksum_address(slot_contract_addr)
     slot_contract = w3.eth.contract(
         address=slot_contract_addr, abi=protocol_abi,
     )
