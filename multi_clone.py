@@ -95,6 +95,10 @@ def main():
     w3 = Web3(Web3.HTTPProvider(slot_rpc_url))
     with open('MintContract.json', 'r') as f:
         protocol_abi = json.load(f)
+
+    wallet_holder_address = Web3.toChecksumAddress(wallet_holder_address)
+    protocol_state_contract = Web3.toChecksumAddress(protocol_state_contract)
+    slot_contract_addr = Web3.toChecksumAddress(slot_contract_addr)
     slot_contract = w3.eth.contract(
         address=slot_contract_addr, abi=protocol_abi,
     )
