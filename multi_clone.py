@@ -132,11 +132,13 @@ def main():
                 return
             slot_ids_batched = [slot_ids[i:i + batch_size] for i in range(0, len(slot_ids), batch_size)]
             for idx, batch in enumerate(slot_ids_batched):
+                if idx > 0:
+                    os.chdir('..')
                 print(f'Cloning for batch {idx + 1} of {len(slot_ids_batched)}')
                 for idx, each_slot in enumerate(batch):
                     if idx > 0:
                         os.chdir('..')
-                    print(f'Cloning for slot {each_slot}')
+                    print(f'Cloning for slot {each_slot}: pwd: {os.getcwd()}')
                     env_contents = env_file_template(
                         source_rpc_url=source_rpc_url,
                         signer_addr=signer_addr,
