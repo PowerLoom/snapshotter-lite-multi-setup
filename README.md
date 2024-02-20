@@ -44,20 +44,24 @@ pip install -r requirements.txt
 # run the setup
 python multi_clone.py
 ```
-When you execute `python multi_clone.py`, you will see following prompts that guide you through setting up your node(s).
+When you execute `python multi_clone.py`, you will see the following prompts that guide you through setting up your node(s).
 
-![Step-By-Step-guide-on-the-prompts](./img/step-by-step-walkthrough.mp4)
+
+
+https://github.com/PowerLoom/snapshotter-lite-multi-setup/assets/6279391/a0f1aa39-2cf6-43ff-86b0-d46f3acae818
+
+
 
 1. **Terminate Existing containers:** "Do you want to kill all running containers and screen sessions of testnet nodes? (y/n) n"
 
-- Type `y` Use this option and stop all active containers or node instances. This will clean up all the older containers. Please cross check your running containers before executing this command. 
+- Type `y` Use this option and stop all active containers or node instances. This will clean up all the older containers. Please cross-check your running containers before executing this command. 
 
 2. **Custom Slot ID Deployment:** "Do you want to deploy a custom index of slot IDs (indices begin at 0, enter in the format [begin, end])? (indices/n)"
 
-- For instance, to deploy the first four slot IDs as nodes, input `[0, 3]`, where 0 is the start index and 3 represents the fourth element in the slot ID array associated with the wallet holder. If you want to deploy the entire array of slot IDs, type `n`.
+- For instance, to deploy the first four slot IDs as nodes, input `[0, 3]`, where 0 is the start index, and 3 represents the fourth element in the slot ID array associated with the wallet holder. If you want to deploy the entire array of slot IDs, type `n`.
 
-1. **Deployment Batch Size:** " Enter batch size into which you wish to split the deployment"
+1. **Deployment Batch Size:** " Enter the batch size into which you wish to split the deployment"
 
-- A batch size of 1 means all nodes will be deployed at once. A batch size of 2 divides the deployment into two groups, and so on.
+- A batch size of 1 means all nodes will be deployed simultaneously. A batch size of 2 divides the deployment into two groups, and so on.
 
-If you encounter any issues, please reach out to us [discord](https://discord.com/invite/powerloom).
+If you encounter any issues, please contact us [discord](https://discord.com/invite/powerloom).
