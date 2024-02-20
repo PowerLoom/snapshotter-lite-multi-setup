@@ -44,7 +44,7 @@ pip install -r requirements.txt
 # run the setup
 python multi_clone.py
 ```
-Upon running `python multi_clone.py`, you'll encounter the following prompts to get your node(s) running: 
+When you execute `python multi_clone.py`, you will see following prompts that guide you through setting up your node(s).
 
 1. **Terminate Existing Processes:** "Do you want to kill all running containers and screen sessions of testnet nodes? (y/n) n"
 
@@ -56,4 +56,6 @@ Upon running `python multi_clone.py`, you'll encounter the following prompts to 
 
 3. **Deployment Batch Size:** " Enter batch size into which you wish to split the deployment"
 
-A batch size of 1 means all nodes will be deployed simultaneously. A batch size of 2 divides the deployment into two groups, and so on.
+- A batch size of 1 means all nodes will be deployed at once. A batch size of 2 divides the deployment into two groups, and so on.
+
+If you encounter any issues, please reach out to us [discord](https://discord.com/invite/powerloom).
