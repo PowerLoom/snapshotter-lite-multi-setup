@@ -44,3 +44,16 @@ pip install -r requirements.txt
 # run the setup
 python multi_clone.py
 ```
+Upon running `python multi_clone.py`, you'll encounter the following prompts to get your node(s) running: 
+
+1. **Terminate Existing Processes:** "Do you want to kill all running containers and screen sessions of testnet nodes? (y/n) n"
+
+- Use this option to stop all active containers or node instances.
+
+2. **Custom Slot ID Deployment:** "Do you want to deploy a custom index of slot IDs (indices begin at 0, enter in the format [begin, end])? (indices/n)"
+
+- For instance, to deploy the first four slot IDs as nodes, input [0, 3], where 0 is the start index and 3 represents the fourth element in the slot ID array associated with the wallet holder.
+
+3. **Deployment Batch Size:** " Enter batch size into which you wish to split the deployment"
+
+A batch size of 1 means all nodes will be deployed simultaneously. A batch size of 2 divides the deployment into two groups, and so on.
