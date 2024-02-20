@@ -62,6 +62,6 @@ https://github.com/PowerLoom/snapshotter-lite-multi-setup/assets/6279391/a0f1aa3
 
 1. **Deployment Batch Size:** " Enter the batch size into which you wish to split the deployment"
 
-- A batch size of 1 means all nodes will be deployed simultaneously. A batch size of 2 divides the deployment into two groups, and so on.
+- A batch size of 1 means nodes will be deployed one by one, in batch size of 1. A batch size of 2 takes two nodes at a time and proceeds with deployment, and so on.
 
 If you encounter any issues, please contact us [discord](https://discord.com/invite/powerloom).
