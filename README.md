@@ -23,12 +23,21 @@ curl https://pyenv.run | bash
 pyenv install 3.11.5
 source ~/.bashrc
 ```
+If running 'pyenv install 3.11.5' gives error run:
+```
+export PATH="$HOME/.pyenv/bin:$PATH"
+export PATH="$PYENV_ROOT/bin:$PATH"
+
+if command -v pyenv 1>/dev/null 2>&1; then
+  eval "$(pyenv init -)"
+fi
+```
+
 ### 1.2 Install `pyenv-virtualenv`
 
 Detailed instructions can be [found here](https://github.com/pyenv/pyenv-virtualenv).
 
 ```
-git clone https://github.com/pyenv/pyenv-virtualenv.git $(pyenv root)/plugins/pyenv-virtualenv
 echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bashrc
 pyenv virtualenv 3.11.5 ss_lite_multi_311
 pyenv local ss_lite_multi_311
