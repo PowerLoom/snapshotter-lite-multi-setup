@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 from os import environ
 
 # get from slot contract and set in redis
-def get_user_slots(contract_obj, signer_addr):
-    holder_slots = contract_obj.functions.getUserOwnedSlotIds(signer_addr).call()
+def get_user_slots(contract_obj, wallet_owner_addr):
+    holder_slots = contract_obj.functions.getUserOwnedSlotIds(wallet_owner_addr).call()
     print(holder_slots)
     return holder_slots
 
@@ -85,9 +85,11 @@ def main():
     wallet_holder_address = os.getenv("WALLET_HOLDER_ADDRESS")
     signer_pkey = os.getenv("SIGNER_ACCOUNT_PRIVATE_KEY")
     slot_rpc_url = os.getenv("SLOT_RPC_URL")
+    slot_rpc_url_base = os.getenv("SLOT_RPC_URL_BASE")
     prost_rpc_url = os.getenv("PROST_RPC_URL")
     protocol_state_contract = os.getenv("PROTOCOL_STATE_CONTRACT")
     slot_contract_addr = os.getenv('SLOT_CONTROLLER_ADDRESS')
+    slot_contract_addr_base = os.getenv('SLOT_CONTROLLER_ADDRESS_BASE')
     relayer_host = os.getenv("RELAYER_HOST")
     namespace = os.getenv("NAMESPACE")
     powerloom_reporting_url = os.getenv("POWERLOOM_REPORTING_URL")
@@ -96,16 +98,24 @@ def main():
         print('Missing environment variables')
         return
     w3 = Web3(Web3.HTTPProvider(slot_rpc_url))
+    w3_base = Web3(Web3.HTTPProvider(slot_rpc_url_base))
     with open('MintContract.json', 'r') as f:
-        protocol_abi = json.load(f)
-
+        nft_contract_abi = json.load(f)
+    with open('MintContractBase.json', 'r') as f:
+        nft_contract_base_abi = json.load(f)
     wallet_holder_address = Web3.to_checksum_address(wallet_holder_address)
     protocol_state_contract = Web3.to_checksum_address(protocol_state_contract)
     slot_contract_addr = Web3.to_checksum_address(slot_contract_addr)
+    slot_contract_addr_base = Web3.to_checksum_address(slot_contract_addr_base)
     slot_contract = w3.eth.contract(
-        address=slot_contract_addr, abi=protocol_abi,
+        address=slot_contract_addr, abi=nft_contract_abi,
+    )
+    slot_contract_base = w3_base.eth.contract(
+        address=slot_contract_addr_base, abi=nft_contract_base_abi,
     )
     slot_ids = get_user_slots(slot_contract, wallet_holder_address)
+    slot_ids_base = get_user_slots(slot_contract_base, wallet_holder_address)
+    slot_ids.extend(slot_ids_base)
     print(f'Got {len(slot_ids)} slots against wallet holder address')
     if not slot_ids:
         print('No slots found against wallet holder address')
