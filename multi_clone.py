@@ -23,6 +23,9 @@ def env_file_template(
         protocol_state_contract: str,
         powerloom_reporting_url: str,
         slot_id: str,
+        sequencer_id: str,
+        relayer_rendezvous_point: str,
+        client_rendezvous_point: str,
         ipfs_url: str = '',
         ipfs_api_key: str = '',
         ipfs_api_secret: str = '',
@@ -40,6 +43,9 @@ RELAYER_HOST={relayer_host}
 PROTOCOL_STATE_CONTRACT={protocol_state_contract}
 POWERLOOM_REPORTING_URL={powerloom_reporting_url}
 SLOT_ID={slot_id}
+SEQUENCER_ID={sequencer_id}
+RELAYER_RENDEZVOUS_POINT={relayer_rendezvous_point}
+CLIENT_RENDEZVOUS_POINT={client_rendezvous_point}
 # OPTIONAL
 IPFS_URL={ipfs_url}
 IPFS_API_KEY={ipfs_api_key}
@@ -61,11 +67,11 @@ def kill_screen_sessions():
 
 
 def clone_lite_repo_with_slot(env_contents: str, slot_id):
-    repo_name = f'powerloom-testnet-{slot_id}'
+    repo_name = f'powerloom-testnet-v2-{slot_id}'
     if os.path.exists(repo_name):
         print(f'Deleting existing dir {repo_name}')
         os.system(f'rm -rf {repo_name}')
-    os.system(f'cp -R snapshotter-lite {repo_name}')
+    os.system(f'cp -R snapshotter-lite-v2 {repo_name}')
     with open(f'{repo_name}/.env', 'w+') as f:
         f.write(env_contents)
     os.chdir(repo_name)
@@ -94,6 +100,9 @@ def main():
     namespace = os.getenv("NAMESPACE")
     powerloom_reporting_url = os.getenv("POWERLOOM_REPORTING_URL")
     prost_chain_id = os.getenv("PROST_CHAIN_ID")
+    sequencer_id = os.getenv("SEQUENCER_ID")
+    relayer_rendezvous_point = os.getenv("RELAYER_RENDEZVOUS_POINT")
+    client_rendezvous_point = os.getenv("CLIENT_RENDEZVOUS_POINT")
     if not all([source_rpc_url, signer_addr, signer_pkey, slot_rpc_url, prost_rpc_url, protocol_state_contract, slot_contract_addr, relayer_host, namespace, powerloom_reporting_url, prost_chain_id]):
         print('Missing environment variables')
         return
@@ -121,9 +130,9 @@ def main():
         print('No slots found against wallet holder address')
         return
     elif len(slot_ids) > 1:
-        if os.path.exists('snapshotter-lite'):
-            os.system('rm -rf snapshotter-lite')
-        os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite')
+        if os.path.exists('snapshotter-lite-v2'):
+            os.system('rm -rf snapshotter-lite-v2')
+        os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2')
         kill_screen_sessions()
         custom_deploy_index = input('Do you want to deploy a custom index of slot IDs \n'
                                     '(indices begin at 0, enter in the format [begin, end])? (indices/n) : ')
@@ -159,7 +168,10 @@ def main():
                         namespace=namespace,
                         relayer_host=relayer_host,
                         powerloom_reporting_url=powerloom_reporting_url,
-                        slot_id=each_slot
+                        slot_id=each_slot,
+                        sequencer_id=sequencer_id,
+                        relayer_rendezvous_point=relayer_rendezvous_point,
+                        client_rendezvous_point=client_rendezvous_point
                     )
                     clone_lite_repo_with_slot(env_contents, each_slot)
         else:
@@ -188,14 +200,17 @@ def main():
                     namespace=namespace,
                     relayer_host=relayer_host,
                     powerloom_reporting_url=powerloom_reporting_url,
-                    slot_id=each_slot
+                    slot_id=each_slot,
+                    sequencer_id=sequencer_id,
+                    relayer_rendezvous_point=relayer_rendezvous_point,
+                    client_rendezvous_point=client_rendezvous_point
                 )
                 clone_lite_repo_with_slot(env_contents, each_slot)
     else:
         kill_screen_sessions()
-        if os.path.exists('snapshotter-lite'):
-            os.system('rm -rf snapshotter-lite')
-        os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite')
+        if os.path.exists('snapshotter-lite-v2'):
+            os.system('rm -rf snapshotter-lite-v2')
+        os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2')
         env_contents = env_file_template(
             source_rpc_url=source_rpc_url,
             signer_addr=signer_addr,
@@ -206,7 +221,10 @@ def main():
             namespace=namespace,
             relayer_host=relayer_host,
             powerloom_reporting_url=powerloom_reporting_url,
-            slot_id=slot_ids[0]
+            slot_id=slot_ids[0],
+            sequencer_id=sequencer_id,
+            relayer_rendezvous_point=relayer_rendezvous_point,
+            client_rendezvous_point=client_rendezvous_point
         )
         clone_lite_repo_with_slot(env_contents, slot_ids[0])
         # print(env_contents)
