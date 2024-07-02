@@ -1,5 +1,6 @@
 import os
 import json
+from threading import local
 import time
 from web3 import Web3
 from dotenv import load_dotenv
@@ -21,6 +22,7 @@ def env_file_template(
         namespace: str,
         relayer_host: str,
         protocol_state_contract: str,
+        local_collector_port: int,
         powerloom_reporting_url: str,
         slot_id: str,
         sequencer_id: str,
@@ -46,6 +48,7 @@ SLOT_ID={slot_id}
 SEQUENCER_ID={sequencer_id}
 RELAYER_RENDEZVOUS_POINT={relayer_rendezvous_point}
 CLIENT_RENDEZVOUS_POINT={client_rendezvous_point}
+LOCAL_COLLECTOR_PORT={local_collector_port}
 # OPTIONAL
 IPFS_URL={ipfs_url}
 IPFS_API_KEY={ipfs_api_key}
@@ -66,7 +69,7 @@ def kill_screen_sessions():
         os.system("screen -ls | grep powerloom-testnet | cut -d. -f1 | awk '{print $1}' | xargs kill")
 
 
-def clone_lite_repo_with_slot(env_contents: str, slot_id):
+def clone_lite_repo_with_slot(env_contents: str, slot_id, dev_mode=False):
     repo_name = f'powerloom-testnet-v2-{slot_id}'
     if os.path.exists(repo_name):
         print(f'Deleting existing dir {repo_name}')
@@ -80,12 +83,27 @@ def clone_lite_repo_with_slot(env_contents: str, slot_id):
     # this works well when there are no existing screen sessions for the same slot
     # TODO: handle case when there are existing screen sessions for the same slot
     os.system(f'screen -dmS {repo_name}')
-    os.system(f'screen -S {repo_name} -p 0 -X stuff "./build.sh\n"')
+    if not dev_mode:
+        os.system(f'screen -S {repo_name} -p 0 -X stuff "./build.sh\n"')
+    else:
+        os.system(f'screen -S {repo_name} -p 0 -X stuff "./build-dev.sh\n"')
     print(f'Spawned screen session for docker containers {repo_name}') 
     # os.system('./build.sh')
 
 def main():
     load_dotenv('.env')
+    dev_mode = os.getenv("DEV_MODE")
+    if not dev_mode:
+        dev_mode = False
+    else:
+        dev_mode = True if dev_mode.lower() == 'true' else False
+    if dev_mode:
+        print('*' * 40 + 'Running in dev mode' + '*' * 40)
+    lite_node_branch = os.getenv("LITE_NODE_BRANCH")
+    if not lite_node_branch:
+        lite_node_branch = 'main'
+    else:
+        lite_node_branch = lite_node_branch.strip()
     source_rpc_url = os.getenv("SOURCE_RPC_URL")
     signer_addr = os.getenv("SIGNER_ACCOUNT_ADDRESS")
     wallet_holder_address = os.getenv("WALLET_HOLDER_ADDRESS")
@@ -125,6 +143,7 @@ def main():
     slot_ids = get_user_slots(slot_contract, wallet_holder_address)
     slot_ids_base = get_user_slots(slot_contract_base, wallet_holder_address)
     slot_ids.extend(slot_ids_base)
+    local_collector_port = 50051
     print(f'Got {len(slot_ids)} slots against wallet holder address')
     if not slot_ids:
         print('No slots found against wallet holder address')
@@ -132,7 +151,8 @@ def main():
     elif len(slot_ids) > 1:
         if os.path.exists('snapshotter-lite-v2'):
             os.system('rm -rf snapshotter-lite-v2')
-        os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2')
+        print('Cloning lite node branch : ', lite_node_branch)
+        os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch ' + lite_node_branch)
         kill_screen_sessions()
         custom_deploy_index = input('Do you want to deploy a custom index of slot IDs \n'
                                     '(indices begin at 0, enter in the format [begin, end])? (indices/n) : ')
@@ -167,13 +187,15 @@ def main():
                         protocol_state_contract=protocol_state_contract,
                         namespace=namespace,
                         relayer_host=relayer_host,
+                        local_collector_port=local_collector_port,
                         powerloom_reporting_url=powerloom_reporting_url,
                         slot_id=each_slot,
                         sequencer_id=sequencer_id,
                         relayer_rendezvous_point=relayer_rendezvous_point,
-                        client_rendezvous_point=client_rendezvous_point
+                        client_rendezvous_point=client_rendezvous_point,
                     )
-                    clone_lite_repo_with_slot(env_contents, each_slot)
+                    clone_lite_repo_with_slot(env_contents, each_slot, dev_mode=dev_mode)
+                    local_collector_port += 1
         else:
             index_str = custom_deploy_index.strip('[]')
             begin, end = index_str.split(',')
@@ -201,11 +223,13 @@ def main():
                     relayer_host=relayer_host,
                     powerloom_reporting_url=powerloom_reporting_url,
                     slot_id=each_slot,
+                    local_collector_port=local_collector_port,
                     sequencer_id=sequencer_id,
                     relayer_rendezvous_point=relayer_rendezvous_point,
                     client_rendezvous_point=client_rendezvous_point
                 )
-                clone_lite_repo_with_slot(env_contents, each_slot)
+                clone_lite_repo_with_slot(env_contents, each_slot, dev_mode=dev_mode)
+                local_collector_port += 1
     else:
         kill_screen_sessions()
         if os.path.exists('snapshotter-lite-v2'):
@@ -223,10 +247,11 @@ def main():
             powerloom_reporting_url=powerloom_reporting_url,
             slot_id=slot_ids[0],
             sequencer_id=sequencer_id,
+            local_collector_port=local_collector_port,
             relayer_rendezvous_point=relayer_rendezvous_point,
             client_rendezvous_point=client_rendezvous_point
         )
-        clone_lite_repo_with_slot(env_contents, slot_ids[0])
+        clone_lite_repo_with_slot(env_contents, slot_ids[0], dev_mode=dev_mode)
         # print(env_contents)
 
 if __name__ == '__main__':
