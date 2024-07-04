@@ -64,4 +64,21 @@ https://github.com/PowerLoom/snapshotter-lite-multi-setup/assets/6279391/a0f1aa3
 
 - A batch size of 1 means nodes will be deployed one by one, in batch size of 1. A batch size of 2 takes two nodes at a time and proceeds with deployment, and so on.
 
-If you encounter any issues, please contact us [discord](https://discord.com/invite/powerloom).
+If you encounter any issues, please contact us on [discord](https://discord.com/invite/powerloom).
+
+
+## [OPTIONAL] Dev mode setup
+
+> [!WARNING]
+>This section is not required if you are not planning on running a customized setup. For any related assistance, contact us on [discord](https://discord.com/invite/powerloom).
+
+
+If you wish to customize the docker containers being launched by not using the published images from Powerloom, and instead clone the underlying snapshotter components locally and building their images, we support that as well now.
+
+Ref: [Step 2](#2-run-the-setup), after running `./init.sh` , you can edit the generated `.env` file for the following fields
+
+```bash
+DEV_MODE=False  # you can set this to True
+# subseqeuently you can specify the branch of https://github.com/PowerLoom/snapshotter-lite-v2 that you wish to run
+LITE_NODE_BRANCH=main
+```
