@@ -1,3 +1,4 @@
+from distutils import core
 import os
 import json
 from threading import local
@@ -25,6 +26,7 @@ def env_file_template(
         local_collector_port: int,
         powerloom_reporting_url: str,
         slot_id: str,
+        core_api_port: int,
         sequencer_id: str,
         relayer_rendezvous_point: str,
         client_rendezvous_point: str,
@@ -45,6 +47,7 @@ RELAYER_HOST={relayer_host}
 PROTOCOL_STATE_CONTRACT={protocol_state_contract}
 POWERLOOM_REPORTING_URL={powerloom_reporting_url}
 SLOT_ID={slot_id}
+CORE_API_PORT={core_api_port}
 SEQUENCER_ID={sequencer_id}
 RELAYER_RENDEZVOUS_POINT={relayer_rendezvous_point}
 CLIENT_RENDEZVOUS_POINT={client_rendezvous_point}
@@ -144,6 +147,7 @@ def main():
     slot_ids_base = get_user_slots(slot_contract_base, wallet_holder_address)
     slot_ids.extend(slot_ids_base)
     local_collector_port = 50051
+    core_api_port = 8002
     print(f'Got {len(slot_ids)} slots against wallet holder address')
     if not slot_ids:
         print('No slots found against wallet holder address')
@@ -193,9 +197,11 @@ def main():
                         sequencer_id=sequencer_id,
                         relayer_rendezvous_point=relayer_rendezvous_point,
                         client_rendezvous_point=client_rendezvous_point,
+                        core_api_port=core_api_port
                     )
                     clone_lite_repo_with_slot(env_contents, each_slot, dev_mode=dev_mode)
                     local_collector_port += 1
+                    core_api_port += 1
         else:
             index_str = custom_deploy_index.strip('[]')
             begin, end = index_str.split(',')
@@ -226,10 +232,12 @@ def main():
                     local_collector_port=local_collector_port,
                     sequencer_id=sequencer_id,
                     relayer_rendezvous_point=relayer_rendezvous_point,
-                    client_rendezvous_point=client_rendezvous_point
+                    client_rendezvous_point=client_rendezvous_point,
+                    core_api_port=core_api_port
                 )
                 clone_lite_repo_with_slot(env_contents, each_slot, dev_mode=dev_mode)
                 local_collector_port += 1
+                core_api_port += 1
     else:
         kill_screen_sessions()
         if os.path.exists('snapshotter-lite-v2'):
@@ -249,7 +257,8 @@ def main():
             sequencer_id=sequencer_id,
             local_collector_port=local_collector_port,
             relayer_rendezvous_point=relayer_rendezvous_point,
-            client_rendezvous_point=client_rendezvous_point
+            client_rendezvous_point=client_rendezvous_point,
+            core_api_port=core_api_port
         )
         clone_lite_repo_with_slot(env_contents, slot_ids[0], dev_mode=dev_mode)
         # print(env_contents)
