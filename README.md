@@ -1,4 +1,7 @@
-# Multi node setup for multiple Powerloom Snapshotter Lite slot holders on Linux VPS
+# Multi node setup for multiple Powerloom Snapshotter Lite: Protocol V2 slot holders on Linux VPS
+
+> [!NOTE]
+> This setup is for Lite nodes participating in the latest V2 of Powerloom Protocol. [Protocol V1 setup](https://github.com/PowerLoom/snapshotter-lite-multi-setup/tree/main) is deprecated and its data markets are archived. Your submission data, rewards on it are finalized and recorded as [announced on Discord](https://discord.com/channels/777248105636560948/1146931631039463484/1242876184509812847).
 
 ## 0. Preparation.
 
