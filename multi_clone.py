@@ -8,6 +8,8 @@ from web3 import Web3
 from dotenv import load_dotenv
 from os import environ
 
+LOCAL_COLLECTOR_NEW_BUILD_THRESHOLD = 200
+
 # get from slot contract and set in redis
 def get_user_slots(contract_obj, wallet_owner_addr):
     holder_slots = contract_obj.functions.getUserOwnedSlotIds(wallet_owner_addr).call()
@@ -28,7 +30,6 @@ def env_file_template(
         powerloom_reporting_url: str,
         slot_id: str,
         core_api_port: int,
-        sequencer_id: str,
         relayer_rendezvous_point: str,
         client_rendezvous_point: str,
         ipfs_url: str = '',
@@ -49,7 +50,6 @@ PROTOCOL_STATE_CONTRACT={protocol_state_contract}
 POWERLOOM_REPORTING_URL={powerloom_reporting_url}
 SLOT_ID={slot_id}
 CORE_API_PORT={core_api_port}
-SEQUENCER_ID={sequencer_id}
 RELAYER_RENDEZVOUS_POINT={relayer_rendezvous_point}
 CLIENT_RENDEZVOUS_POINT={client_rendezvous_point}
 LOCAL_COLLECTOR_PORT={local_collector_port}
@@ -73,7 +73,7 @@ def kill_screen_sessions():
         os.system("screen -ls | grep powerloom-testnet | cut -d. -f1 | awk '{print $1}' | xargs kill")
 
 
-def clone_lite_repo_with_slot(env_contents: str, slot_id, dev_mode=False):
+def clone_lite_repo_with_slot(env_contents: str, slot_id, new_collector_instance, dev_mode=False):
     repo_name = f'powerloom-testnet-v2-{slot_id}'
     if os.path.exists(repo_name):
         print(f'Deleting existing dir {repo_name}')
@@ -88,7 +88,10 @@ def clone_lite_repo_with_slot(env_contents: str, slot_id, dev_mode=False):
     # TODO: handle case when there are existing screen sessions for the same slot
     os.system(f'screen -dmS {repo_name}')
     if not dev_mode:
-        os.system(f'screen -S {repo_name} -p 0 -X stuff "./build.sh\n"')
+        if new_collector_instance:
+            os.system(f'screen -S {repo_name} -p 0 -X stuff "./build.sh yes_collector\n"')
+        else:
+            os.system(f'screen -S {repo_name} -p 0 -X stuff "./build.sh\n"')
     else:
         os.system(f'screen -S {repo_name} -p 0 -X stuff "./build-dev.sh\n"')
     print(f'Spawned screen session for docker containers {repo_name}') 
@@ -122,7 +125,6 @@ def main():
     namespace = os.getenv("NAMESPACE")
     powerloom_reporting_url = os.getenv("POWERLOOM_REPORTING_URL")
     prost_chain_id = os.getenv("PROST_CHAIN_ID")
-    sequencer_id = os.getenv("SEQUENCER_ID")
     relayer_rendezvous_point = os.getenv("RELAYER_RENDEZVOUS_POINT")
     client_rendezvous_point = os.getenv("CLIENT_RENDEZVOUS_POINT")
     if not all([source_rpc_url, signer_addr, signer_pkey, slot_rpc_url, prost_rpc_url, protocol_state_contract, slot_contract_addr, relayer_host, namespace, powerloom_reporting_url, prost_chain_id]):
@@ -165,6 +167,12 @@ def main():
                 if idx > 0:
                     os.chdir('..')
                 print(f'Cloning for slot {each_slot}')
+                if idx % LOCAL_COLLECTOR_NEW_BUILD_THRESHOLD == 0: 
+                    if idx > 1:
+                        local_collector_port += 1
+                    new_collector_instance = True
+                else:
+                    new_collector_instance = False
                 env_contents = env_file_template(
                     source_rpc_url=source_rpc_url,
                     signer_addr=signer_addr,
@@ -177,13 +185,11 @@ def main():
                     powerloom_reporting_url=powerloom_reporting_url,
                     slot_id=each_slot,
                     local_collector_port=local_collector_port,
-                    sequencer_id=sequencer_id,
                     relayer_rendezvous_point=relayer_rendezvous_point,
                     client_rendezvous_point=client_rendezvous_point,
                     core_api_port=core_api_port
                 )
-                clone_lite_repo_with_slot(env_contents, each_slot, dev_mode=dev_mode)
-                local_collector_port += 1
+                clone_lite_repo_with_slot(env_contents, each_slot, new_collector_instance, dev_mode=dev_mode)
                 core_api_port += 1
         else:
             custom_deploy_index = input('Enter custom index of slot IDs to deploy \n'
@@ -202,6 +208,12 @@ def main():
             for idx, each_slot in enumerate(slot_ids[begin:end+1]):
                 if idx > 0:
                     os.chdir('..')
+                if idx % LOCAL_COLLECTOR_NEW_BUILD_THRESHOLD == 0: 
+                    if idx > 1:
+                        local_collector_port += 1
+                    new_collector_instance = True
+                else:
+                    new_collector_instance = False
                 print(f'Cloning for slot {each_slot}')
                 env_contents = env_file_template(
                     source_rpc_url=source_rpc_url,
@@ -215,13 +227,11 @@ def main():
                     powerloom_reporting_url=powerloom_reporting_url,
                     slot_id=each_slot,
                     local_collector_port=local_collector_port,
-                    sequencer_id=sequencer_id,
                     relayer_rendezvous_point=relayer_rendezvous_point,
                     client_rendezvous_point=client_rendezvous_point,
                     core_api_port=core_api_port
                 )
-                clone_lite_repo_with_slot(env_contents, each_slot, dev_mode=dev_mode)
-                local_collector_port += 1
+                clone_lite_repo_with_slot(env_contents, each_slot, new_collector_instance, dev_mode=dev_mode)
                 core_api_port += 1
     else:
         kill_screen_sessions()
@@ -239,13 +249,12 @@ def main():
             relayer_host=relayer_host,
             powerloom_reporting_url=powerloom_reporting_url,
             slot_id=slot_ids[0],
-            sequencer_id=sequencer_id,
             local_collector_port=local_collector_port,
             relayer_rendezvous_point=relayer_rendezvous_point,
             client_rendezvous_point=client_rendezvous_point,
             core_api_port=core_api_port
         )
-        clone_lite_repo_with_slot(env_contents, slot_ids[0], dev_mode=dev_mode)
+        clone_lite_repo_with_slot(env_contents, slot_ids[0], True, dev_mode=dev_mode)
         # print(env_contents)
 
 if __name__ == '__main__':
