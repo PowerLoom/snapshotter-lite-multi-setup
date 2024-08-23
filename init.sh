@@ -29,15 +29,11 @@ if [ ! -f .env ]; then
     # fill defaults 
 
     # replace PROTOCOL_STATE_CONTRACT in .env
-    sed -i'.backup' 's/^PROTOCOL_STATE_CONTRACT=.*/PROTOCOL_STATE_CONTRACT='"0x10c5E2ee14006B3860d4FdF6B173A30553ea6333"'/' .env
+    sed -i'.backup' 's/^PROTOCOL_STATE_CONTRACT=.*/PROTOCOL_STATE_CONTRACT='"0xE88E5f64AEB483d7057645326AdDFA24A3B312DF"'/' .env
+    # replace DATA_MARKET_CONTRACT in .env
+    sed -i'.backup' 's/^DATA_MARKET_CONTRACT=.*/DATA_MARKET_CONTRACT='"0x0C2E22fe7526fAeF28E7A58c84f8723dEFcE200c"'/' .env
     # replace PROST_CHAIN_ID in .env
-    sed -i'.backup' 's/^PROST_CHAIN_ID=.*/PROST_CHAIN_ID='"11165"'/' .env
-    # replace SEQUENCER_ID in .env
-    sed -i'.backup' 's/^SEQUENCER_ID=.*/SEQUENCER_ID='"QmdJbNsbHpFseUPKC9vLt4vMsfdxA4dyHPzsAWuzYz3Yxx"'/' .env
-    # replace RELAYER_RENDEZVOUS_POINT in .env
-    sed -i'.backup' 's/^RELAYER_RENDEZVOUS_POINT=.*/RELAYER_RENDEZVOUS_POINT='"Relayer_POP_test_simulation_phase_1"'/' .env
-    # replace CLIENT_RENDEZVOUS_POINT in .env
-    sed -i'.backup' 's/^CLIENT_RENDEZVOUS_POINT=.*/CLIENT_RENDEZVOUS_POINT='"POP_Client_simulation_test_alpha"'/' .env
+    sed -i'.backup' 's/^PROST_CHAIN_ID=.*/PROST_CHAIN_ID='"11169"'/' .env
     
 fi
 echo ".env file populated! Run python multi_clone.py next";

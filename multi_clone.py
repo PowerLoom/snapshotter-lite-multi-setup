@@ -24,14 +24,12 @@ def env_file_template(
         prost_chain_id: str,
         prost_rpc_url: str,
         namespace: str,
-        relayer_host: str,
+        data_market_contract: str,
         protocol_state_contract: str,
         local_collector_port: int,
         powerloom_reporting_url: str,
         slot_id: str,
         core_api_port: int,
-        relayer_rendezvous_point: str,
-        client_rendezvous_point: str,
         ipfs_url: str = '',
         ipfs_api_key: str = '',
         ipfs_api_secret: str = '',
@@ -45,13 +43,11 @@ SIGNER_ACCOUNT_PRIVATE_KEY={signer_pkey}
 PROST_CHAIN_ID={prost_chain_id}
 PROST_RPC_URL={prost_rpc_url}
 NAMESPACE={namespace}
-RELAYER_HOST={relayer_host}
 PROTOCOL_STATE_CONTRACT={protocol_state_contract}
+DATA_MARKET_CONTRACT={data_market_contract}
 POWERLOOM_REPORTING_URL={powerloom_reporting_url}
 SLOT_ID={slot_id}
 CORE_API_PORT={core_api_port}
-RELAYER_RENDEZVOUS_POINT={relayer_rendezvous_point}
-CLIENT_RENDEZVOUS_POINT={client_rendezvous_point}
 LOCAL_COLLECTOR_PORT={local_collector_port}
 # OPTIONAL
 IPFS_URL={ipfs_url}
@@ -121,13 +117,15 @@ def main():
     protocol_state_contract = os.getenv("PROTOCOL_STATE_CONTRACT")
     slot_contract_addr = os.getenv('SLOT_CONTROLLER_ADDRESS')
     slot_contract_addr_base = os.getenv('SLOT_CONTROLLER_ADDRESS_BASE')
-    relayer_host = os.getenv("RELAYER_HOST")
     namespace = os.getenv("NAMESPACE")
+    prost_chain_id = os.getenv("PROST_CHAIN_ID")
     powerloom_reporting_url = os.getenv("POWERLOOM_REPORTING_URL")
     prost_chain_id = os.getenv("PROST_CHAIN_ID")
-    relayer_rendezvous_point = os.getenv("RELAYER_RENDEZVOUS_POINT")
-    client_rendezvous_point = os.getenv("CLIENT_RENDEZVOUS_POINT")
-    if not all([source_rpc_url, signer_addr, signer_pkey, slot_rpc_url, prost_rpc_url, protocol_state_contract, slot_contract_addr, relayer_host, namespace, powerloom_reporting_url, prost_chain_id]):
+    data_market_contract = os.getenv("DATA_MARKET_CONTRACT")
+    if not all([
+        source_rpc_url, signer_addr, signer_pkey, slot_rpc_url, prost_rpc_url, slot_contract_addr, 
+        namespace, powerloom_reporting_url, protocol_state_contract, data_market_contract, prost_chain_id,
+    ]):
         print('Missing environment variables')
         return
     w3 = Web3(Web3.HTTPProvider(slot_rpc_url))
@@ -181,13 +179,11 @@ def main():
                     prost_rpc_url=prost_rpc_url,
                     protocol_state_contract=protocol_state_contract,
                     namespace=namespace,
-                    relayer_host=relayer_host,
                     powerloom_reporting_url=powerloom_reporting_url,
                     slot_id=each_slot,
                     local_collector_port=local_collector_port,
-                    relayer_rendezvous_point=relayer_rendezvous_point,
-                    client_rendezvous_point=client_rendezvous_point,
-                    core_api_port=core_api_port
+                    core_api_port=core_api_port,
+                    data_market_contract=data_market_contract
                 )
                 clone_lite_repo_with_slot(env_contents, each_slot, new_collector_instance, dev_mode=dev_mode)
                 core_api_port += 1
@@ -227,9 +223,8 @@ def main():
                     powerloom_reporting_url=powerloom_reporting_url,
                     slot_id=each_slot,
                     local_collector_port=local_collector_port,
-                    relayer_rendezvous_point=relayer_rendezvous_point,
-                    client_rendezvous_point=client_rendezvous_point,
-                    core_api_port=core_api_port
+                    core_api_port=core_api_port,
+                    data_market_contract=data_market_contract
                 )
                 clone_lite_repo_with_slot(env_contents, each_slot, new_collector_instance, dev_mode=dev_mode)
                 core_api_port += 1
@@ -246,13 +241,11 @@ def main():
             prost_rpc_url=prost_rpc_url,
             protocol_state_contract=protocol_state_contract,
             namespace=namespace,
-            relayer_host=relayer_host,
             powerloom_reporting_url=powerloom_reporting_url,
             slot_id=slot_ids[0],
             local_collector_port=local_collector_port,
-            relayer_rendezvous_point=relayer_rendezvous_point,
-            client_rendezvous_point=client_rendezvous_point,
-            core_api_port=core_api_port
+            core_api_port=core_api_port,
+            data_market_contract=data_market_contract
         )
         clone_lite_repo_with_slot(env_contents, slot_ids[0], True, dev_mode=dev_mode)
         # print(env_contents)
