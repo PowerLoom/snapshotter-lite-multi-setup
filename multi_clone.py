@@ -1,3 +1,4 @@
+from email.policy import default
 from distutils import core
 import os
 import json
@@ -158,51 +159,35 @@ def main():
         print('Cloning lite node branch : ', lite_node_branch)
         os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch ' + lite_node_branch)
         kill_screen_sessions()
-        custom_deploy_index = input('Do you want to deploy a custom index of slot IDs \n'
-                                    '(indices begin at 0, enter in the format [begin, end])? (indices/n) : ')
-        if custom_deploy_index.lower() == 'n':
-            batch_size = input('Enter batch size into which you wish to split the deployment : ')
-            try:
-                batch_size = int(batch_size)
-            except ValueError:
-                print('Invalid batch size')
-                return
-            if batch_size < 1:
-                print('Invalid batch size')
-                return
-            if batch_size > len(slot_ids):
-                print('Batch size is greater than total slots')
-                return
-            slot_ids_batched = [slot_ids[i:i + batch_size] for i in range(0, len(slot_ids), batch_size)]
-            for idx, batch in enumerate(slot_ids_batched):
+        default_deploy = input('Do you want to deploy all slots? (y/n) : ')
+        if default_deploy.lower() == 'y':
+            for idx, each_slot in enumerate(slot_ids):
                 if idx > 0:
                     os.chdir('..')
-                print(f'Cloning for batch {idx + 1} of {len(slot_ids_batched)}')
-                for idx, each_slot in enumerate(batch):
-                    if idx > 0:
-                        os.chdir('..')
-                    print(f'Cloning for slot {each_slot}: pwd: {os.getcwd()}')
-                    env_contents = env_file_template(
-                        source_rpc_url=source_rpc_url,
-                        signer_addr=signer_addr,
-                        signer_pkey=signer_pkey,
-                        prost_chain_id=prost_chain_id,
-                        prost_rpc_url=prost_rpc_url,
-                        protocol_state_contract=protocol_state_contract,
-                        namespace=namespace,
-                        relayer_host=relayer_host,
-                        local_collector_port=local_collector_port,
-                        powerloom_reporting_url=powerloom_reporting_url,
-                        slot_id=each_slot,
-                        sequencer_id=sequencer_id,
-                        relayer_rendezvous_point=relayer_rendezvous_point,
-                        client_rendezvous_point=client_rendezvous_point,
-                        core_api_port=core_api_port
-                    )
-                    clone_lite_repo_with_slot(env_contents, each_slot, dev_mode=dev_mode)
-                    local_collector_port += 1
-                    core_api_port += 1
+                print(f'Cloning for slot {each_slot}')
+                env_contents = env_file_template(
+                    source_rpc_url=source_rpc_url,
+                    signer_addr=signer_addr,
+                    signer_pkey=signer_pkey,
+                    prost_chain_id=prost_chain_id,
+                    prost_rpc_url=prost_rpc_url,
+                    protocol_state_contract=protocol_state_contract,
+                    namespace=namespace,
+                    relayer_host=relayer_host,
+                    powerloom_reporting_url=powerloom_reporting_url,
+                    slot_id=each_slot,
+                    local_collector_port=local_collector_port,
+                    sequencer_id=sequencer_id,
+                    relayer_rendezvous_point=relayer_rendezvous_point,
+                    client_rendezvous_point=client_rendezvous_point,
+                    core_api_port=core_api_port
+                )
+                clone_lite_repo_with_slot(env_contents, each_slot, dev_mode=dev_mode)
+                local_collector_port += 1
+                core_api_port += 1
         else:
+            custom_deploy_index = input('Enter custom index of slot IDs to deploy \n'
+                                    '(indices begin at 0, enter in the format [begin, end])? (indices/n) : ')
             index_str = custom_deploy_index.strip('[]')
             begin, end = index_str.split(',')
             try:
