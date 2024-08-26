@@ -85,9 +85,9 @@ def clone_lite_repo_with_slot(env_contents: str, slot_id, new_collector_instance
     os.system(f'screen -dmS {repo_name}')
     if not dev_mode:
         if new_collector_instance:
-            os.system(f'screen -S {repo_name} -p 0 -X stuff "./build.sh yes_collector\n"')
-        else:
             os.system(f'screen -S {repo_name} -p 0 -X stuff "./build.sh\n"')
+        else:
+            os.system(f'screen -S {repo_name} -p 0 -X stuff "./build.sh no_collector\n"')
     else:
         os.system(f'screen -S {repo_name} -p 0 -X stuff "./build-dev.sh\n"')
     print(f'Spawned screen session for docker containers {repo_name}') 
