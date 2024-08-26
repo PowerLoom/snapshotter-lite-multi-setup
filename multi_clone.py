@@ -219,7 +219,6 @@ def main():
                     prost_rpc_url=prost_rpc_url,
                     protocol_state_contract=protocol_state_contract,
                     namespace=namespace,
-                    relayer_host=relayer_host,
                     powerloom_reporting_url=powerloom_reporting_url,
                     slot_id=each_slot,
                     local_collector_port=local_collector_port,
