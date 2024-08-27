@@ -1,5 +1,4 @@
 from email.policy import default
-from distutils import core
 import os
 import json
 from threading import local
@@ -69,7 +68,7 @@ def kill_screen_sessions():
         os.system("screen -ls | grep powerloom-testnet | cut -d. -f1 | awk '{print $1}' | xargs kill")
 
 
-def clone_lite_repo_with_slot(env_contents: str, slot_id, new_collector_instance, dev_mode=False):
+def clone_lite_repo_with_slot(env_contents: str, slot_id, new_collector_instance, dev_mode=False, lite_node_branch='main'):
     repo_name = f'powerloom-testnet-v2-{slot_id}'
     if os.path.exists(repo_name):
         print(f'Deleting existing dir {repo_name}')
@@ -85,6 +84,23 @@ def clone_lite_repo_with_slot(env_contents: str, slot_id, new_collector_instance
     os.system(f'screen -dmS {repo_name}')
     if not dev_mode:
         if new_collector_instance:
+            # run docker pull first
+            print('Pulling docker images...')
+            if lite_node_branch == 'main':
+                image_tag = 'latest'
+            else:
+                image_tag = 'dockerify'
+            print('Selecting image tag : ', image_tag)
+            command = f"""
+source .env
+export IMAGE_TAG={image_tag}
+if ! [ -x "$(command -v docker-compose)" ]; then
+    docker compose -f docker-compose.yaml pull
+else
+    docker-compose -f docker-compose.yaml pull
+fi
+"""
+            os.system(command)
             os.system(f'screen -S {repo_name} -p 0 -X stuff "./build.sh yes_collector\n"')
         else:
             os.system(f'screen -S {repo_name} -p 0 -X stuff "./build.sh\n"')
@@ -185,7 +201,7 @@ def main():
                     core_api_port=core_api_port,
                     data_market_contract=data_market_contract
                 )
-                clone_lite_repo_with_slot(env_contents, each_slot, new_collector_instance, dev_mode=dev_mode)
+                clone_lite_repo_with_slot(env_contents, each_slot, new_collector_instance, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
                 core_api_port += 1
         else:
             custom_deploy_index = input('Enter custom index of slot IDs to deploy \n'
@@ -225,7 +241,7 @@ def main():
                     core_api_port=core_api_port,
                     data_market_contract=data_market_contract
                 )
-                clone_lite_repo_with_slot(env_contents, each_slot, new_collector_instance, dev_mode=dev_mode)
+                clone_lite_repo_with_slot(env_contents, each_slot, new_collector_instance, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
                 core_api_port += 1
     else:
         kill_screen_sessions()
@@ -246,7 +262,7 @@ def main():
             core_api_port=core_api_port,
             data_market_contract=data_market_contract
         )
-        clone_lite_repo_with_slot(env_contents, slot_ids[0], True, dev_mode=dev_mode)
+        clone_lite_repo_with_slot(env_contents, slot_ids[0], True, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
         # print(env_contents)
 
 if __name__ == '__main__':
