@@ -101,9 +101,9 @@ else
 fi
 """
             os.system(command)
-            os.system(f'screen -S {repo_name} -p 0 -X stuff "./build.sh yes_collector\n"')
-        else:
             os.system(f'screen -S {repo_name} -p 0 -X stuff "./build.sh\n"')
+        else:
+            os.system(f'screen -S {repo_name} -p 0 -X stuff "./build.sh no_collector\n"')
     else:
         os.system(f'screen -S {repo_name} -p 0 -X stuff "./build-dev.sh\n"')
     print(f'Spawned screen session for docker containers {repo_name}') 
