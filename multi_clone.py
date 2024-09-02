@@ -108,6 +108,7 @@ fi
         os.system(f'screen -S {repo_name} -p 0 -X stuff "./build-dev.sh\n"')
     print(f'Spawned screen session for docker containers {repo_name}') 
     # os.system('./build.sh')
+    time.sleep(2)
 
 def main():
     load_dotenv('.env')
