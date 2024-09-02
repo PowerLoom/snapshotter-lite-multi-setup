@@ -50,9 +50,12 @@ python multi_clone.py
 When you execute `python multi_clone.py`, you will see the following prompts that guide you through setting up your node(s).
 
 
+>[!NOTE]
+>Follow our [walkthrough tutorial video](https://youtu.be/SPToeDh9MUo?si=3Q6zruCdUA0GG-73) posted on Youtube or click on the preview below!
 
-https://github.com/PowerLoom/snapshotter-lite-multi-setup/assets/6279391/a0f1aa39-2cf6-43ff-86b0-d46f3acae818
 
+[<img src="https://img.youtube.com/vi/SPToeDh9MUo/hqdefault.jpg" width="600" height="300"
+/>](https://youtu.be/SPToeDh9MUo)
 
 
 1. **Terminate Existing containers:** "Do you want to kill all running containers and screen sessions of testnet nodes? (y/n) n"
