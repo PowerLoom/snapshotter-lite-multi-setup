@@ -272,4 +272,6 @@ if __name__ == '__main__':
     # get args passed
     if len(sys.argv) == 2:
         collector_flag = sys.argv[1]
+    else:
+        collector_flag = ''
     main(collector_flag)
