@@ -1,6 +1,7 @@
 from email.policy import default
 import os
 import json
+import sys
 from threading import local
 import time
 from web3 import Web3
@@ -110,7 +111,7 @@ fi
     # os.system('./build.sh')
     time.sleep(2)
 
-def main():
+def main(collector_flag=""):
     load_dotenv('.env')
     dev_mode = os.getenv("DEV_MODE")
     if not dev_mode:
@@ -166,6 +167,7 @@ def main():
     slot_ids.extend(slot_ids_base)
     local_collector_port = 50051
     core_api_port = 8002
+    should_spawn_local_collector_at_all = False if collector_flag.lower() == 'no_collector' else True
     print(f'Got {len(slot_ids)} slots against wallet holder address')
     if not slot_ids:
         print('No slots found against wallet holder address')
@@ -185,7 +187,7 @@ def main():
                 if idx % LOCAL_COLLECTOR_NEW_BUILD_THRESHOLD == 0: 
                     if idx > 1:
                         local_collector_port += 1
-                    new_collector_instance = True
+                    new_collector_instance = True and should_spawn_local_collector_at_all
                 else:
                     new_collector_instance = False
                 env_contents = env_file_template(
@@ -224,7 +226,7 @@ def main():
                 if idx % LOCAL_COLLECTOR_NEW_BUILD_THRESHOLD == 0: 
                     if idx > 1:
                         local_collector_port += 1
-                    new_collector_instance = True
+                    new_collector_instance = True and should_spawn_local_collector_at_all
                 else:
                     new_collector_instance = False
                 print(f'Cloning for slot {each_slot}')
@@ -263,8 +265,11 @@ def main():
             core_api_port=core_api_port,
             data_market_contract=data_market_contract
         )
-        clone_lite_repo_with_slot(env_contents, slot_ids[0], True, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
+        clone_lite_repo_with_slot(env_contents, slot_ids[0], True and should_spawn_local_collector_at_all, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
         # print(env_contents)
 
 if __name__ == '__main__':
-    main()
+    # get args passed
+    if len(sys.argv) == 2:
+        collector_flag = sys.argv[1]
+    main(collector_flag)
