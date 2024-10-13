@@ -32,6 +32,7 @@ def env_file_template(
         powerloom_reporting_url: str,
         slot_id: str,
         core_api_port: int,
+        subnet_third_octet: int,
         ipfs_url: str = '',
         ipfs_api_key: str = '',
         ipfs_api_secret: str = '',
@@ -51,6 +52,7 @@ POWERLOOM_REPORTING_URL={powerloom_reporting_url}
 SLOT_ID={slot_id}
 CORE_API_PORT={core_api_port}
 LOCAL_COLLECTOR_PORT={local_collector_port}
+SUBNET_THIRD_OCTET={subnet_third_octet}
 # OPTIONAL
 IPFS_URL={ipfs_url}
 IPFS_API_KEY={ipfs_api_key}
@@ -71,7 +73,7 @@ def kill_screen_sessions():
         os.system("screen -ls | grep powerloom-testnet | cut -d. -f1 | awk '{print $1}' | xargs kill")
 
 
-def clone_lite_repo_with_slot(idx: int, env_contents: str, slot_id, new_collector_instance, dev_mode=False, lite_node_branch='main'):
+def clone_lite_repo_with_slot(env_contents: str, slot_id, new_collector_instance, dev_mode=False, lite_node_branch='main'):
     repo_name = f'powerloom-testnet-v2-{slot_id}'
     if os.path.exists(repo_name):
         print(f'Deleting existing dir {repo_name}')
@@ -86,7 +88,6 @@ def clone_lite_repo_with_slot(idx: int, env_contents: str, slot_id, new_collecto
     # TODO: handle case when there are existing screen sessions for the same slot
     os.system(f'screen -dmS {repo_name}')
     if not dev_mode:
-        os.system(f'export NETWORK_OCTET={idx}')
         if new_collector_instance:
             # run docker pull first
             print('Pulling docker images...')
@@ -232,9 +233,11 @@ def main():
                     slot_id=each_slot,
                     local_collector_port=local_collector_port,
                     core_api_port=core_api_port,
-                    data_market_contract=data_market_contract
+                    data_market_contract=data_market_contract,
+                    # this is fine since we can only have 100 max slots against a wallet
+                    subnet_third_octet=idx + 1  # Simply use idx + 1 for unique values
                 )
-                clone_lite_repo_with_slot(idx, env_contents, each_slot, new_collector_instance, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
+                clone_lite_repo_with_slot(env_contents, each_slot, new_collector_instance, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
                 core_api_port += 1
         else:
             custom_deploy_index = input('Enter custom index of slot IDs to deploy \n'
@@ -250,11 +253,11 @@ def main():
             if begin < 0 or end < 0 or begin > end or end >= len(slot_ids):
                 print('Invalid indices')
                 return
-            for idx, each_slot in enumerate(slot_ids[begin:end+1]):
-                if idx > 0:
+            for idx, each_slot in enumerate(slot_ids[begin:end+1], start=begin):
+                if idx > begin:
                     os.chdir('..')
                 if idx % LOCAL_COLLECTOR_NEW_BUILD_THRESHOLD == 0: 
-                    if idx > 1:
+                    if idx > begin + 1:
                         local_collector_port += 1
                     new_collector_instance = True
                 else:
@@ -272,9 +275,11 @@ def main():
                     slot_id=each_slot,
                     local_collector_port=local_collector_port,
                     core_api_port=core_api_port,
-                    data_market_contract=data_market_contract
+                    data_market_contract=data_market_contract,
+                    # this is fine since we can only have 100 max slots against a wallet
+                    subnet_third_octet=idx + 1  # Simply use idx + 1 for unique values
                 )
-                clone_lite_repo_with_slot(idx, env_contents, each_slot, new_collector_instance, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
+                clone_lite_repo_with_slot(env_contents, each_slot, new_collector_instance, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
                 core_api_port += 1
     else:
         kill_screen_sessions()
@@ -294,7 +299,8 @@ def main():
             slot_id=slot_ids[0],
             local_collector_port=local_collector_port,
             core_api_port=core_api_port,
-            data_market_contract=data_market_contract
+            data_market_contract=data_market_contract,
+            subnet_third_octet=1
         )
         clone_lite_repo_with_slot(env_contents, slot_ids[0], True, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
         # print(env_contents)
