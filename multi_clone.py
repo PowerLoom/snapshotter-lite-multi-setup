@@ -6,6 +6,9 @@ import time
 from web3 import Web3
 from dotenv import load_dotenv
 from os import environ
+import subprocess
+import re
+import sys
 
 LOCAL_COLLECTOR_NEW_BUILD_THRESHOLD = 200
 
@@ -68,7 +71,7 @@ def kill_screen_sessions():
         os.system("screen -ls | grep powerloom-testnet | cut -d. -f1 | awk '{print $1}' | xargs kill")
 
 
-def clone_lite_repo_with_slot(env_contents: str, slot_id, new_collector_instance, dev_mode=False, lite_node_branch='main'):
+def clone_lite_repo_with_slot(idx: int, env_contents: str, slot_id, new_collector_instance, dev_mode=False, lite_node_branch='main'):
     repo_name = f'powerloom-testnet-v2-{slot_id}'
     if os.path.exists(repo_name):
         print(f'Deleting existing dir {repo_name}')
@@ -83,6 +86,7 @@ def clone_lite_repo_with_slot(env_contents: str, slot_id, new_collector_instance
     # TODO: handle case when there are existing screen sessions for the same slot
     os.system(f'screen -dmS {repo_name}')
     if not dev_mode:
+        os.system(f'export NETWORK_OCTET={idx}')
         if new_collector_instance:
             # run docker pull first
             print('Pulling docker images...')
@@ -109,6 +113,32 @@ fi
     print(f'Spawned screen session for docker containers {repo_name}') 
     # os.system('./build.sh')
     time.sleep(2)
+
+def check_existing_networks(slot_ids):
+    # Run docker network ls command
+    result = subprocess.run(['docker', 'network', 'ls', '--format', '{{.Name}}'], capture_output=True, text=True)
+    
+    if result.returncode != 0:
+        print(f"Error running docker network ls: {result.stderr}")
+        sys.exit(1)
+    
+    # Get the list of network names
+    networks = result.stdout.strip().split('\n')
+    
+    # Create patterns for each slot ID
+    patterns = [f'snapshotter-lite-v2-{slot_id}' for slot_id in slot_ids]
+    
+    # Find matching networks
+    matching_networks = [net for net in networks if any(net == pattern for pattern in patterns)]
+    
+    if matching_networks:
+        print("Found existing networks for the provided slot IDs:")
+        for net in matching_networks:
+            print(f"- {net}")
+        print("Please remove these networks before continuing.")
+        sys.exit(1)
+    else:
+        print("No existing networks found for the provided slot IDs. Continuing...")
 
 def main():
     load_dotenv('.env')
@@ -176,6 +206,8 @@ def main():
         print('Cloning lite node branch : ', lite_node_branch)
         os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch ' + lite_node_branch)
         kill_screen_sessions()
+        # Check for existing networks with the provided slot IDs
+        check_existing_networks(slot_ids)
         default_deploy = input('Do you want to deploy all slots? (y/n) : ')
         if default_deploy.lower() == 'y':
             for idx, each_slot in enumerate(slot_ids):
@@ -202,7 +234,7 @@ def main():
                     core_api_port=core_api_port,
                     data_market_contract=data_market_contract
                 )
-                clone_lite_repo_with_slot(env_contents, each_slot, new_collector_instance, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
+                clone_lite_repo_with_slot(idx, env_contents, each_slot, new_collector_instance, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
                 core_api_port += 1
         else:
             custom_deploy_index = input('Enter custom index of slot IDs to deploy \n'
@@ -242,10 +274,11 @@ def main():
                     core_api_port=core_api_port,
                     data_market_contract=data_market_contract
                 )
-                clone_lite_repo_with_slot(env_contents, each_slot, new_collector_instance, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
+                clone_lite_repo_with_slot(idx, env_contents, each_slot, new_collector_instance, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
                 core_api_port += 1
     else:
         kill_screen_sessions()
+        check_existing_networks(slot_ids)
         if os.path.exists('snapshotter-lite-v2'):
             os.system('rm -rf snapshotter-lite-v2')
         os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2')
