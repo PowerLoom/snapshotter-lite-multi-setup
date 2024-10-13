@@ -286,7 +286,7 @@ def main():
         check_existing_networks(slot_ids)
         if os.path.exists('snapshotter-lite-v2'):
             os.system('rm -rf snapshotter-lite-v2')
-        os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2')
+        os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch ' + lite_node_branch)
         env_contents = env_file_template(
             source_rpc_url=source_rpc_url,
             signer_addr=signer_addr,
