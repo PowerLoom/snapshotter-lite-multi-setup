@@ -6,6 +6,9 @@ import time
 from web3 import Web3
 from dotenv import load_dotenv
 from os import environ
+import subprocess
+import re
+import sys
 
 LOCAL_COLLECTOR_NEW_BUILD_THRESHOLD = 200
 
@@ -29,6 +32,7 @@ def env_file_template(
         powerloom_reporting_url: str,
         slot_id: str,
         core_api_port: int,
+        subnet_third_octet: int,
         ipfs_url: str = '',
         ipfs_api_key: str = '',
         ipfs_api_secret: str = '',
@@ -48,6 +52,7 @@ POWERLOOM_REPORTING_URL={powerloom_reporting_url}
 SLOT_ID={slot_id}
 CORE_API_PORT={core_api_port}
 LOCAL_COLLECTOR_PORT={local_collector_port}
+SUBNET_THIRD_OCTET={subnet_third_octet}
 # OPTIONAL
 IPFS_URL={ipfs_url}
 IPFS_API_KEY={ipfs_api_key}
@@ -109,6 +114,35 @@ fi
     print(f'Spawned screen session for docker containers {repo_name}') 
     # os.system('./build.sh')
     time.sleep(2)
+
+def check_existing_networks(slot_ids):
+    # Run docker network ls command
+    result = subprocess.run(['docker', 'network', 'ls', '--format', '{{.Name}}'], capture_output=True, text=True)
+    
+    if result.returncode != 0:
+        print(f"Error running docker network ls: {result.stderr}")
+        sys.exit(1)
+    
+    # Get the list of network names
+    networks = result.stdout.strip().split('\n')
+    
+    # Create patterns for each slot ID
+    patterns = [f'snapshotter-lite-v2-{slot_id}' for slot_id in slot_ids]
+    
+    # Find matching networks
+    matching_networks = [net for net in networks if any(net == pattern for pattern in patterns)]
+    
+    if matching_networks:
+        print("Found existing networks for the provided slot IDs:")
+        for net in matching_networks:
+            print(f"- {net}")
+        print("""Please remove these networks before continuing. The following command can be used to remove the networks:
+docker network rm <network_name>  ...OR...
+docker network prune
+""")
+        sys.exit(1)
+    else:
+        print("No existing networks found for the provided slot IDs. Continuing...")
 
 def main():
     load_dotenv('.env')
@@ -176,6 +210,8 @@ def main():
         print('Cloning lite node branch : ', lite_node_branch)
         os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch ' + lite_node_branch)
         kill_screen_sessions()
+        # Check for existing networks with the provided slot IDs
+        check_existing_networks(slot_ids)
         default_deploy = input('Do you want to deploy all slots? (y/n) : ')
         if default_deploy.lower() == 'y':
             for idx, each_slot in enumerate(slot_ids):
@@ -200,7 +236,9 @@ def main():
                     slot_id=each_slot,
                     local_collector_port=local_collector_port,
                     core_api_port=core_api_port,
-                    data_market_contract=data_market_contract
+                    data_market_contract=data_market_contract,
+                    # this is fine since we can only have 100 max slots against a wallet
+                    subnet_third_octet=idx + 1  # Simply use idx + 1 for unique values
                 )
                 clone_lite_repo_with_slot(env_contents, each_slot, new_collector_instance, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
                 core_api_port += 1
@@ -218,11 +256,11 @@ def main():
             if begin < 0 or end < 0 or begin > end or end >= len(slot_ids):
                 print('Invalid indices')
                 return
-            for idx, each_slot in enumerate(slot_ids[begin:end+1]):
-                if idx > 0:
+            for idx, each_slot in enumerate(slot_ids[begin:end+1], start=begin):
+                if idx > begin:
                     os.chdir('..')
                 if idx % LOCAL_COLLECTOR_NEW_BUILD_THRESHOLD == 0: 
-                    if idx > 1:
+                    if idx > begin + 1:
                         local_collector_port += 1
                     new_collector_instance = True
                 else:
@@ -240,15 +278,18 @@ def main():
                     slot_id=each_slot,
                     local_collector_port=local_collector_port,
                     core_api_port=core_api_port,
-                    data_market_contract=data_market_contract
+                    data_market_contract=data_market_contract,
+                    # this is fine since we can only have 100 max slots against a wallet
+                    subnet_third_octet=idx + 1  # Simply use idx + 1 for unique values
                 )
                 clone_lite_repo_with_slot(env_contents, each_slot, new_collector_instance, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
                 core_api_port += 1
     else:
         kill_screen_sessions()
+        check_existing_networks(slot_ids)
         if os.path.exists('snapshotter-lite-v2'):
             os.system('rm -rf snapshotter-lite-v2')
-        os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2')
+        os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch ' + lite_node_branch)
         env_contents = env_file_template(
             source_rpc_url=source_rpc_url,
             signer_addr=signer_addr,
@@ -261,7 +302,8 @@ def main():
             slot_id=slot_ids[0],
             local_collector_port=local_collector_port,
             core_api_port=core_api_port,
-            data_market_contract=data_market_contract
+            data_market_contract=data_market_contract,
+            subnet_third_octet=1
         )
         clone_lite_repo_with_slot(env_contents, slot_ids[0], True, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
         # print(env_contents)
