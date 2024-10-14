@@ -136,7 +136,10 @@ def check_existing_networks(slot_ids):
         print("Found existing networks for the provided slot IDs:")
         for net in matching_networks:
             print(f"- {net}")
-        print("Please remove these networks before continuing.")
+        print("""Please remove these networks before continuing. The following command can be used to remove the networks:
+docker network rm <network_name>  ...OR...
+docker network prune
+""")
         sys.exit(1)
     else:
         print("No existing networks found for the provided slot IDs. Continuing...")
