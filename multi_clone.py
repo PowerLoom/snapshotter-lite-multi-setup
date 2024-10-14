@@ -210,10 +210,10 @@ def main():
         print('Cloning lite node branch : ', lite_node_branch)
         os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch ' + lite_node_branch)
         kill_screen_sessions()
-        # Check for existing networks with the provided slot IDs
-        check_existing_networks(slot_ids)
         default_deploy = input('Do you want to deploy all slots? (y/n) : ')
         if default_deploy.lower() == 'y':
+            # Check for existing networks with all the slot IDs
+            check_existing_networks(slot_ids)
             for idx, each_slot in enumerate(slot_ids):
                 if idx > 0:
                     os.chdir('..')
@@ -256,6 +256,8 @@ def main():
             if begin < 0 or end < 0 or begin > end or end >= len(slot_ids):
                 print('Invalid indices')
                 return
+            # Check for existing networks with the provided slot IDs
+            check_existing_networks(slot_ids[begin:end+1])
             for idx, each_slot in enumerate(slot_ids[begin:end+1], start=begin):
                 if idx > begin:
                     os.chdir('..')
