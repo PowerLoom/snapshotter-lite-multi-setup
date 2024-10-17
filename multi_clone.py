@@ -33,6 +33,8 @@ def env_file_template(
         slot_id: str,
         core_api_port: int,
         subnet_third_octet: int,
+        max_stream_pool_size: int,
+        stream_pool_health_check_interval: int,
         ipfs_url: str = '',
         ipfs_api_key: str = '',
         ipfs_api_secret: str = '',
@@ -53,6 +55,8 @@ SLOT_ID={slot_id}
 CORE_API_PORT={core_api_port}
 LOCAL_COLLECTOR_PORT={local_collector_port}
 SUBNET_THIRD_OCTET={subnet_third_octet}
+MAX_STREAM_POOL_SIZE={max_stream_pool_size}
+STREAM_POOL_HEALTH_CHECK_INTERVAL={stream_pool_health_check_interval}
 # OPTIONAL
 IPFS_URL={ipfs_url}
 IPFS_API_KEY={ipfs_api_key}
@@ -173,6 +177,8 @@ def main():
     powerloom_reporting_url = os.getenv("POWERLOOM_REPORTING_URL")
     prost_chain_id = os.getenv("PROST_CHAIN_ID")
     data_market_contract = os.getenv("DATA_MARKET_CONTRACT")
+    max_stream_pool_size = os.getenv("MAX_STREAM_POOL_SIZE")
+    stream_pool_health_check_interval = os.getenv("STREAM_POOL_HEALTH_CHECK_INTERVAL")
     if not all([
         source_rpc_url, signer_addr, signer_pkey, slot_rpc_url, prost_rpc_url, slot_contract_addr, 
         namespace, powerloom_reporting_url, protocol_state_contract, data_market_contract, prost_chain_id,
@@ -238,7 +244,9 @@ def main():
                     core_api_port=core_api_port,
                     data_market_contract=data_market_contract,
                     # this is fine since we can only have 100 max slots against a wallet
-                    subnet_third_octet=idx + 1  # Simply use idx + 1 for unique values
+                    subnet_third_octet=idx + 1,
+                    max_stream_pool_size=max_stream_pool_size,
+                    stream_pool_health_check_interval=stream_pool_health_check_interval
                 )
                 clone_lite_repo_with_slot(env_contents, each_slot, new_collector_instance, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
                 core_api_port += 1
@@ -282,7 +290,9 @@ def main():
                     core_api_port=core_api_port,
                     data_market_contract=data_market_contract,
                     # this is fine since we can only have 100 max slots against a wallet
-                    subnet_third_octet=idx + 1  # Simply use idx + 1 for unique values
+                    subnet_third_octet=idx + 1,
+                    max_stream_pool_size=max_stream_pool_size,
+                    stream_pool_health_check_interval=stream_pool_health_check_interval
                 )
                 clone_lite_repo_with_slot(env_contents, each_slot, new_collector_instance, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
                 core_api_port += 1
@@ -305,7 +315,9 @@ def main():
             local_collector_port=local_collector_port,
             core_api_port=core_api_port,
             data_market_contract=data_market_contract,
-            subnet_third_octet=1
+            subnet_third_octet=1,
+            max_stream_pool_size=2,
+            stream_pool_health_check_interval=30
         )
         clone_lite_repo_with_slot(env_contents, slot_ids[0], True, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
         # print(env_contents)
