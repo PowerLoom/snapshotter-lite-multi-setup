@@ -179,6 +179,11 @@ def main():
     data_market_contract = os.getenv("DATA_MARKET_CONTRACT")
     max_stream_pool_size = os.getenv("MAX_STREAM_POOL_SIZE")
     stream_pool_health_check_interval = os.getenv("STREAM_POOL_HEALTH_CHECK_INTERVAL")
+    # choosing large default values for max_stream_pool_size and stream_pool_health_check_interval
+    if not max_stream_pool_size:
+        max_stream_pool_size = 1024
+    if not stream_pool_health_check_interval:
+        stream_pool_health_check_interval = 600
     if not all([
         source_rpc_url, signer_addr, signer_pkey, slot_rpc_url, prost_rpc_url, slot_contract_addr, 
         namespace, powerloom_reporting_url, protocol_state_contract, data_market_contract, prost_chain_id,
