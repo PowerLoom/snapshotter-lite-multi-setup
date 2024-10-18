@@ -1,14 +1,16 @@
-from email.policy import default
 import os
 import json
-from threading import local
 import time
+import sys
+try:
+    import psutil
+except ImportError:
+    print('psutil not found, please install all requirements using pip install -r requirements.txt')
+    sys.exit(1)
+import subprocess
 from web3 import Web3
 from dotenv import load_dotenv
 from os import environ
-import subprocess
-import re
-import sys
 
 LOCAL_COLLECTOR_NEW_BUILD_THRESHOLD = 200
 
@@ -75,6 +77,18 @@ def kill_screen_sessions():
         time.sleep(10)
         print('Killing running screen sessions....')
         os.system("screen -ls | grep powerloom-testnet | cut -d. -f1 | awk '{print $1}' | xargs kill")
+
+
+def suggest_max_stream_pool_size() -> tuple[int, int]:
+    # using the core information from psutil to determine the number of
+    # libp2p streams that local collector will be able to context switch and maintain concurrently
+    cores = psutil.cpu_count(logical=True)
+    if cores <= 4:
+        return cores, 2
+    if cores <= 8:
+        return cores, 2 * cores
+    if cores >= 8:
+        return cores, 4 * pow(2, int(cores))
 
 
 def clone_lite_repo_with_slot(env_contents: str, slot_id, new_collector_instance, dev_mode=False, lite_node_branch='main'):
@@ -179,7 +193,20 @@ def main():
     data_market_contract = os.getenv("DATA_MARKET_CONTRACT")
     max_stream_pool_size = os.getenv("MAX_STREAM_POOL_SIZE")
     stream_pool_health_check_interval = os.getenv("STREAM_POOL_HEALTH_CHECK_INTERVAL")
-    # choosing large default values for max_stream_pool_size and stream_pool_health_check_interval
+    cores, max_stream_pool_size = suggest_max_stream_pool_size()
+    print(f"""
+Detected {cores} cores on the system.
+Suggested max_stream_pool_size: {max_stream_pool_size}
+Suggested stream_pool_health_check_interval: {stream_pool_health_check_interval}
+
+Press y to continue with the suggested values, or n to enter custom values.
+    """)
+    continue_with_suggested = input('(y/n) : ')
+    if continue_with_suggested.lower() == 'n':
+        max_stream_pool_size = int(input('Enter max_stream_pool_size : '))
+        stream_pool_health_check_interval = int(input('Enter stream_pool_health_check_interval : '))
+    else:
+        print('Continuing with suggested values...')
     if not max_stream_pool_size:
         max_stream_pool_size = 1024
     if not stream_pool_health_check_interval:
