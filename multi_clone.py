@@ -85,8 +85,8 @@ def suggest_max_stream_pool_size() -> tuple[int, int]:
     cores = psutil.cpu_count(logical=True)
     if cores <= 4:
         return cores, 2
-    if cores <= 8:
-        return cores, 2 * cores
+    if cores < 8:
+        return cores, pow(2, int(cores))
     if cores >= 8:
         return cores, 4 * pow(2, int(cores))
 
