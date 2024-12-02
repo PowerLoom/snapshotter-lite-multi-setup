@@ -11,6 +11,11 @@ if [ ! -f .env ]; then
     read SOURCE_RPC_URL;
     sed -i'.backup' "s#<source-rpc-url>#$SOURCE_RPC_URL#" .env
 
+    # prompt for PROST_RPC_URL
+    echo "Enter PROST_RPC_URL: ";
+    read PROST_RPC_URL;
+    sed -i'.backup' "s#<prost-rpc-url>#$PROST_RPC_URL#" .env
+
     # ask user for SIGNER_ACCOUNT_ADDRESS and replace it in .env
     
     echo "Enter SIGNER_ACCOUNT_ADDRESS: ";
