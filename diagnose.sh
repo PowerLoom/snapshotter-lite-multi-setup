@@ -134,14 +134,14 @@ fi
 
 # Check for existing screen sessions
 echo -e "\n🖥️ Checking existing PowerLoom screen sessions..."
-EXISTING_SCREENS=$(screen -ls | grep 'powerloom-premainnet-v2' || true)
+EXISTING_SCREENS=$(screen -ls | grep -E 'powerloom-(premainnet|testnet)-v2' || true)
 if [ -n "$EXISTING_SCREENS" ]; then
     echo -e "${YELLOW}Found existing PowerLoom screen sessions:${NC}"
     echo "$EXISTING_SCREENS"
     read -p "Would you like to terminate these screen sessions? (y/n): " kill_screens
     if [ "$kill_screens" = "y" ]; then
         echo -e "\n${YELLOW}Killing screen sessions...${NC}"
-        screen -ls | grep powerloom-premainnet-v2 | cut -d. -f1 | awk '{print $1}' | xargs -r kill
+        screen -ls | grep -E 'powerloom-(premainnet|testnet)-v2' | cut -d. -f1 | awk '{print $1}' | xargs -r kill
         echo -e "${GREEN}✅ Screen sessions terminated${NC}"
     fi
 fi

@@ -44,20 +44,6 @@ def get_user_slots(contract_obj, wallet_owner_addr):
     return holder_slots
 
 
-def kill_screen_sessions(data_market_namespace: str):
-    kill_screens = input(f'⚠️ Do you want to kill all running containers and screen sessions of previously running nodes, including those in the data market namespace {data_market_namespace}? (y/n) : ')
-    if kill_screens.lower() == 'y':
-        print('Killing running containers....')
-        os.system("docker container ls | grep powerloom-testnet | cut  -d ' ' -f1 | xargs docker container stop")
-        os.system("docker container ls | grep powerloom-premainnet | cut  -d ' ' -f1 | xargs docker container stop")
-        print('Sleeping for 10...')
-        time.sleep(10)
-        print('Killing running screen sessions....')
-        os.system("screen -ls | grep powerloom-testnet | cut -d. -f1 | awk '{print $1}' | xargs kill")
-        os.system(f"screen -ls | grep powerloom-premainnet | grep {data_market_namespace} | cut -d. -f1 | awk '{{print $1}}' | xargs kill")
-        os.system("screen -ls | grep powerloom-premainnet | cut -d. -f1 | awk '{print $1}' | xargs kill")
-
-
 def env_file_template(
     source_rpc_url: str,
     signer_addr: str,
@@ -269,7 +255,6 @@ def main(data_market_choice: str):
         os.system('rm -rf snapshotter-lite-v2')
     print('⚙️ Cloning snapshotter-lite-v2 repo from main branch...')
     os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch feat/flexible-build-support-multi-nodes')
-    kill_screen_sessions(namespace)
     run_snapshotter_lite_v2(
         deploy_slots,
         data_market_contract_number,
