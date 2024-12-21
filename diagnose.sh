@@ -150,12 +150,31 @@ if [ -n "$EXISTING_NETWORKS" ]; then
     read -p "Would you like to remove existing PowerLoom networks? (y/n): " remove_networks
     if [ "$remove_networks" = "y" ]; then
         echo -e "\n${YELLOW}Removing networks...${NC}"
-        docker network ls --filter "name=snapshotter-lite-v2" -q | xargs -r docker network rm
-        echo -e "${GREEN}✅ Networks removed${NC}"
+        NETWORK_REMOVAL_FAILED=false
+        
+        while read -r network_id; do
+            if ! docker network rm "$network_id" 2>/dev/null; then
+                NETWORK_REMOVAL_FAILED=true
+                network_name=$(docker network ls --format '{{.Name}}' --filter "id=$network_id")
+                echo -e "${RED}❌ Failed to remove network ${network_name}${NC}"
+            fi
+        done < <(docker network ls --filter "name=snapshotter-lite-v2" -q)
+        
+        if [ "$NETWORK_REMOVAL_FAILED" = true ]; then
+            echo -e "\n${YELLOW}⚠️  Warning: Some networks could not be removed due to active endpoints.${NC}"
+            echo -e "${YELLOW}This usually means there are still some containers using these networks.${NC}"
+            echo -e "${YELLOW}A system-wide cleanup might be necessary to remove all resources.${NC}"
+        else
+            echo -e "${GREEN}✅ Networks removed${NC}"
+        fi
     fi
 fi
 
-# Add system-wide cleanup option
+# Add system-wide cleanup option with context-aware message
+if [ "$NETWORK_REMOVAL_FAILED" = true ]; then
+    echo -e "\n${YELLOW}Due to network removal failures, a system-wide cleanup is recommended.${NC}"
+fi
+
 read -p "Would you like to perform a system-wide Docker cleanup (this will remove all unused containers, networks, images, and cache)? (y/n): " deep_clean
 if [ "$deep_clean" = "y" ]; then
     echo -e "\n${YELLOW}Performing system-wide Docker cleanup...${NC}"
