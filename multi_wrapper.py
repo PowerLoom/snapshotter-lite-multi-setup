@@ -163,7 +163,7 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
 screen -dmS {repo_name}
 export DATA_MARKET_CONTRACT_NUMBER={data_market_contract_number}
 export NAMESPACE={data_market_namespace}
-screen -S {repo_name} -p 0 -X stuff "./build.sh --skip-credential-update --data-market-contract-number {data_market_contract_number} {collector_flag} \n"
+screen -S {repo_name} -p 0 -X stuff "./build.sh --skip-credential-update --data-market-contract-number {data_market_contract_number} {collector_flag}\n"
         """)
         time.sleep(3)
 
