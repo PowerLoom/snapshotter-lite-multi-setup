@@ -6,7 +6,15 @@ import argparse
 from dotenv import load_dotenv
 from web3 import Web3
 
-OUTPUT_WORTHY_ENV_VARS = ['SOURCE_RPC_URL', 'SIGNER_ACCOUNT_ADDRESS', 'WALLET_HOLDER_ADDRESS']
+OUTPUT_WORTHY_ENV_VARS = [
+    'SOURCE_RPC_URL', 
+    'SIGNER_ACCOUNT_ADDRESS', 
+    'WALLET_HOLDER_ADDRESS', 
+    'TELEGRAM_CHAT_ID',
+    'POWERLOOM_REPORTING_URL',
+    'PROST_RPC_URL',
+    'PROST_CHAIN_ID',
+]
 
 DATA_MARKET_CHOICE_NAMESPACES = {
     '1': 'AAVEV3',
@@ -36,8 +44,8 @@ def get_user_slots(contract_obj, wallet_owner_addr):
     return holder_slots
 
 
-def kill_screen_sessions():
-    kill_screens = input('⚠️ Do you want to kill all running containers and screen sessions of testnet nodes? (y/n) : ')
+def kill_screen_sessions(data_market_namespace: str):
+    kill_screens = input(f'⚠️ Do you want to kill all running containers and screen sessions of previously running nodes, including those in the data market namespace {data_market_namespace}? (y/n) : ')
     if kill_screens.lower() == 'y':
         print('Killing running containers....')
         os.system("docker container ls | grep powerloom-testnet | cut  -d ' ' -f1 | xargs docker container stop")
@@ -46,6 +54,7 @@ def kill_screen_sessions():
         time.sleep(10)
         print('Killing running screen sessions....')
         os.system("screen -ls | grep powerloom-testnet | cut -d. -f1 | awk '{print $1}' | xargs kill")
+        os.system(f"screen -ls | grep powerloom-premainnet | grep {data_market_namespace} | cut -d. -f1 | awk '{{print $1}}' | xargs kill")
         os.system("screen -ls | grep powerloom-premainnet | cut -d. -f1 | awk '{print $1}' | xargs kill")
 
 
@@ -63,6 +72,8 @@ def env_file_template(
     snapshotter_compute_repo: str,
     snapshotter_compute_repo_branch: str,
     powerloom_reporting_url: str,
+    subnet_third_octet: int,
+    core_api_port: int,
     data_market_in_request: str = 'false',
     ipfs_url: str = '',
     ipfs_api_key: str = '',
@@ -89,7 +100,8 @@ NAMESPACE={namespace}
 POWERLOOM_REPORTING_URL={powerloom_reporting_url}
 PROST_CHAIN_ID={prost_chain_id}
 DATA_MARKET_IN_REQUEST={data_market_in_request}
-
+SUBNET_THIRD_OCTET={subnet_third_octet}
+CORE_API_PORT={core_api_port}
 # Optional
 IPFS_URL={ipfs_url}
 IPFS_API_KEY={ipfs_api_key}
@@ -117,14 +129,21 @@ def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
         snapshotter_compute_repo_branch=kwargs['snapshotter_compute_repo_branch'],
         powerloom_reporting_url=kwargs['powerloom_reporting_url'],
         telegram_chat_id=kwargs['telegram_chat_id'],
+        subnet_third_octet=kwargs['subnet_third_octet'],
+        core_api_port=kwargs['core_api_port'],
     )
 
 def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int, data_market_namespace: str, **kwargs):
     protocol_state = DATA_MARKET_CHOICES_PROTOCOL_STATE[data_market_namespace]
+    core_api_port = 8002
+    subnet_third_octet = 1
     for idx, slot_id in enumerate(deploy_slots):
         print(f'🟠 Deploying node for slot {slot_id} in data market {data_market_namespace}')
         if idx > 0:
             os.chdir('..')
+            collector_flag = '--no-collector'
+        else:
+            collector_flag = ''
         repo_name = f'powerloom-premainnet-v2-{slot_id}-{data_market_namespace}'
         if os.path.exists(repo_name):
             print(f'Deleting existing dir {repo_name}')
@@ -147,16 +166,18 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             powerloom_reporting_url=kwargs['powerloom_reporting_url'],
             telegram_chat_id=kwargs['telegram_chat_id'],
             slot_id=slot_id,
+            subnet_third_octet=subnet_third_octet+idx,
+            core_api_port=core_api_port+idx,
         )
         with open(f'.env-{data_market_namespace}', 'w+') as f:
             f.write(env_file_contents)
         # docker build and run
         print('--'*20 + f'Spinning up docker containers for slot {slot_id}' + '--'*20) 
-        os.system(f'screen -dmS {repo_name}')
         os.system(f"""
+screen -dmS {repo_name}
 export DATA_MARKET_CONTRACT_NUMBER={data_market_contract_number}
 export NAMESPACE={data_market_namespace}
-screen -S {repo_name} -p 0 -X stuff "./build.sh --skip-credential-update --data-market-contract-number {data_market_contract_number} \n"
+screen -S {repo_name} -p 0 -X stuff "./build.sh --skip-credential-update --data-market-contract-number {data_market_contract_number} {collector_flag} \n"
         """)
         time.sleep(3)
 
@@ -244,11 +265,11 @@ def main(data_market_choice: str):
         print(f"\n🟢 Selected data market namespace: {namespace}")
 
     if os.path.exists('snapshotter-lite-v2'):
-        print('🟡 a snapshotter-lite-v2 repo already exists, deleting...')
+        print('🟡 Previously cloned snapshotter-lite-v2 repo already exists, deleting...')
         os.system('rm -rf snapshotter-lite-v2')
     print('⚙️ Cloning snapshotter-lite-v2 repo from main branch...')
-    os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch main')
-    kill_screen_sessions()
+    os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch feat/flexible-build-support-multi-nodes')
+    kill_screen_sessions(namespace)
     run_snapshotter_lite_v2(
         deploy_slots,
         data_market_contract_number,
