@@ -51,6 +51,17 @@ if [ ! -f ".env" ]; then
         # Linux and others
         sed -i "s/<signer-account-private-key>/${SIGNER_ACCOUNT_PRIVATE_KEY}/g" .env
     fi
+    # get the TELEGRAM_CHAT_ID from the user
+    echo "🫸 ▶︎ Please enter the TELEGRAM_CHAT_ID (press enter to skip): "
+    read TELEGRAM_CHAT_ID
+    # replace the TELEGRAM_CHAT_ID in the .env file
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        sed -i '' "s/<telegram-chat-id>/${TELEGRAM_CHAT_ID}/g" .env
+    else
+        # Linux and others
+        sed -i "s/<telegram-chat-id>/${TELEGRAM_CHAT_ID}/g" .env
+    fi
     echo "🟢 .env file created successfully!"
 else
     echo "🟢 .env file found, do you wish to update any of the following for different set of slot IDs to be deployed?"
