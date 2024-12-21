@@ -123,7 +123,7 @@ echo -e "\n📁 Checking for PowerLoom deployment directories..."
 # - powerloom-premainnet-v2-456-UNISWAPV2
 # - powerloom-testnet-v2-789-AAVEV3
 # - powerloom-testnet-v2-3928
-EXISTING_DIRS=$(find . -maxdepth 1 -type d -regex "./powerloom-\(premainnet\|testnet\)-v2-[0-9]+" -printf "%f\n" || true)
+EXISTING_DIRS=$(find . -maxdepth 1 -type d -regex "./powerloom-\(premainnet\|testnet\)-v2-[0-9]+\(-[A-Z0-9]+\)?" -printf "%f\n" || true)
 if [ -n "$EXISTING_DIRS" ]; then
     echo -e "${YELLOW}Found existing PowerLoom deployment directories:${NC}"
     echo "$EXISTING_DIRS"
