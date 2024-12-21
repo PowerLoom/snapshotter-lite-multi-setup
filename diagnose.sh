@@ -116,6 +116,25 @@ if [ -n "$USED_SUBNETS" ]; then
     done
 fi
 
+# Check for cloned directories
+echo -e "\n📁 Checking for PowerLoom deployment directories..."
+# Matches patterns like:
+# - powerloom-premainnet-v2-123-AAVEV3
+# - powerloom-premainnet-v2-456-UNISWAPV2
+# - powerloom-testnet-v2-789-AAVEV3
+# - powerloom-testnet-v2-3928
+EXISTING_DIRS=$(find . -maxdepth 1 -type d -regex "./powerloom-\(premainnet\|testnet\)-v2-[0-9]+" -printf "%f\n" || true)
+if [ -n "$EXISTING_DIRS" ]; then
+    echo -e "${YELLOW}Found existing PowerLoom deployment directories:${NC}"
+    echo "$EXISTING_DIRS"
+    read -p "Would you like to remove these directories? (y/n): " remove_dirs
+    if [ "$remove_dirs" = "y" ]; then
+        echo -e "\n${YELLOW}Removing deployment directories...${NC}"
+        echo "$EXISTING_DIRS" | xargs -I {} rm -rf "{}"
+        echo -e "${GREEN}✅ Deployment directories removed${NC}"
+    fi
+fi
+
 # Phase 2: Cleanup Options
 echo -e "\n🧹 Cleanup Options:"
 
