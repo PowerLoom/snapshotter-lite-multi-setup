@@ -64,6 +64,15 @@ if [ ! -f ".env" ]; then
     fi
     echo "🟢 .env file created successfully!"
 else
-    echo "🟢 .env file found, do you wish to update any of the following for different set of slot IDs to be deployed?"
-    # allow for the wallet holder address, source RPC URL only to be updated
+    echo "🟢 .env file already found to be initialized! If you wish to change any of the values, please backup the .env file at the following prompt."
+    # add timestamp to the backup file name
+    TIMESTAMP=$(date +%Y%m%d%H%M%S)
+    BACKUP_FILE=".env.backup.${TIMESTAMP}"
+    # prompt the user to backup
+    echo "Do you wish to backup the .env file? (y/n)"
+    read BACKUP_CHOICE
+    if [ "$BACKUP_CHOICE" == "y" ]; then
+        mv .env $BACKUP_FILE
+        echo "🟢 .env file backed up to $BACKUP_FILE"
+    fi
 fi
