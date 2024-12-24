@@ -2,3 +2,4 @@ powerloom-testnet-*/
 .env*
 .python-version
 *snapshotter-lite*/
+powerloom-premainnet-*/

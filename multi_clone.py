@@ -1,358 +1,281 @@
 import os
-import json
-import time
 import sys
-try:
-    import psutil
-except ImportError:
-    print('psutil not found, please install all requirements using pip install -r requirements.txt')
-    sys.exit(1)
-import subprocess
-from web3 import Web3
+import time
+import json
+import argparse
 from dotenv import load_dotenv
-from os import environ
+from web3 import Web3
 
-LOCAL_COLLECTOR_NEW_BUILD_THRESHOLD = 200
+OUTPUT_WORTHY_ENV_VARS = [
+    'SOURCE_RPC_URL', 
+    'SIGNER_ACCOUNT_ADDRESS', 
+    'WALLET_HOLDER_ADDRESS', 
+    'TELEGRAM_CHAT_ID',
+    'POWERLOOM_REPORTING_URL',
+    'PROST_RPC_URL',
+    'PROST_CHAIN_ID',
+]
 
-# get from slot contract and set in redis
+DATA_MARKET_CHOICE_NAMESPACES = {
+    '1': 'AAVEV3',
+    '2': 'UNISWAPV2'
+}
+PROST_RPC_URL = 'https://rpc-prost1m.powerloom.io'
+DATA_MARKET_CHOICES_PROTOCOL_STATE = {
+    'AAVEV3': {
+        'DATA_MARKET_CONTRACT': "0xc390a15BcEB89C2d4910b2d3C696BfD21B190F07",
+        'SNAPSHOTTER_CONFIG_REPO': 'https://github.com/PowerLoom/snapshotter-configs.git',
+        'SNAPSHOTTER_COMPUTE_REPO': 'https://github.com/PowerLoom/snapshotter-computes.git',
+        'SNAPSHOTTER_CONFIG_REPO_BRANCH': "eth_aavev3_lite_v2",
+        'SNAPSHOTTER_COMPUTE_REPO_BRANCH': "eth_aavev3_lite"
+    },
+    'UNISWAPV2': {
+        'DATA_MARKET_CONTRACT': "0x8023BD7A9e8386B10336E88294985e3Fbc6CF23F",
+        'SNAPSHOTTER_CONFIG_REPO': 'https://github.com/PowerLoom/snapshotter-configs.git',
+        'SNAPSHOTTER_COMPUTE_REPO': 'https://github.com/PowerLoom/snapshotter-computes.git',
+        'SNAPSHOTTER_CONFIG_REPO_BRANCH': "eth_uniswapv2-lite_v2",
+        'SNAPSHOTTER_COMPUTE_REPO_BRANCH': "eth_uniswapv2_lite_v2",
+    }
+}
+
+
 def get_user_slots(contract_obj, wallet_owner_addr):
-    holder_slots = contract_obj.functions.getUserOwnedSlotIds(wallet_owner_addr).call()
-    print(holder_slots)
+    holder_slots = contract_obj.functions.getUserOwnedNodeIds(wallet_owner_addr).call()
     return holder_slots
 
 
 def env_file_template(
-        source_rpc_url: str,
-        signer_addr: str,
-        signer_pkey: str,
-        prost_chain_id: str,
-        prost_rpc_url: str,
-        namespace: str,
-        data_market_contract: str,
-        protocol_state_contract: str,
-        local_collector_port: int,
-        powerloom_reporting_url: str,
-        slot_id: str,
-        core_api_port: int,
-        subnet_third_octet: int,
-        max_stream_pool_size: int,
-        stream_pool_health_check_interval: int,
-        ipfs_url: str = '',
-        ipfs_api_key: str = '',
-        ipfs_api_secret: str = '',
-        slack_reporting_url: str = '',
-        web3_storage_token: str = ''
+    source_rpc_url: str,
+    signer_addr: str,
+    signer_pkey: str,
+    prost_chain_id: str,
+    prost_rpc_url: str,
+    namespace: str,
+    data_market_contract: str,
+    slot_id: str,
+    snapshot_config_repo: str,
+    snapshot_config_repo_branch: str,
+    snapshotter_compute_repo: str,
+    snapshotter_compute_repo_branch: str,
+    powerloom_reporting_url: str,
+    subnet_third_octet: int,
+    core_api_port: int,
+    data_market_in_request: str = 'false',
+    ipfs_url: str = '',
+    ipfs_api_key: str = '',
+    ipfs_api_secret: str = '',
+    slack_reporting_url: str = '',
+    web3_storage_token: str = '',
+    dashboard_enabled: str = 'false',
+    telegram_reporting_url: str = '',
+    telegram_chat_id: str = ''
 ) -> str:
     return f"""
+# Required
 SOURCE_RPC_URL={source_rpc_url}
 SIGNER_ACCOUNT_ADDRESS={signer_addr}
 SIGNER_ACCOUNT_PRIVATE_KEY={signer_pkey}
-PROST_CHAIN_ID={prost_chain_id}
-PROST_RPC_URL={prost_rpc_url}
-NAMESPACE={namespace}
-PROTOCOL_STATE_CONTRACT={protocol_state_contract}
-DATA_MARKET_CONTRACT={data_market_contract}
-POWERLOOM_REPORTING_URL={powerloom_reporting_url}
 SLOT_ID={slot_id}
-CORE_API_PORT={core_api_port}
-LOCAL_COLLECTOR_PORT={local_collector_port}
+SNAPSHOT_CONFIG_REPO={snapshot_config_repo}
+SNAPSHOT_CONFIG_REPO_BRANCH={snapshot_config_repo_branch}
+SNAPSHOTTER_COMPUTE_REPO={snapshotter_compute_repo}
+SNAPSHOTTER_COMPUTE_REPO_BRANCH={snapshotter_compute_repo_branch}
+PROST_RPC_URL={prost_rpc_url}
+DATA_MARKET_CONTRACT={data_market_contract}
+NAMESPACE={namespace}
+POWERLOOM_REPORTING_URL={powerloom_reporting_url}
+PROST_CHAIN_ID={prost_chain_id}
+DATA_MARKET_IN_REQUEST={data_market_in_request}
 SUBNET_THIRD_OCTET={subnet_third_octet}
-MAX_STREAM_POOL_SIZE={max_stream_pool_size}
-STREAM_POOL_HEALTH_CHECK_INTERVAL={stream_pool_health_check_interval}
-# OPTIONAL
+CORE_API_PORT={core_api_port}
+# Optional
 IPFS_URL={ipfs_url}
 IPFS_API_KEY={ipfs_api_key}
 IPFS_API_SECRET={ipfs_api_secret}
 SLACK_REPORTING_URL={slack_reporting_url}
 WEB3_STORAGE_TOKEN={web3_storage_token}
-    """
-
-
-def kill_screen_sessions():
-    kill_screens = input('Do you want to kill all running containers and screen sessions of testnet nodes? (y/n) : ')
-    if kill_screens.lower() == 'y':
-        print('Killing running containers....')
-        os.system("docker container ls | grep powerloom-testnet | cut  -d ' ' -f1 | xargs docker container stop")
-        print('Sleeping for 10...')
-        time.sleep(10)
-        print('Killing running screen sessions....')
-        os.system("screen -ls | grep powerloom-testnet | cut -d. -f1 | awk '{print $1}' | xargs kill")
-
-
-def suggest_max_stream_pool_size() -> tuple[int, int]:
-    # using the core information from psutil to determine the number of
-    # libp2p streams that local collector will be able to context switch and maintain concurrently
-    cores = psutil.cpu_count(logical=True)
-    if cores <= 4:
-        return cores, 2
-    if cores < 8:
-        return cores, pow(2, int(cores))
-    if cores >= 8:
-        return cores, 4 * pow(2, int(cores))
-
-
-def clone_lite_repo_with_slot(env_contents: str, slot_id, new_collector_instance, dev_mode=False, lite_node_branch='main'):
-    repo_name = f'powerloom-testnet-v2-{slot_id}'
-    if os.path.exists(repo_name):
-        print(f'Deleting existing dir {repo_name}')
-        os.system(f'rm -rf {repo_name}')
-    os.system(f'cp -R snapshotter-lite-v2 {repo_name}')
-    with open(f'{repo_name}/.env', 'w+') as f:
-        f.write(env_contents)
-    os.chdir(repo_name)
-    # docker build and run
-    print('--'*20 + f'Spinning up docker containers for slot {slot_id}' + '--'*20)
-    # this works well when there are no existing screen sessions for the same slot
-    # TODO: handle case when there are existing screen sessions for the same slot
-    os.system(f'screen -dmS {repo_name}')
-    if not dev_mode:
-        if new_collector_instance:
-            # run docker pull first
-            print('Pulling docker images...')
-            if lite_node_branch == 'main':
-                image_tag = 'latest'
-            else:
-                image_tag = 'dockerify'
-            print('Selecting image tag : ', image_tag)
-            command = f"""
-source .env
-export IMAGE_TAG={image_tag}
-if ! [ -x "$(command -v docker-compose)" ]; then
-    docker compose -f docker-compose.yaml pull
-else
-    docker-compose -f docker-compose.yaml pull
-fi
+DASHBOARD_ENABLED={dashboard_enabled}
+TELEGRAM_REPORTING_URL={telegram_reporting_url}
+TELEGRAM_CHAT_ID={telegram_chat_id}
 """
-            os.system(command)
-            os.system(f'screen -S {repo_name} -p 0 -X stuff "./build.sh\n"')
-        else:
-            os.system(f'screen -S {repo_name} -p 0 -X stuff "./build.sh no_collector\n"')
-    else:
-        os.system(f'screen -S {repo_name} -p 0 -X stuff "./build-dev.sh\n"')
-    print(f'Spawned screen session for docker containers {repo_name}') 
-    # os.system('./build.sh')
-    time.sleep(2)
 
-def check_existing_networks(slot_ids):
-    # Run docker network ls command
-    result = subprocess.run(['docker', 'network', 'ls', '--format', '{{.Name}}'], capture_output=True, text=True)
-    
-    if result.returncode != 0:
-        print(f"Error running docker network ls: {result.stderr}")
-        sys.exit(1)
-    
-    # Get the list of network names
-    networks = result.stdout.strip().split('\n')
-    
-    # Create patterns for each slot ID
-    patterns = [f'snapshotter-lite-v2-{slot_id}' for slot_id in slot_ids]
-    
-    # Find matching networks
-    matching_networks = [net for net in networks if any(net == pattern for pattern in patterns)]
-    
-    if matching_networks:
-        print("Found existing networks for the provided slot IDs:")
-        for net in matching_networks:
-            print(f"- {net}")
-        print("""Please remove these networks before continuing. The following command can be used to remove the networks:
-docker network rm <network_name>  ...OR...
-docker network prune
-""")
-        sys.exit(1)
-    else:
-        print("No existing networks found for the provided slot IDs. Continuing...")
-
-def main():
-    load_dotenv('.env')
-    dev_mode = os.getenv("DEV_MODE")
-    if not dev_mode:
-        dev_mode = False
-    else:
-        dev_mode = True if dev_mode.lower() == 'true' else False
-    if dev_mode:
-        print('*' * 40 + 'Running in dev mode' + '*' * 40)
-    lite_node_branch = os.getenv("LITE_NODE_BRANCH")
-    if not lite_node_branch:
-        lite_node_branch = 'main'
-    else:
-        lite_node_branch = lite_node_branch.strip()
-    source_rpc_url = os.getenv("SOURCE_RPC_URL")
-    signer_addr = os.getenv("SIGNER_ACCOUNT_ADDRESS")
-    wallet_holder_address = os.getenv("WALLET_HOLDER_ADDRESS")
-    signer_pkey = os.getenv("SIGNER_ACCOUNT_PRIVATE_KEY")
-    slot_rpc_url = os.getenv("SLOT_RPC_URL")
-    slot_rpc_url_base = os.getenv("SLOT_RPC_URL_BASE")
-    prost_rpc_url = os.getenv("PROST_RPC_URL")
-    protocol_state_contract = os.getenv("PROTOCOL_STATE_CONTRACT")
-    slot_contract_addr = os.getenv('SLOT_CONTROLLER_ADDRESS')
-    slot_contract_addr_base = os.getenv('SLOT_CONTROLLER_ADDRESS_BASE')
-    namespace = os.getenv("NAMESPACE")
-    prost_chain_id = os.getenv("PROST_CHAIN_ID")
-    powerloom_reporting_url = os.getenv("POWERLOOM_REPORTING_URL")
-    prost_chain_id = os.getenv("PROST_CHAIN_ID")
-    data_market_contract = os.getenv("DATA_MARKET_CONTRACT")
-    max_stream_pool_size = os.getenv("MAX_STREAM_POOL_SIZE")
-    stream_pool_health_check_interval = os.getenv("STREAM_POOL_HEALTH_CHECK_INTERVAL")
-    cores, max_stream_pool_size = suggest_max_stream_pool_size()
-    print(f"""
-Detected {cores} cores on the system.
-Suggested max_stream_pool_size: {max_stream_pool_size}
-Suggested stream_pool_health_check_interval: {stream_pool_health_check_interval}
-
-Press y to continue with the suggested values, or n to enter custom values.
-    """)
-    continue_with_suggested = input('(y/n) : ')
-    if continue_with_suggested.lower() == 'n':
-        max_stream_pool_size = int(input('Enter max_stream_pool_size : '))
-        stream_pool_health_check_interval = int(input('Enter stream_pool_health_check_interval : '))
-    else:
-        print('Continuing with suggested values...')
-    if not max_stream_pool_size:
-        max_stream_pool_size = 1024
-    if not stream_pool_health_check_interval:
-        stream_pool_health_check_interval = 600
-    if not all([
-        source_rpc_url, signer_addr, signer_pkey, slot_rpc_url, prost_rpc_url, slot_contract_addr, 
-        namespace, powerloom_reporting_url, protocol_state_contract, data_market_contract, prost_chain_id,
-    ]):
-        print('Missing environment variables')
-        return
-    w3 = Web3(Web3.HTTPProvider(slot_rpc_url))
-    w3_base = Web3(Web3.HTTPProvider(slot_rpc_url_base))
-    with open('MintContract.json', 'r') as f:
-        nft_contract_abi = json.load(f)
-    with open('MintContractBase.json', 'r') as f:
-        nft_contract_base_abi = json.load(f)
-    wallet_holder_address = Web3.to_checksum_address(wallet_holder_address)
-    protocol_state_contract = Web3.to_checksum_address(protocol_state_contract)
-    slot_contract_addr = Web3.to_checksum_address(slot_contract_addr)
-    slot_contract_addr_base = Web3.to_checksum_address(slot_contract_addr_base)
-    slot_contract = w3.eth.contract(
-        address=slot_contract_addr, abi=nft_contract_abi,
+def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
+    return env_file_template(
+        source_rpc_url=kwargs['source_rpc_url'],
+        signer_addr=kwargs['signer_addr'],
+        signer_pkey=kwargs['signer_pkey'],
+        prost_chain_id=kwargs['prost_chain_id'],
+        prost_rpc_url=kwargs['prost_rpc_url'],
+        namespace=data_market_namespace,
+        data_market_contract=kwargs['data_market_contract'],
+        slot_id=kwargs['slot_id'],
+        snapshot_config_repo=kwargs['snapshotter_config_repo'],
+        snapshot_config_repo_branch=kwargs['snapshotter_config_repo_branch'],
+        snapshotter_compute_repo=kwargs['snapshotter_compute_repo'],
+        snapshotter_compute_repo_branch=kwargs['snapshotter_compute_repo_branch'],
+        powerloom_reporting_url=kwargs['powerloom_reporting_url'],
+        telegram_chat_id=kwargs['telegram_chat_id'],
+        subnet_third_octet=kwargs['subnet_third_octet'],
+        core_api_port=kwargs['core_api_port'],
     )
-    slot_contract_base = w3_base.eth.contract(
-        address=slot_contract_addr_base, abi=nft_contract_base_abi,
-    )
-    slot_ids = get_user_slots(slot_contract, wallet_holder_address)
-    slot_ids_base = get_user_slots(slot_contract_base, wallet_holder_address)
-    slot_ids.extend(slot_ids_base)
-    local_collector_port = 50051
+
+def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int, data_market_namespace: str, **kwargs):
+    protocol_state = DATA_MARKET_CHOICES_PROTOCOL_STATE[data_market_namespace]
     core_api_port = 8002
-    print(f'Got {len(slot_ids)} slots against wallet holder address')
-    if not slot_ids:
-        print('No slots found against wallet holder address')
-        return
-    elif len(slot_ids) > 1:
-        if os.path.exists('snapshotter-lite-v2'):
-            os.system('rm -rf snapshotter-lite-v2')
-        print('Cloning lite node branch : ', lite_node_branch)
-        os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch ' + lite_node_branch)
-        kill_screen_sessions()
-        default_deploy = input('Do you want to deploy all slots? (y/n) : ')
-        if default_deploy.lower() == 'y':
-            # Check for existing networks with all the slot IDs
-            check_existing_networks(slot_ids)
-            for idx, each_slot in enumerate(slot_ids):
-                if idx > 0:
-                    os.chdir('..')
-                print(f'Cloning for slot {each_slot}')
-                if idx % LOCAL_COLLECTOR_NEW_BUILD_THRESHOLD == 0: 
-                    if idx > 1:
-                        local_collector_port += 1
-                    new_collector_instance = True
-                else:
-                    new_collector_instance = False
-                env_contents = env_file_template(
-                    source_rpc_url=source_rpc_url,
-                    signer_addr=signer_addr,
-                    signer_pkey=signer_pkey,
-                    prost_chain_id=prost_chain_id,
-                    prost_rpc_url=prost_rpc_url,
-                    protocol_state_contract=protocol_state_contract,
-                    namespace=namespace,
-                    powerloom_reporting_url=powerloom_reporting_url,
-                    slot_id=each_slot,
-                    local_collector_port=local_collector_port,
-                    core_api_port=core_api_port,
-                    data_market_contract=data_market_contract,
-                    # this is fine since we can only have 100 max slots against a wallet
-                    subnet_third_octet=idx + 1,
-                    max_stream_pool_size=max_stream_pool_size,
-                    stream_pool_health_check_interval=stream_pool_health_check_interval
-                )
-                clone_lite_repo_with_slot(env_contents, each_slot, new_collector_instance, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
-                core_api_port += 1
+    subnet_third_octet = 1
+    for idx, slot_id in enumerate(deploy_slots):
+        print(f'🟠 Deploying node for slot {slot_id} in data market {data_market_namespace}')
+        if idx > 0:
+            os.chdir('..')
+            collector_flag = '--no-collector'
         else:
-            custom_deploy_index = input('Enter custom index of slot IDs to deploy \n'
-                                    '(indices begin at 0, enter in the format [begin, end])? (indices/n) : ')
-            index_str = custom_deploy_index.strip('[]')
-            begin, end = index_str.split(',')
-            try:
-                begin = int(begin)
-                end = int(end)
-            except ValueError:
-                print('Invalid indices')
-                return
-            if begin < 0 or end < 0 or begin > end or end >= len(slot_ids):
-                print('Invalid indices')
-                return
-            # Check for existing networks with the provided slot IDs
-            check_existing_networks(slot_ids[begin:end+1])
-            for idx, each_slot in enumerate(slot_ids[begin:end+1], start=begin):
-                if idx > begin:
-                    os.chdir('..')
-                if idx % LOCAL_COLLECTOR_NEW_BUILD_THRESHOLD == 0: 
-                    if idx > begin + 1:
-                        local_collector_port += 1
-                    new_collector_instance = True
-                else:
-                    new_collector_instance = False
-                print(f'Cloning for slot {each_slot}')
-                env_contents = env_file_template(
-                    source_rpc_url=source_rpc_url,
-                    signer_addr=signer_addr,
-                    signer_pkey=signer_pkey,
-                    prost_chain_id=prost_chain_id,
-                    prost_rpc_url=prost_rpc_url,
-                    protocol_state_contract=protocol_state_contract,
-                    namespace=namespace,
-                    powerloom_reporting_url=powerloom_reporting_url,
-                    slot_id=each_slot,
-                    local_collector_port=local_collector_port,
-                    core_api_port=core_api_port,
-                    data_market_contract=data_market_contract,
-                    # this is fine since we can only have 100 max slots against a wallet
-                    subnet_third_octet=idx + 1,
-                    max_stream_pool_size=max_stream_pool_size,
-                    stream_pool_health_check_interval=stream_pool_health_check_interval
-                )
-                clone_lite_repo_with_slot(env_contents, each_slot, new_collector_instance, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
-                core_api_port += 1
-    else:
-        kill_screen_sessions()
-        check_existing_networks(slot_ids)
-        if os.path.exists('snapshotter-lite-v2'):
-            os.system('rm -rf snapshotter-lite-v2')
-        os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch ' + lite_node_branch)
-        env_contents = env_file_template(
-            source_rpc_url=source_rpc_url,
-            signer_addr=signer_addr,
-            signer_pkey=signer_pkey,
-            prost_chain_id=prost_chain_id,
-            prost_rpc_url=prost_rpc_url,
-            protocol_state_contract=protocol_state_contract,
-            namespace=namespace,
-            powerloom_reporting_url=powerloom_reporting_url,
-            slot_id=slot_ids[0],
-            local_collector_port=local_collector_port,
-            core_api_port=core_api_port,
-            data_market_contract=data_market_contract,
-            subnet_third_octet=1,
-            max_stream_pool_size=2,
-            stream_pool_health_check_interval=30
+            collector_flag = ''
+        repo_name = f'powerloom-premainnet-v2-{slot_id}-{data_market_namespace}'
+        if os.path.exists(repo_name):
+            print(f'Deleting existing dir {repo_name}')
+            os.system(f'rm -rf {repo_name}')
+        os.system(f'cp -R snapshotter-lite-v2 {repo_name}')
+        os.chdir(repo_name)
+        env_file_contents = generate_env_file_contents(
+            data_market_namespace=data_market_namespace,
+            source_rpc_url=kwargs['source_rpc_url'],
+            signer_addr=kwargs['signer_addr'],
+            signer_pkey=kwargs['signer_pkey'],
+            prost_chain_id=kwargs['prost_chain_id'],
+            prost_rpc_url=kwargs['prost_rpc_url'],
+            namespace=data_market_namespace,
+            data_market_contract=protocol_state['DATA_MARKET_CONTRACT'],
+            snapshotter_config_repo_branch=protocol_state['SNAPSHOTTER_CONFIG_REPO_BRANCH'],
+            snapshotter_compute_repo_branch=protocol_state['SNAPSHOTTER_COMPUTE_REPO_BRANCH'],
+            snapshotter_config_repo=protocol_state['SNAPSHOTTER_CONFIG_REPO'],
+            snapshotter_compute_repo=protocol_state['SNAPSHOTTER_COMPUTE_REPO'],
+            powerloom_reporting_url=kwargs['powerloom_reporting_url'],
+            telegram_chat_id=kwargs['telegram_chat_id'],
+            slot_id=slot_id,
+            subnet_third_octet=subnet_third_octet+idx,
+            core_api_port=core_api_port+idx,
         )
-        clone_lite_repo_with_slot(env_contents, slot_ids[0], True, dev_mode=dev_mode, lite_node_branch=lite_node_branch)
-        # print(env_contents)
+        with open(f'.env-{data_market_namespace}', 'w+') as f:
+            f.write(env_file_contents)
+        # docker build and run
+        print('--'*20 + f'Spinning up docker containers for slot {slot_id}' + '--'*20) 
+        os.system(f"""
+screen -dmS {repo_name}
+export DATA_MARKET_CONTRACT_NUMBER={data_market_contract_number}
+export NAMESPACE={data_market_namespace}
+screen -S {repo_name} -p 0 -X stuff "./build.sh --skip-credential-update --data-market-contract-number {data_market_contract_number} {collector_flag}\n"
+        """)
+        print('Sleeping for 20 seconds to allow docker containers to spin up...')
+        time.sleep(20)
+
+def main(data_market_choice: str):
+    # check if .env file exists
+    if not os.path.exists('.env'):
+        print("🟡 .env file not found, please run bootstrap.sh to create one!")
+        sys.exit(1)
+    print('🟢 .env file found with following env variables...')
+    incomplete_env = False
+    with open('.env', 'r') as f:
+        for line in f:
+            # if the line contains any of the OUTPUT_WORTHY_ENV_VARS, print it
+            if any(var in line for var in OUTPUT_WORTHY_ENV_VARS):
+                print(line.strip())
+                if line.strip() == '' or '<' in line.strip() or '>' in line.strip():
+                    incomplete_env = True
+    if incomplete_env:
+        print('🟡 .env file may be incomplete or corrupted during a previous faulty initialization. Do you want to clear the .env file and re-run ./bootstrap.sh? (y/n)')
+        clear_env = input('🫸 ▶︎ Please enter your choice: ')
+        if clear_env.lower() == 'y':
+            os.remove('.env')
+            print('🟢 .env file removed, please run ./bootstrap.sh to re-initialize the .env file...')
+            sys.exit(0)
+    load_dotenv(override=True)
+    
+    # Setup Web3 connections
+    wallet_holder_address = os.getenv("WALLET_HOLDER_ADDRESS")
+    slot_contract_address = os.getenv("SLOT_CONTROLLER_ADDRESS")
+    prost_rpc_url = os.getenv("PROST_RPC_URL")
+    if not all([wallet_holder_address, slot_contract_address, prost_rpc_url]):
+        print('Missing slot configuration environment variables')
+        sys.exit(1)
+
+    # Initialize Web3 and contract connections
+    w3 = Web3(Web3.HTTPProvider(prost_rpc_url))
+    
+    # Load contract ABIs
+    with open('PowerloomNodes.json', 'r') as f:
+        powerloom_nodes_abi = json.load(f)
+
+    # Setup contract instances
+    wallet_holder_address = Web3.to_checksum_address(wallet_holder_address)
+    slot_contract = w3.eth.contract(
+        address=Web3.to_checksum_address(slot_contract_address),
+        abi=powerloom_nodes_abi,
+    )
+    # Get all slots
+    slot_ids = get_user_slots(slot_contract, wallet_holder_address)
+    if not slot_ids:
+        print('No slots found for wallet holder address')
+        return
+
+    print(f'Found {len(slot_ids)} slots for wallet holder address')
+    print(slot_ids)
+    deploy_slots = list()
+    # choose range of slots to deploy
+    deploy_all_slots = input('☑️ Do you want to deploy all slots? (y/n)')
+    if deploy_all_slots.lower() == 'n':
+        start_slot = input('🫸 ▶︎ Enter the start slot ID: ')
+        end_slot = input('🫸 ▶︎ Enter the end slot ID: ')
+        start_slot = int(start_slot)
+        end_slot = int(end_slot)
+        # find index of start_slot and end_slot in slot_ids
+        start_slot_idx = slot_ids.index(start_slot)
+        end_slot_idx = slot_ids.index(end_slot)
+        deploy_slots = slot_ids[start_slot_idx:end_slot_idx+1]
+    else:
+        deploy_slots = slot_ids
+
+    print(f'🎰 Final list of slots to deploy: {deploy_slots}')
+    data_market_contract_number = int(data_market_choice, 10)
+    if not data_market_contract_number:
+        print("\n🔍 Select a data market contract:")
+        for key, value in DATA_MARKET_CHOICE_NAMESPACES.items():
+            print(f"{key}. {value}")
+        data_market = input("\n🫸 ▶︎ Please enter your choice (1/2): ")
+    
+        # Get namespace from the data market choice
+        namespace = DATA_MARKET_CHOICE_NAMESPACES[data_market]
+        data_market_contract_number = int(data_market, 10)
+        print(f"\n🟢 Selected data market namespace: {namespace}")
+    else:
+        namespace = DATA_MARKET_CHOICE_NAMESPACES[data_market_choice]
+        print(f"\n🟢 Selected data market namespace: {namespace}")
+
+    if os.path.exists('snapshotter-lite-v2'):
+        print('🟡 Previously cloned snapshotter-lite-v2 repo already exists, deleting...')
+        os.system('rm -rf snapshotter-lite-v2')
+    print('⚙️ Cloning snapshotter-lite-v2 repo from main branch...')
+    os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch main')
+    run_snapshotter_lite_v2(
+        deploy_slots,
+        data_market_contract_number,
+        namespace,
+        source_rpc_url=os.getenv('SOURCE_RPC_URL'),
+        signer_addr=os.getenv('SIGNER_ACCOUNT_ADDRESS'),
+        signer_pkey=os.getenv('SIGNER_ACCOUNT_PRIVATE_KEY'),
+        prost_chain_id=os.getenv('PROST_CHAIN_ID'),
+        prost_rpc_url=os.getenv('PROST_RPC_URL'),
+        powerloom_reporting_url=os.getenv('POWERLOOM_REPORTING_URL'),
+        telegram_chat_id=os.getenv('TELEGRAM_CHAT_ID'),
+    )
+
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description='PowerLoom pre-mainnet multi-node setup')
+    parser.add_argument('--data-market', choices=['1', '2'],
+                    help='Data market choice (1: AAVEV3, 2: UNISWAPV2)')
+    
+    args = parser.parse_args()
+    
+    data_market = args.data_market if args.data_market else '0'
+    main(data_market_choice=data_market)

@@ -1,16 +1,38 @@
 # Multi node setup for multiple Powerloom Snapshotter Lite: Protocol V2 slot holders on Linux VPS
 
 > [!NOTE]
-> This setup is for Lite nodes participating in the latest V2 of Powerloom Protocol. [Protocol V1 setup](https://github.com/PowerLoom/snapshotter-lite-multi-setup/tree/main) is deprecated and its data markets are archived. Your submission data, rewards on it are finalized and recorded as [announced on Discord](https://discord.com/channels/777248105636560948/1146931631039463484/1242876184509812847).
+> This setup is for Lite nodes participating in the latest V2 of Powerloom Protocol with multiple data markets. [Protocol V1 setup](https://github.com/PowerLoom/snapshotter-lite-multi-setup/tree/main) is deprecated and its data markets are archived. Your submission data, rewards on it are finalized and recorded as [announced on Discord](https://discord.com/channels/777248105636560948/1146931631039463484/1242876184509812847).
 
-## 0. Preparation.
+## 0. Preparation
 
-Clone this repository. And change into the repository's directory. All commands will be run within there henceforth.
+Clone this repository and change into the repository's directory. All commands will be run within there henceforth.
 
-```
+```bash
 git clone https://github.com/PowerLoom/snapshotter-lite-multi-setup.git
 cd snapshotter-lite-multi-setup
 ```
+
+## 1. System Check and Environment Setup
+
+### 1.1 Run Diagnostics
+First, run the diagnostic tool to check your system and clean up any existing deployments:
+```bash
+./diagnose.sh
+```
+This will help you:
+- Verify system requirements
+- Detect and manage running instances
+- Clean up stale deployments and Docker resources
+- Ensure a clean setup environment
+
+### 1.2 Initialize Environment
+```bash
+./bootstrap.sh
+```
+This will:
+- Back up any existing configuration
+- Guide you through setting up required variables
+- Create a new .env file with your settings
 
 ## 1. Setup Python environment
 
@@ -40,22 +62,11 @@ pyenv local ss_lite_multi_311
 ## 2. Run the setup
 
 ```bash
-# prepare the .env file
-./init.sh
 # install all python requirements
 pip install -r requirements.txt
 # run the setup
 python multi_clone.py
 ```
-
-
->[!NOTE]
->Follow our [walkthrough tutorial video](https://youtu.be/SPToeDh9MUo?si=3Q6zruCdUA0GG-73) posted on Youtube or click on the preview below!
-
-
-[<img src="https://img.youtube.com/vi/SPToeDh9MUo/hqdefault.jpg" width="600" height="300"
-/>](https://youtu.be/SPToeDh9MUo)
-
 
 
 If you encounter any issues, please contact us on [discord](https://discord.com/invite/powerloom).
