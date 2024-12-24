@@ -165,7 +165,8 @@ export DATA_MARKET_CONTRACT_NUMBER={data_market_contract_number}
 export NAMESPACE={data_market_namespace}
 screen -S {repo_name} -p 0 -X stuff "./build.sh --skip-credential-update --data-market-contract-number {data_market_contract_number} {collector_flag}\n"
         """)
-        time.sleep(3)
+        print('Sleeping for 20 seconds to allow docker containers to spin up...')
+        time.sleep(20)
 
 def main(data_market_choice: str):
     # check if .env file exists
@@ -254,7 +255,7 @@ def main(data_market_choice: str):
         print('🟡 Previously cloned snapshotter-lite-v2 repo already exists, deleting...')
         os.system('rm -rf snapshotter-lite-v2')
     print('⚙️ Cloning snapshotter-lite-v2 repo from main branch...')
-    os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch main')
+    os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch dockerify')
     run_snapshotter_lite_v2(
         deploy_slots,
         data_market_contract_number,
