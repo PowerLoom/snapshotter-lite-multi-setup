@@ -71,11 +71,6 @@ python multi_clone.py
 ```
 
 
-[<img src="https://img.youtube.com/vi/SPToeDh9MUo/hqdefault.jpg" width="600" height="300"
-/>](https://youtu.be/SPToeDh9MUo)
-
-
-
 If you encounter any issues, please contact us on [discord](https://discord.com/invite/powerloom).
 
 
