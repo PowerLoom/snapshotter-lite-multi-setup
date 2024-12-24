@@ -62,8 +62,6 @@ pyenv local ss_lite_multi_311
 ## 2. Run the setup
 
 ```bash
-# prepare the .env file
-./init.sh
 # install all python requirements
 pip install -r requirements.txt
 # run the setup
