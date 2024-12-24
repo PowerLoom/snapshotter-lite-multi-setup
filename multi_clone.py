@@ -254,7 +254,7 @@ def main(data_market_choice: str):
         print('🟡 Previously cloned snapshotter-lite-v2 repo already exists, deleting...')
         os.system('rm -rf snapshotter-lite-v2')
     print('⚙️ Cloning snapshotter-lite-v2 repo from main branch...')
-    os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch feat/flexible-build-support-multi-nodes')
+    os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch main')
     run_snapshotter_lite_v2(
         deploy_slots,
         data_market_contract_number,
