@@ -73,6 +73,6 @@ else
     read BACKUP_CHOICE
     if [ "$BACKUP_CHOICE" == "y" ]; then
         mv .env $BACKUP_FILE
-        echo "🟢 .env file backed up to $BACKUP_FILE"
+        echo "🟢 .env file backed up to $BACKUP_FILE. Please re-run this bootstrap.sh script to initialize the environment."
     fi
 fi
