@@ -5,6 +5,7 @@ from rich.table import Table
 from enum import Enum
 from pathlib import Path
 from typing import Optional, List
+from .commands.diagnose import diagnose_command
 
 console = Console()
 app = typer.Typer(
@@ -30,8 +31,7 @@ def diagnose(
     """
     Run diagnostics on the system and optionally clean up existing deployments
     """
-    console.print("🔍 Running system diagnostics...", style="bold blue")
-    # TODO: Port diagnose.sh functionality here
+    diagnose_command(clean, force)
 
 @app.command()
 def deploy(
