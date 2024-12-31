@@ -86,8 +86,17 @@ def find_next_available_port(start_port: int) -> int:
 def get_powerloom_containers() -> List[str]:
     """Get list of PowerLoom containers."""
     try:
+        # Create a list of filters for different container name patterns
+        filters = [
+            'name=snapshotter-lite-v2',
+            'name=powerloom-premainnet-',
+            'name=powerloom-testnet-',
+            'name=powerloom-mainnet-',
+            'name=local-collector'
+        ]
+        # Run docker ps with multiple filters
         result = run_with_sudo(
-            ['docker', 'ps', '-a', '--filter', 'name=snapshotter-lite-v2', '--format', '{{.Names}}'],
+            ['docker', 'ps', '-a'] + sum([['--filter', f] for f in filters], []),
             capture_output=True, text=True
         )
         return [line for line in result.stdout.split('\n') if line]
@@ -113,15 +122,25 @@ def cleanup_resources(force: bool = False) -> None:
     if containers and (force or typer.confirm("Would you like to stop and remove existing PowerLoom containers?")):
         console.print("Stopping and removing containers...", style="yellow")
         for container in containers:
-            run_with_sudo(['docker', 'stop', container], capture_output=True)
-            run_with_sudo(['docker', 'rm', container], capture_output=True)
-        console.print("✅ Containers removed", style="green")
+            try:
+                run_with_sudo(['docker', 'stop', container], capture_output=True)
+                run_with_sudo(['docker', 'rm', container], capture_output=True)
+                console.print(f"✅ Removed container: {container}", style="green")
+            except subprocess.CalledProcessError as e:
+                console.print(f"⚠️  Failed to remove container {container}: {e}", style="red")
+                continue
+        console.print("Container cleanup completed", style="green")
 
     if networks and (force or typer.confirm("Would you like to remove PowerLoom networks?")):
         console.print("Removing networks...", style="yellow")
         for network in networks:
-            run_with_sudo(['docker', 'network', 'rm', network], capture_output=True)
-        console.print("✅ Networks removed", style="green")
+            try:
+                run_with_sudo(['docker', 'network', 'rm', network], capture_output=True)
+                console.print(f"✅ Removed network: {network}", style="green")
+            except subprocess.CalledProcessError as e:
+                console.print(f"⚠️  Failed to remove network {network}: {e}", style="red")
+                continue
+        console.print("Network cleanup completed", style="green")
 
 def run_diagnostics(clean: bool = False, force: bool = False) -> None:
     """Run system diagnostics and optionally clean up resources."""
