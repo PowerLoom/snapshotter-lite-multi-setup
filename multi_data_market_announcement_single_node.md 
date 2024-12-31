@@ -1,0 +1,28 @@
+Hey @Lite Snapshotter 
+
+We recently added support for participating in multiple data markets to the Snapshotter Lite Program in the latest release.
+
+The latest addition is the Aave V3 data market. You can now choose to participate in either the existing Uniswap V2 or the new Aave V3 data market, or both and help us stress test the protocol as we go to mainnet.
+
+👉🏼🏗️ Here is how to run the snapshotter with multiple data markets:
+
+* Stop your currently running snapshotter node.
+* Within the existing `powerloom-pre-mainnet` directory, run `git pull` to get the latest changes.
+* Run `./build.sh` to run the new setup and follow the prompts to choose the data markets you want to participate in.
+* Further detailed instructions can be found in the README: https://github.com/PowerLoom/snapshotter-lite-v2/blob/main/README.md#setting-up-multi-data-market-release-for-the-first-time
+
+⚠️ Please note that the snapshotter dashboard is not yet tracking the submission counts but they are committed every 10 epochs by the sequencer on the Powerloom chain. They can be inspected on the protocol state contract at https://explorer-prost1m.powerloom.io/address/0xF68342970beF978697e1104223b2E1B6a1D7764d?tab=read_proxy under the `slotSubmissionCount` method. Refer to the screenshot below for an example with the following parameters:
+
+* `dataMarket`: `0xc390a15BcEB89C2d4910b2d3C696BfD21B190F07` (Aave V3) or `0x8023BD7A9e8386B10336E88294985e3Fbc6CF23F` (Uniswap V2)
+* `slotId` = <your slot id>
+* `dayId` = 2 (today is 2)
+
+This is part of our larger effort to move more stateful data to the chain and make the protocol more decentralized.
+
+📊 The Aave V3 dashboard powered by this data market is available on devnet and is being hosted by us at https://aave-v3.powerloom.io/ 
+
+---
+
+🗒️Release notes: https://github.com/PowerLoom/snapshotter-lite-v2/releases/tag/v2.0.0
+
+Contact us for support on Discord if you have any questions.

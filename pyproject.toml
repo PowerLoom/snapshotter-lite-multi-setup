@@ -1,0 +1,30 @@
+[tool.poetry]
+name = "snapshotter-cli"
+version = "0.1.0"
+description = "PowerLoom Snapshotter Node Management CLI"
+authors = ["PowerLoom Protocol"]
+readme = "README.md"
+packages = [
+    { include = "snapshotter_cli" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+typer = {extras = ["all"], version = "^0.9.0"}
+rich = "^13.7.0"
+web3 = "^6.15.1"
+python-dotenv = "^1.0.1"
+psutil = "^5.9.8"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.2.0"
+isort = "^5.13.2"
+pytest = "^8.0.0"
+mypy = "^1.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+snapshotter-cli = "snapshotter_cli.cli:app"
