@@ -108,7 +108,7 @@ pyenv virtualenv 3.12 snapshotter-cli-global
 # Activate the global virtualenv
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
-pyenv activate snapshotter-cli-global
+pyenv activate --quiet snapshotter-cli-global
 
 # Verify we're using the correct Python version
 echo -e "${YELLOW}Verifying Python version...${NC}"
@@ -143,7 +143,7 @@ sudo tee "$WRAPPER_PATH" > /dev/null << 'EOF'
 #!/bin/bash
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
-pyenv activate snapshotter-cli-global
+pyenv activate --quiet snapshotter-cli-global
 python -m snapshotter_cli.cli "$@"
 EOF
 
