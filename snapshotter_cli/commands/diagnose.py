@@ -192,5 +192,5 @@ def run_diagnostics(clean: bool = False, force: bool = False) -> None:
 
 def diagnose_command(clean: bool = False, force: bool = False):
     """CLI command handler for diagnose."""
-    console.print("🔍 Running PowerLoom Node Diagnostics...", style="bold blue")
+    console.print("🔍 Running PowerLoom Snapshotter Node Diagnostics...", style="bold blue")
     run_diagnostics(clean, force)
