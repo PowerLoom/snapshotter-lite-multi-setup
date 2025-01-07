@@ -81,7 +81,7 @@ fi
 
 # Check existing containers and networks
 echo -e "\n🔍 Checking existing PowerLoom containers..."
-EXISTING_CONTAINERS=$(docker ps -a --filter "name=snapshotter-lite-v2" --format "{{.Names}}")
+EXISTING_CONTAINERS=$(docker ps -a --filter "name=snapshotter-lite-v2" --filter "name=powerloom" --format "{{.Names}}")
 if [ -n "$EXISTING_CONTAINERS" ]; then
     echo -e "${YELLOW}Found existing PowerLoom containers:${NC}"
     echo "$EXISTING_CONTAINERS"
@@ -142,10 +142,10 @@ if [ -n "$EXISTING_CONTAINERS" ]; then
     read -p "Would you like to stop and remove existing PowerLoom containers? (y/n): " remove_containers
     if [ "$remove_containers" = "y" ]; then
         echo -e "\n${YELLOW}Stopping running containers...${NC}"
-        docker ps --filter "name=snapshotter-lite-v2" -q | xargs -r docker stop
+        docker ps --filter "name=snapshotter-lite-v2" --filter "name=powerloom" -q | xargs -r docker stop
         
         echo -e "\n${YELLOW}Removing stopped containers...${NC}"
-        docker ps -a --filter "name=snapshotter-lite-v2" -q | xargs -r docker rm
+        docker ps -a --filter "name=snapshotter-lite-v2" --filter "name=powerloom" -q | xargs -r docker rm
         
         echo -e "${GREEN}✅ Containers stopped and removed${NC}"
     fi
@@ -153,14 +153,14 @@ fi
 
 # Check for existing screen sessions
 echo -e "\n🖥️ Checking existing PowerLoom screen sessions..."
-EXISTING_SCREENS=$(screen -ls | grep -E 'powerloom-(premainnet|testnet)-v2' || true)
+EXISTING_SCREENS=$(screen -ls | grep -E 'powerloom-(premainnet|testnet)-v2|snapshotter' || true)
 if [ -n "$EXISTING_SCREENS" ]; then
     echo -e "${YELLOW}Found existing PowerLoom screen sessions:${NC}"
     echo "$EXISTING_SCREENS"
     read -p "Would you like to terminate these screen sessions? (y/n): " kill_screens
     if [ "$kill_screens" = "y" ]; then
         echo -e "\n${YELLOW}Killing screen sessions...${NC}"
-        screen -ls | grep -E 'powerloom-(premainnet|testnet)-v2' | cut -d. -f1 | awk '{print $1}' | xargs -r kill
+        screen -ls | grep -E 'powerloom-(premainnet|testnet)-v2|snapshotter' | cut -d. -f1 | awk '{print $1}' | xargs -r kill
         echo -e "${GREEN}✅ Screen sessions terminated${NC}"
     fi
 fi
@@ -194,18 +194,15 @@ if [ "$NETWORK_REMOVAL_FAILED" = true ]; then
     echo -e "\n${YELLOW}Due to network removal failures, a system-wide cleanup is recommended.${NC}"
 fi
 
-read -p "Would you like to perform a system-wide Docker cleanup (this will remove all unused containers, networks, images, and cache)? (y/n): " deep_clean
+read -p "Would you like to remove unused Docker resources (only unused images, networks, and cache)? (y/n): " deep_clean
 if [ "$deep_clean" = "y" ]; then
-    echo -e "\n${YELLOW}Performing system-wide Docker cleanup...${NC}"
+    echo -e "\n${YELLOW}Removing unused Docker resources...${NC}"
     echo -e "${YELLOW}This might take a few minutes...${NC}"
     
-    echo -e "\n${YELLOW}Stopping all containers...${NC}"
-    docker ps -q | xargs -r docker stop
-    
     echo -e "\n${YELLOW}Running docker system prune...${NC}"
-    docker system prune -af --volumes
+    docker system prune -af
     
-    echo -e "${GREEN}✅ System-wide cleanup complete${NC}"
+    echo -e "${GREEN}✅ Cleanup complete${NC}"
 fi
 
 echo -e "\n${GREEN}✅ Diagnostic check complete${NC}"

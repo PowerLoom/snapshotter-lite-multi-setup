@@ -37,7 +37,8 @@ DATA_MARKET_CHOICES_PROTOCOL_STATE = {
         'SNAPSHOTTER_COMPUTE_REPO_BRANCH': "eth_uniswapv2_lite_v2",
     }
 }
-
+POWERLOOM_CHAIN = 'pre-mainnet'
+SOURCE_CHAIN = 'ETH'
 
 def get_user_slots(contract_obj, wallet_owner_addr):
     holder_slots = contract_obj.functions.getUserOwnedNodeIds(wallet_owner_addr).call()
@@ -68,8 +69,15 @@ def env_file_template(
     web3_storage_token: str = '',
     dashboard_enabled: str = 'false',
     telegram_reporting_url: str = '',
-    telegram_chat_id: str = ''
+    telegram_chat_id: str = '',
+    powerloom_chain: str = POWERLOOM_CHAIN,
+    source_chain: str = SOURCE_CHAIN,
+    local_collector_port: int = 50051,
+    max_stream_pool_size: int = 2,
+    stream_pool_health_check_interval: int = 30,
 ) -> str:
+    full_namespace = f'{powerloom_chain}-{namespace}-{source_chain}'
+    docker_network_name = f"snapshotter-lite-v2-{slot_id}-{full_namespace}"
     return f"""
 # Required
 SOURCE_RPC_URL={source_rpc_url}
@@ -80,14 +88,21 @@ SNAPSHOT_CONFIG_REPO={snapshot_config_repo}
 SNAPSHOT_CONFIG_REPO_BRANCH={snapshot_config_repo_branch}
 SNAPSHOTTER_COMPUTE_REPO={snapshotter_compute_repo}
 SNAPSHOTTER_COMPUTE_REPO_BRANCH={snapshotter_compute_repo_branch}
+DOCKER_NETWORK_NAME={docker_network_name}
 PROST_RPC_URL={prost_rpc_url}
 DATA_MARKET_CONTRACT={data_market_contract}
 NAMESPACE={namespace}
+POWERLOOM_CHAIN={powerloom_chain}
+SOURCE_CHAIN={source_chain}
+FULL_NAMESPACE={full_namespace}
 POWERLOOM_REPORTING_URL={powerloom_reporting_url}
 PROST_CHAIN_ID={prost_chain_id}
-DATA_MARKET_IN_REQUEST={data_market_in_request}
-SUBNET_THIRD_OCTET={subnet_third_octet}
+LOCAL_COLLECTOR_PORT={local_collector_port}
 CORE_API_PORT={core_api_port}
+SUBNET_THIRD_OCTET={subnet_third_octet}
+MAX_STREAM_POOL_SIZE={max_stream_pool_size}
+STREAM_POOL_HEALTH_CHECK_INTERVAL={stream_pool_health_check_interval}
+DATA_MARKET_IN_REQUEST={data_market_in_request}
 # Optional
 IPFS_URL={ipfs_url}
 IPFS_API_KEY={ipfs_api_key}
@@ -123,13 +138,14 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
     protocol_state = DATA_MARKET_CHOICES_PROTOCOL_STATE[data_market_namespace]
     core_api_port = 8002
     subnet_third_octet = 1
+    full_namespace = f'{POWERLOOM_CHAIN}-{data_market_namespace}-{SOURCE_CHAIN}'
     for idx, slot_id in enumerate(deploy_slots):
         print(f'🟠 Deploying node for slot {slot_id} in data market {data_market_namespace}')
         if idx > 0:
             os.chdir('..')
-            collector_flag = '--no-collector'
+            collector_profile_string = '--no-collector'
         else:
-            collector_flag = ''
+            collector_profile_string = ''
         repo_name = f'powerloom-premainnet-v2-{slot_id}-{data_market_namespace}'
         if os.path.exists(repo_name):
             print(f'Deleting existing dir {repo_name}')
@@ -155,15 +171,17 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             subnet_third_octet=subnet_third_octet+idx,
             core_api_port=core_api_port+idx,
         )
-        with open(f'.env-{data_market_namespace}', 'w+') as f:
+        with open(f'.env-{full_namespace}', 'w+') as f:
             f.write(env_file_contents)
+        env_file_name = f'.env-{full_namespace}'
+        project_name = f'snapshotter-lite-v2-{slot_id}-{full_namespace}'
+        project_name_lower = project_name.lower()
+        image_tag = 'dockerify'
         # docker build and run
         print('--'*20 + f'Spinning up docker containers for slot {slot_id}' + '--'*20) 
         os.system(f"""
 screen -dmS {repo_name}
-export DATA_MARKET_CONTRACT_NUMBER={data_market_contract_number}
-export NAMESPACE={data_market_namespace}
-screen -S {repo_name} -p 0 -X stuff "./build.sh --skip-credential-update --data-market-contract-number {data_market_contract_number} {collector_flag}\n"
+screen -r {repo_name} -p 0 -X stuff "./build.sh {collector_profile_string} --skip-credential-update --data-market-contract-number {data_market_contract_number}\n"
         """)
         print('Sleeping for 20 seconds to allow docker containers to spin up...')
         time.sleep(20)
@@ -255,7 +273,7 @@ def main(data_market_choice: str):
         print('🟡 Previously cloned snapshotter-lite-v2 repo already exists, deleting...')
         os.system('rm -rf snapshotter-lite-v2')
     print('⚙️ Cloning snapshotter-lite-v2 repo from main branch...')
-    os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch main')
+    os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch dockerify')
     run_snapshotter_lite_v2(
         deploy_slots,
         data_market_contract_number,
