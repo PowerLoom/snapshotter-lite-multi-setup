@@ -11,48 +11,52 @@ from .commands.diagnose import diagnose_command
 from rich.table import Table
 from rich.panel import Panel
 from rich.tree import Tree
+from .commands.configure import configure_command
+from .utils.models import CLIContext, ChainConfig, ChainMarketData, MarketConfig, ComputeConfig, PowerloomChainConfig
 
 
 console = Console()
 
 MARKETS_CONFIG_URL = "https://raw.githubusercontent.com/PowerLoom/curated-datamarkets/refs/heads/main/sources.json"
 
-def fetch_markets_config() -> Dict:
+
+def fetch_markets_config() -> List[PowerloomChainConfig]:
     """Fetch markets configuration from GitHub"""
     try:
         response = requests.get(MARKETS_CONFIG_URL)
         response.raise_for_status()
-        return response.json()
+        raw_data = response.json()
+        return [PowerloomChainConfig(**chain) for chain in raw_data]
     except Exception as e:
         console.print(f"⚠️ Failed to fetch markets config: {e}", style="bold red")
-        return dict()
+        return []
 
 def load_default_config(ctx: typer.Context):
     """Load default configuration and available markets"""
-    ctx.ensure_object(dict)
     markets_config = fetch_markets_config()
     
     # Create chain-to-markets mapping
-    chain_markets_map = {}
+    chain_markets_map: Dict[str, ChainMarketData] = {}
     for chain in markets_config:
-        chain_name = chain["powerloomChain"]["name"].upper()
-        chain_markets_map[chain_name] = {
-            "chain_config": chain["powerloomChain"],
-            "markets": {
-                market["name"].upper(): market 
-                for market in chain["dataMarkets"]
+        chain_name = chain.powerloomChain.name.upper()
+        chain_markets_map[chain_name] = ChainMarketData(
+            chain_config=chain.powerloomChain,
+            markets={
+                market.name.upper(): market
+                for market in chain.dataMarkets
             }
-        }
+        )
     
-    # Store both the raw config and the organized mapping
-    ctx.obj["markets_config"] = markets_config
-    ctx.obj["chain_markets_map"] = chain_markets_map
-    ctx.obj["available_environments"] = set(chain_markets_map.keys())
-    ctx.obj["available_markets"] = {
-        market_name 
-        for chain_data in chain_markets_map.values() 
-        for market_name in chain_data["markets"].keys()
-    }
+    ctx.obj = CLIContext(
+        markets_config=markets_config,
+        chain_markets_map=chain_markets_map,
+        available_environments=set(chain_markets_map.keys()),
+        available_markets={
+            market_name 
+            for chain_data in chain_markets_map.values() 
+            for market_name in chain_data.markets.keys()
+        }
+    )
 
 app = typer.Typer(
     name="powerloom",
@@ -84,14 +88,12 @@ def deploy(
     data_markets: List[str] = typer.Option(None, "--market", "-m", help="Data markets to deploy"),
     slots: List[int] = typer.Option(None, "--slot", "-s", help="Specific slot IDs to deploy"),
 ):
-    """
-    Deploy snapshotter nodes for specified environment and data markets
-    """
-    chain_markets_map = ctx.obj["chain_markets_map"]
+    """Deploy snapshotter nodes for specified environment and data markets"""
+    cli_context: CLIContext = ctx.obj
     
     # Validate environment
-    env_config = next((chain for chain in ctx.obj["markets_config"] 
-                      if chain["powerloomChain"]["name"].upper() == environment.upper()), None)
+    env_config = next((chain for chain in cli_context.markets_config 
+                      if chain.powerloomChain.name.upper() == environment.upper()), None)
     if not env_config:
         console.print(f"❌ Invalid environment: {environment}", style="bold red")
         raise typer.Exit(1)
@@ -99,7 +101,7 @@ def deploy(
     console.print(f"🚀 Deploying to {environment}...", style="bold green")
     
     # Handle data markets selection
-    available_markets = [m["name"] for m in env_config["dataMarkets"]]
+    available_markets = [m.name for m in env_config.dataMarkets]
     if not data_markets:
         markets_str = ",".join(available_markets)
         data_markets = typer.prompt(
@@ -114,26 +116,23 @@ def deploy(
             console.print(f"❌ Invalid market for {environment}: {market}", style="bold red")
             raise typer.Exit(1)
     
-    # Here you can access full market configuration
+    # Use the market configurations for deployment
     selected_markets = [
-        market for market in env_config["dataMarkets"]
-        if market["name"].upper() in [m.upper() for m in data_markets]
+        market for market in env_config.dataMarkets
+        if market.name.upper() in [m.upper() for m in data_markets]
     ]
     
-    # Use the market configurations for deployment
+    # Here you can access full market configuration
     for market in selected_markets:
-        console.print(f"📦 Configuring {market['name']}...", style="bold blue")
+        console.print(f"📦 Configuring {market.name}...", style="bold blue")
         # Access market["compute"], market["config"], etc. for deployment
 
 @app.command()
-def configure(
-    environment: Environment = typer.Option(..., "--env", "-e", help="Environment to configure"),
-    reset: bool = typer.Option(False, "--reset", "-r", help="Reset existing configuration")
-):
+def configure(ctx: typer.Context):
     """
     Configure environment settings and credentials
     """
-    console.print(f"⚙️ Configuring {environment.value} environment...", style="bold yellow")
+    configure_command(ctx)
 
 @app.command()
 def status():

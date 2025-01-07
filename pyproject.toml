@@ -15,6 +15,7 @@ rich = "^13.7.0"
 web3 = "^6.15.1"
 python-dotenv = "^1.0.1"
 psutil = "^5.9.8"
+pydantic = "^2.10.4"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.2.0"
