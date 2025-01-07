@@ -134,11 +134,13 @@ def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
         core_api_port=kwargs['core_api_port'],
     )
 
-def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int, data_market_namespace: str, **kwargs):
+def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int, data_market_namespace: str, lite_node_branch: str, **kwargs):
     protocol_state = DATA_MARKET_CHOICES_PROTOCOL_STATE[data_market_namespace]
     core_api_port = 8002
     subnet_third_octet = 1
     full_namespace = f'{POWERLOOM_CHAIN}-{data_market_namespace}-{SOURCE_CHAIN}'
+    image_tag = 'dockerify' if lite_node_branch == 'dockerify' else 'latest'
+
     for idx, slot_id in enumerate(deploy_slots):
         print(f'🟠 Deploying node for slot {slot_id} in data market {data_market_namespace}')
         if idx > 0:
@@ -176,7 +178,6 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
         env_file_name = f'.env-{full_namespace}'
         project_name = f'snapshotter-lite-v2-{slot_id}-{full_namespace}'
         project_name_lower = project_name.lower()
-        image_tag = 'dockerify'
         # docker build and run
         print('--'*20 + f'Spinning up docker containers for slot {slot_id}' + '--'*20) 
         os.system(f"""
@@ -213,6 +214,7 @@ def main(data_market_choice: str):
     wallet_holder_address = os.getenv("WALLET_HOLDER_ADDRESS")
     slot_contract_address = os.getenv("SLOT_CONTROLLER_ADDRESS")
     prost_rpc_url = os.getenv("PROST_RPC_URL")
+    lite_node_branch = os.getenv("LITE_NODE_BRANCH", 'main')
     if not all([wallet_holder_address, slot_contract_address, prost_rpc_url]):
         print('Missing slot configuration environment variables')
         sys.exit(1)
@@ -273,11 +275,12 @@ def main(data_market_choice: str):
         print('🟡 Previously cloned snapshotter-lite-v2 repo already exists, deleting...')
         os.system('rm -rf snapshotter-lite-v2')
     print('⚙️ Cloning snapshotter-lite-v2 repo from main branch...')
-    os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch dockerify')
+    os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch {lite_node_branch}')
     run_snapshotter_lite_v2(
         deploy_slots,
         data_market_contract_number,
         namespace,
+        lite_node_branch,
         source_rpc_url=os.getenv('SOURCE_RPC_URL'),
         signer_addr=os.getenv('SIGNER_ACCOUNT_ADDRESS'),
         signer_pkey=os.getenv('SIGNER_ACCOUNT_PRIVATE_KEY'),
