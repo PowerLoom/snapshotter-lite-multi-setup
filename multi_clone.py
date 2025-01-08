@@ -23,21 +23,21 @@ DATA_MARKET_CHOICE_NAMESPACES = {
 PROST_RPC_URL = 'https://rpc-prost1m.powerloom.io'
 DATA_MARKET_CHOICES_PROTOCOL_STATE = {
     'AAVEV3': {
-        'DATA_MARKET_CONTRACT': "0xc390a15BcEB89C2d4910b2d3C696BfD21B190F07",
+        'DATA_MARKET_CONTRACT': "0xdE95f6d0D1A7B8411fCbfc60d5c2C5Df69d667a9",
         'SNAPSHOTTER_CONFIG_REPO': 'https://github.com/PowerLoom/snapshotter-configs.git',
         'SNAPSHOTTER_COMPUTE_REPO': 'https://github.com/PowerLoom/snapshotter-computes.git',
         'SNAPSHOTTER_CONFIG_REPO_BRANCH': "eth_aavev3_lite_v2",
         'SNAPSHOTTER_COMPUTE_REPO_BRANCH': "eth_aavev3_lite"
     },
     'UNISWAPV2': {
-        'DATA_MARKET_CONTRACT': "0x8023BD7A9e8386B10336E88294985e3Fbc6CF23F",
+        'DATA_MARKET_CONTRACT': "0xC53ad4C6A8A978fC4A91F08A21DcE847f5Bc0E27",
         'SNAPSHOTTER_CONFIG_REPO': 'https://github.com/PowerLoom/snapshotter-configs.git',
         'SNAPSHOTTER_COMPUTE_REPO': 'https://github.com/PowerLoom/snapshotter-computes.git',
         'SNAPSHOTTER_CONFIG_REPO_BRANCH': "eth_uniswapv2-lite_v2",
         'SNAPSHOTTER_COMPUTE_REPO_BRANCH': "eth_uniswapv2_lite_v2",
     }
 }
-POWERLOOM_CHAIN = 'pre-mainnet'
+POWERLOOM_CHAIN = 'mainnet'
 SOURCE_CHAIN = 'ETH'
 
 def get_user_slots(contract_obj, wallet_owner_addr):
