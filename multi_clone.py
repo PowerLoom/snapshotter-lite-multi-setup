@@ -256,13 +256,18 @@ def main(data_market_choice: str):
         deploy_slots = slot_ids
 
     print(f'🎰 Final list of slots to deploy: {deploy_slots}')
-    data_market_contract_number = int(data_market_choice, 10)
+    data_market_contract_number = int(data_market_choice, 10) if data_market_choice != '0' else 0
     if not data_market_contract_number:
-        print("\n🔍 Select a data market contract:")
+        print("\n🔍 Select a data market contract (UNISWAPV2 is default):")
         for key, value in DATA_MARKET_CHOICE_NAMESPACES.items():
             print(f"{key}. {value}")
-        data_market = input("\n🫸 ▶︎ Please enter your choice (1/2): ")
-    
+        data_market = input("\n🫸 ▶︎ Please enter your choice (1/2) [default: 2 - UNISWAPV2]: ").strip()
+        
+        # Default to UNISWAPV2 if input is empty or invalid
+        if not data_market or data_market not in DATA_MARKET_CHOICE_NAMESPACES:
+            data_market = '2'  # Default to UNISWAPV2
+            print(f"\n�� Defaulting to UNISWAPV2")
+
         # Get namespace from the data market choice
         namespace = DATA_MARKET_CHOICE_NAMESPACES[data_market]
         data_market_contract_number = int(data_market, 10)
