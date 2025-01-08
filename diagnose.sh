@@ -119,11 +119,16 @@ fi
 # Check for cloned directories
 echo -e "\n📁 Checking for PowerLoom deployment directories..."
 # Matches patterns like:
-# - powerloom-premainnet-v2-123-AAVEV3
-# - powerloom-premainnet-v2-456-UNISWAPV2
-# - powerloom-testnet-v2-789-AAVEV3
-# - powerloom-testnet-v2-3928
-EXISTING_DIRS=$(find . -maxdepth 1 -type d -regex "./powerloom-\(premainnet\|testnet\)-v2-[0-9]+\(-[A-Z0-9]+\)?" -exec basename {} \; || true)  
+# - powerloom-premainnet-v2-*
+# - powerloom-testnet-v2-*
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS version
+    EXISTING_DIRS=$(find . -maxdepth 1 -type d \( -name "powerloom-premainnet-v2-*" -o -name "powerloom-testnet-v2-*" \) -exec basename {} \; || true)
+else
+    # Linux version (unchanged)
+    EXISTING_DIRS=$(find . -maxdepth 1 -type d -name "powerloom-premainnet-v2-*" -o -name "powerloom-testnet-v2-*" -exec basename {} \; || true)
+fi
+
 if [ -n "$EXISTING_DIRS" ]; then
     echo -e "${YELLOW}Found existing PowerLoom deployment directories:${NC}"
     echo "$EXISTING_DIRS"
