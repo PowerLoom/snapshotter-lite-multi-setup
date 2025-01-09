@@ -148,7 +148,7 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             collector_profile_string = '--no-collector'
         else:
             collector_profile_string = ''
-        repo_name = f'powerloom-premainnet-v2-{slot_id}-{data_market_namespace}'
+        repo_name = f'powerloom-mainnet-v2-{slot_id}-{data_market_namespace}'
         if os.path.exists(repo_name):
             print(f'Deleting existing dir {repo_name}')
             os.system(f'rm -rf {repo_name}')
@@ -297,7 +297,7 @@ def main(data_market_choice: str):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='PowerLoom pre-mainnet multi-node setup')
+    parser = argparse.ArgumentParser(description='PowerLoom mainnet multi-node setup')
     parser.add_argument('--data-market', choices=['1', '2'],
                     help='Data market choice (1: AAVEV3, 2: UNISWAPV2)')
     
