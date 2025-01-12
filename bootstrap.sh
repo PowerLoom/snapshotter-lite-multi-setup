@@ -28,10 +28,16 @@ create_env() {
         local key=$2
         local existing_value=$(get_existing_value "$key")
         
-        if [ -n "$existing_value" ]; then
-            echo "🫸 ▶︎ $prompt (press enter to keep current value: $existing_value): "
-        else
+        if [ ! -f "$BACKUP_FILE" ]; then
+            # First time setup - show simple prompt
             echo "🫸 ▶︎ $prompt: "
+        else
+            # Updating existing values - show current value
+            if [ "$key" == "SIGNER_ACCOUNT_PRIVATE_KEY" ]; then
+                echo "🫸 ▶︎ $prompt (press enter to keep current value: [hidden]): "
+            else
+                echo "🫸 ▶︎ $prompt (press enter to keep current value: $existing_value): "
+            fi
         fi
     }
 
@@ -72,7 +78,13 @@ create_env() {
     # TELEGRAM_CHAT_ID
     prompt_with_existing "Please enter the TELEGRAM_CHAT_ID (press enter to skip)" "TELEGRAM_CHAT_ID"
     read input
-    [ -n "$input" ] && update_env_value "TELEGRAM_CHAT_ID" "$input"
+    if [ -z "$input" ]; then
+        # If user pressed enter (skipped), explicitly set to blank
+        update_env_value "TELEGRAM_CHAT_ID" ""
+    elif [ -n "$input" ]; then
+        # If user entered a value, use it
+        update_env_value "TELEGRAM_CHAT_ID" "$input"
+    fi
 
     echo "🟢 .env file created successfully!"
 }
