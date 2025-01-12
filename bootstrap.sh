@@ -1,78 +1,86 @@
 #! /bin/bash
 
-# if .env not found
+create_env() {
+    echo "creating .env file..."
+    # Only copy from example if no backup exists
+    if [ ! -f "$BACKUP_FILE" ]; then
+        cp env.example ".env"
+    else
+        cp "$BACKUP_FILE" ".env"
+    fi
 
+    # Function to get existing value from .env
+    get_existing_value() {
+        local key=$1
+        grep "^$key=" .env | cut -d'=' -f2-
+    }
+
+    # Function to prompt user with existing value
+    prompt_with_existing() {
+        local prompt=$1
+        local key=$2
+        local existing_value=$(get_existing_value "$key")
+        
+        if [ -n "$existing_value" ]; then
+            echo "🫸 ▶︎ $prompt (press enter to keep current value: $existing_value): "
+        else
+            echo "🫸 ▶︎ $prompt: "
+        fi
+    }
+
+    # Function to update env value
+    update_env_value() {
+        local placeholder=$1
+        local value=$2
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' "s|$placeholder|${value}|g" .env
+        else
+            sed -i "s|$placeholder|${value}|g" .env
+        fi
+    }
+
+    # WALLET_HOLDER_ADDRESS
+    prompt_with_existing "Please enter the WALLET_HOLDER_ADDRESS" "WALLET_HOLDER_ADDRESS"
+    read input
+    [ -n "$input" ] && update_env_value "<wallet-holder-address>" "$input"
+
+    # SOURCE_RPC_URL
+    prompt_with_existing "Please enter the SOURCE_RPC_URL" "SOURCE_RPC_URL"
+    read input
+    [ -n "$input" ] && update_env_value "<source-rpc-url>" "$input"
+
+    # SIGNER_ACCOUNT_ADDRESS
+    prompt_with_existing "Please enter the SIGNER_ACCOUNT_ADDRESS" "SIGNER_ACCOUNT_ADDRESS"
+    read input
+    [ -n "$input" ] && update_env_value "<signer-account-address>" "$input"
+
+    # SIGNER_ACCOUNT_PRIVATE_KEY
+    prompt_with_existing "Please enter the SIGNER_ACCOUNT_PRIVATE_KEY" "SIGNER_ACCOUNT_PRIVATE_KEY"
+    read -s input
+    echo "" # add a newline after hidden input
+    [ -n "$input" ] && update_env_value "<signer-account-private-key>" "$input"
+
+    # TELEGRAM_CHAT_ID
+    prompt_with_existing "Please enter the TELEGRAM_CHAT_ID (press enter to skip)" "TELEGRAM_CHAT_ID"
+    read input
+    [ -n "$input" ] && update_env_value "<telegram-chat-id>" "$input"
+
+    echo "🟢 .env file created successfully!"
+}
+
+# Main script flow
 if [ ! -f ".env" ]; then
     echo "🟡 .env file not found, please follow the instructions below to create one!"
-    echo "creating .env file..."
-    cp env.example ".env"
-    # get the WALLET_HOLDER_ADDRESS from the user
-    echo "🫸 ▶︎ Please enter the WALLET_HOLDER_ADDRESS: "
-    read WALLET_HOLDER_ADDRESS
-    # Get the OS type
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS
-        sed -i '' "s/<wallet-holder-address>/${WALLET_HOLDER_ADDRESS}/g" .env
-    else
-        # Linux and others
-        sed -i "s/<wallet-holder-address>/${WALLET_HOLDER_ADDRESS}/g" .env
-    fi
-    # get the SOURCE_RPC_URL from the user
-    echo "🫸 ▶︎ Please enter the SOURCE_RPC_URL: "
-    read SOURCE_RPC_URL
-    # replace the SOURCE_RPC_URL in the .env file
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS
-        sed -i '' "s|<source-rpc-url>|${SOURCE_RPC_URL}|g" .env
-    else
-        # Linux and others
-        sed -i "s|<source-rpc-url>|${SOURCE_RPC_URL}|g" .env
-    fi
-    # get the SIGNER_ACCOUNT_ADDRESS from the user
-    echo "🫸 ▶︎ Please enter the SIGNER_ACCOUNT_ADDRESS: "
-    read SIGNER_ACCOUNT_ADDRESS
-    # replace the SIGNER_ACCOUNT_ADDRESS in the .env file
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS
-        sed -i '' "s/<signer-account-address>/${SIGNER_ACCOUNT_ADDRESS}/g" .env
-    else
-        # Linux and others
-        sed -i "s/<signer-account-address>/${SIGNER_ACCOUNT_ADDRESS}/g" .env
-    fi
-    # get the SIGNER_ACCOUNT_PRIVATE_KEY from the user
-    echo "🫸 ▶︎ Please enter the SIGNER_ACCOUNT_PRIVATE_KEY: "
-    read -s SIGNER_ACCOUNT_PRIVATE_KEY
-    echo "" # add a newline after hidden input
-    # replace the SIGNER_ACCOUNT_PRIVATE_KEY in the .env file
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS
-        sed -i '' "s/<signer-account-private-key>/${SIGNER_ACCOUNT_PRIVATE_KEY}/g" .env
-    else
-        # Linux and others
-        sed -i "s/<signer-account-private-key>/${SIGNER_ACCOUNT_PRIVATE_KEY}/g" .env
-    fi
-    # get the TELEGRAM_CHAT_ID from the user
-    echo "🫸 ▶︎ Please enter the TELEGRAM_CHAT_ID (press enter to skip): "
-    read TELEGRAM_CHAT_ID
-    # replace the TELEGRAM_CHAT_ID in the .env file
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS
-        sed -i '' "s/<telegram-chat-id>/${TELEGRAM_CHAT_ID}/g" .env
-    else
-        # Linux and others
-        sed -i "s/<telegram-chat-id>/${TELEGRAM_CHAT_ID}/g" .env
-    fi
-    echo "🟢 .env file created successfully!"
+    create_env
 else
     echo "🟢 .env file already found to be initialized! If you wish to change any of the values, please backup the .env file at the following prompt."
-    # add timestamp to the backup file name
     TIMESTAMP=$(date +%Y%m%d%H%M%S)
     BACKUP_FILE=".env.backup.${TIMESTAMP}"
-    # prompt the user to backup
     echo "Do you wish to backup the .env file? (y/n)"
     read BACKUP_CHOICE
     if [ "$BACKUP_CHOICE" == "y" ]; then
         mv .env $BACKUP_FILE
-        echo "🟢 .env file backed up to $BACKUP_FILE. Please re-run this bootstrap.sh script to initialize the environment."
+        echo "🟢 .env file backed up to $BACKUP_FILE"
+        create_env
     fi
 fi
