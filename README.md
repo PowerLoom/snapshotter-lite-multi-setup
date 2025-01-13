@@ -2,6 +2,7 @@
 
 
 ## Table of Contents
+
 - [Multi node setup for multiple Powerloom Snapshotter Lite: Protocol V2 slot holders on Linux VPS](#multi-node-setup-for-multiple-powerloom-snapshotter-lite-protocol-v2-slot-holders-on-linux-vps)
   - [Table of Contents](#table-of-contents)
   - [0. Preparation](#0-preparation)
@@ -17,8 +18,8 @@
       - [2.1.2 Run the deploy script](#212-run-the-deploy-script)
       - [2.1.3. Deploying a subset of slots](#213-deploying-a-subset-of-slots)
       - [2.1.4. Deploying all slots](#214-deploying-all-slots)
-  - [3. Monitoring, diagnostics and cleanup](#3-monitoring-diagnostics-and-cleanup)
     - [2.2 Deploy subset of slots with different configs](#22-deploy-subset-of-slots-with-different-configs)
+  - [3. Monitoring, diagnostics and cleanup](#3-monitoring-diagnostics-and-cleanup)
     - [3.1 Cleanup\[optional\]](#31-cleanupoptional)
       - [3.1.1 Stop and remove all powerloom containers](#311-stop-and-remove-all-powerloom-containers)
       - [3.1.2 Remove all Docker subnets assigned to the snapshotter-lite containers](#312-remove-all-docker-subnets-assigned-to-the-snapshotter-lite-containers)
@@ -182,6 +183,16 @@ Sleeping for 30 seconds to allow docker containers to spin up...
 ----------------------------------------Spinning up docker containers for slot xxx2----------------------------------------
 Sleeping for 10 seconds to allow docker containers to spin up...
 ```
+### 2.2 Deploy subset of slots with different configs
+
+> [!TIP]
+> This is useful if you want to deploy your slots in custom ranges with different configs, for eg the SOURCE_RPC_URL or any of the other configurations prompted to you during [bootstrap](#bootstrap).
+
+The same instructions as above apply here in the following sequence:
+
+1. During the bootstrap, choose `y` to backup the old .env file.
+2. In the next prompt, enter the new values for the fields you want to change.
+3. Run the deploy script with the new .env file as shown in [2.1.2 Run the deploy script](#212-run-the-deploy-script).
 
 ## 3. Monitoring, diagnostics and cleanup
 
@@ -216,17 +227,6 @@ snapshotter-lite-local-collector-xxx1-mainnet-UNISWAPV2-ETH
 snapshotter-lite-v2-xxx2-mainnet-UNISWAPV2-ETH
 ```
 If you want to cleanup the existing containers, follow along to the next section
-
-### 2.2 Deploy subset of slots with different configs
-
-> [!TIP]
-> This is useful if you want to deploy your slots in custom ranges with different configs, for eg the SOURCE_RPC_URL or any of the other configurations prompted to you during [bootstrap](#bootstrap).
-
-The same instructions as above apply here in the following sequence:
-
-1. During the bootstrap, choose `y` to backup the old .env file.
-2. In the next prompt, enter the new values for the fields you want to change.
-3. Run the deploy script with the new .env file as shown in [2.1.2 Run the deploy script](#212-run-the-deploy-script).
 
 ### 3.1 Cleanup[optional]
 
