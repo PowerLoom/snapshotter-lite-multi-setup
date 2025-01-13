@@ -123,12 +123,13 @@ echo -e "\n📁 Checking for PowerLoom deployment directories..."
 # Matches patterns like:
 # - powerloom-premainnet-v2-*
 # - powerloom-testnet-v2-*
+# - powerloom-mainnet-v2-*
 if [[ "$OSTYPE" == "darwin"* ]]; then
     # macOS version
-    EXISTING_DIRS=$(find . -maxdepth 1 -type d \( -name "powerloom-premainnet-v2-*" -o -name "powerloom-testnet*" \) -exec basename {} \; || true)
+    EXISTING_DIRS=$(find . -maxdepth 1 -type d \( -name "powerloom-premainnet-v2-*" -o -name "powerloom-testnet*" -o -name "powerloom-mainnet-v2-*" \) -exec basename {} \; || true)
 else
-    # Linux version (unchanged)
-    EXISTING_DIRS=$(find . -maxdepth 1 -type d -name "powerloom-premainnet-v2-*" -o -name "powerloom-testnet*" -exec basename {} \; || true)
+    # Linux version
+    EXISTING_DIRS=$(find . -maxdepth 1 -type d \( -name "powerloom-premainnet-v2-*" -o -name "powerloom-testnet*" -o -name "powerloom-mainnet-v2-*" \) -exec basename {} \; || true)
 fi
 
 if [ -n "$EXISTING_DIRS" ]; then
@@ -178,7 +179,7 @@ fi
 
 # Check for existing screen sessions
 echo -e "\n🖥️ Checking existing PowerLoom screen sessions..."
-EXISTING_SCREENS=$(screen -ls | grep -E 'powerloom-(premainnet|testnet)-v2|snapshotter' || true)
+EXISTING_SCREENS=$(screen -ls | grep -E 'powerloom-(premainnet|testnet|mainnet)-v2|snapshotter' || true)
 if [ -n "$EXISTING_SCREENS" ]; then
     echo -e "${YELLOW}Found existing PowerLoom screen sessions:${NC}"
     echo "$EXISTING_SCREENS"

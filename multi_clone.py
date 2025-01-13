@@ -184,8 +184,9 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
 screen -dmS {repo_name}
 screen -r {repo_name} -p 0 -X stuff "./build.sh {collector_profile_string} --skip-credential-update --data-market-contract-number {data_market_contract_number}\n"
         """)
-        print('Sleeping for 20 seconds to allow docker containers to spin up...')
-        time.sleep(20)
+        sleep_duration = 30 if idx == 0 else 10
+        print(f'Sleeping for {sleep_duration} seconds to allow docker containers to spin up...')
+        time.sleep(sleep_duration)
 
 def main(data_market_choice: str):
     # check if .env file exists
