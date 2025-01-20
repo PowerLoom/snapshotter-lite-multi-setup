@@ -130,6 +130,7 @@ def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
         snapshotter_compute_repo_branch=kwargs['snapshotter_compute_repo_branch'],
         powerloom_reporting_url=kwargs['powerloom_reporting_url'],
         telegram_chat_id=kwargs['telegram_chat_id'],
+        telegram_reporting_url=kwargs['telegram_reporting_url'],
         subnet_third_octet=kwargs['subnet_third_octet'],
         core_api_port=kwargs['core_api_port'],
     )
@@ -169,6 +170,7 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             snapshotter_compute_repo=protocol_state['SNAPSHOTTER_COMPUTE_REPO'],
             powerloom_reporting_url=kwargs['powerloom_reporting_url'],
             telegram_chat_id=kwargs['telegram_chat_id'],
+            telegram_reporting_url=kwargs['telegram_reporting_url'],
             slot_id=slot_id,
             subnet_third_octet=subnet_third_octet+idx,
             core_api_port=core_api_port+idx,
@@ -294,6 +296,7 @@ def main(data_market_choice: str):
         prost_rpc_url=os.getenv('PROST_RPC_URL'),
         powerloom_reporting_url=os.getenv('POWERLOOM_REPORTING_URL'),
         telegram_chat_id=os.getenv('TELEGRAM_CHAT_ID'),
+        telegram_reporting_url=os.getenv('TELEGRAM_REPORTING_URL'),
     )
 
 
