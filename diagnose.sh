@@ -82,7 +82,7 @@ fi
 
 # Check existing containers and networks
 echo -e "\n🔍 Checking existing PowerLoom containers..."
-EXISTING_CONTAINERS=$(docker ps -a --filter "name=snapshotter-lite-v2" --filter "name=powerloom" --filter "name=local-collector" --format "{{.Names}}")
+EXISTING_CONTAINERS=$(docker ps -a --filter "name=snapshotter-lite-v2" --filter "name=powerloom" --filter "name=local-collector" --filter "name=autoheal" --format "{{.Names}}")
 if [ -n "$EXISTING_CONTAINERS" ]; then
     echo -e "${YELLOW}Found existing PowerLoom containers:${NC}"
     echo "$EXISTING_CONTAINERS"
