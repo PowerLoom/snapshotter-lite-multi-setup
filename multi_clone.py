@@ -296,7 +296,7 @@ def main(data_market_choice: str):
         prost_rpc_url=os.getenv('PROST_RPC_URL'),
         powerloom_reporting_url=os.getenv('POWERLOOM_REPORTING_URL'),
         telegram_chat_id=os.getenv('TELEGRAM_CHAT_ID'),
-        telegram_reporting_url=os.getenv('TELEGRAM_REPORTING_URL'),
+        telegram_reporting_url=os.getenv('TELEGRAM_REPORTING_URL', 'https://tg-testing.powerloom.io'),
     )
 
 
