@@ -5,10 +5,6 @@ create_env() {
     if [ ! -f "$BACKUP_FILE" ]; then
         # First time setup - use env.example
         cp env.example ".env"
-    else
-        # Keep existing .env, no need to copy from backup
-        # since we already have the values we want to preserve
-        :
     fi
 
     # Function to get existing value from .env
