@@ -146,7 +146,7 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
         print(f'🟠 Deploying node for slot {slot_id} in data market {data_market_namespace}')
         if idx > 0:
             os.chdir('..')
-            collector_profile_string = '--no-collector'
+            collector_profile_string = '--no-collector --no-autoheal-launch'
         else:
             collector_profile_string = ''
         repo_name = f'powerloom-mainnet-v2-{slot_id}-{data_market_namespace}'
@@ -269,7 +269,7 @@ def main(data_market_choice: str):
         # Default to UNISWAPV2 if input is empty or invalid
         if not data_market or data_market not in DATA_MARKET_CHOICE_NAMESPACES:
             data_market = '2'  # Default to UNISWAPV2
-            print(f"\n�� Defaulting to UNISWAPV2")
+            print(f"\n🟢 Defaulting to UNISWAPV2")
 
         # Get namespace from the data market choice
         namespace = DATA_MARKET_CHOICE_NAMESPACES[data_market]
