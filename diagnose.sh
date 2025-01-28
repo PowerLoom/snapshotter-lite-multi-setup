@@ -205,12 +205,13 @@ if [ -n "$EXISTING_NETWORKS" ]; then
         echo -e "\n${YELLOW}Removing networks...${NC}"
         NETWORK_REMOVAL_FAILED=false
         
-        echo "$EXISTING_NETWORKS" | while read -r network; do
+        echo "$EXISTING_NETWORKS" | xargs -P64 -I {} bash -c '
+            network="$1"
             if ! docker network rm "$network" 2>/dev/null; then
-                NETWORK_REMOVAL_FAILED=true
-                echo -e "${RED}❌ Failed to remove network ${network}${NC}"
+                echo -e "\033[0;31m❌ Failed to remove network ${network}\033[0m"
+                exit 1
             fi
-        done
+        ' -- {} || NETWORK_REMOVAL_FAILED=true
         
         if [ "$NETWORK_REMOVAL_FAILED" = true ]; then
             echo -e "\n${YELLOW}⚠️  Warning: Some networks could not be removed due to active endpoints.${NC}"
