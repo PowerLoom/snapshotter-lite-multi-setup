@@ -1,4 +1,5 @@
 import os
+import subprocess
 import sys
 import time
 import json
@@ -190,7 +191,19 @@ screen -r {repo_name} -p 0 -X stuff "./build.sh {collector_profile_string} --ski
         print(f'Sleeping for {sleep_duration} seconds to allow docker containers to spin up...')
         time.sleep(sleep_duration)
 
+def docker_running():
+    try:
+        # Check if Docker is running
+        subprocess.check_output(['docker', 'info'])
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
 def main(data_market_choice: str):
+    # check if Docker is running
+    if not docker_running():
+        print('🟡 Docker is not running, please start Docker and try again!')
+        sys.exit(1)
     # check if .env file exists
     if not os.path.exists('.env'):
         print("🟡 .env file not found, please run bootstrap.sh to create one!")
