@@ -150,29 +150,37 @@ if [ -n "$EXISTING_CONTAINERS" ]; then
     read -p "Would you like to stop and remove existing PowerLoom containers? (y/n): " remove_containers
     if [ "$remove_containers" = "y" ]; then
         echo -e "\n${YELLOW}Stopping running containers... (timeout: 30s per container)${NC}"
-        # Stop containers with timeout and track failures
+        # Stop containers with timeout and track failures in parallel
         STOP_FAILED=false
-        echo "$EXISTING_CONTAINERS" | while read -r container; do
-            # Only try to stop if container is running
+        echo "$EXISTING_CONTAINERS" | xargs -P64 -I {} bash -c '
+            container="$1"
             if docker ps -q --filter "name=$container" | grep -q .; then
                 echo -e "Attempting to stop container ${container}..."
                 if ! timeout 35 docker stop --time 30 "$container" 2>/dev/null; then
-                    STOP_FAILED=true
-                    echo -e "${YELLOW}⚠️ Container ${container} could not be stopped gracefully after 30 seconds${NC}"
+                    echo -e "\033[1;33m⚠️ Container ${container} could not be stopped gracefully after 30 seconds\033[0m"
+                    exit 1
                 fi
             fi
-        done
+        ' -- {} || STOP_FAILED=true
 
         echo -e "\n${YELLOW}Removing containers...${NC}"
-        echo "$EXISTING_CONTAINERS" | while read -r container; do
+        # Remove containers in parallel and track failures
+        REMOVE_FAILED=false
+        echo "$EXISTING_CONTAINERS" | xargs -P64 -I {} bash -c '
+            container="$1"
             echo -e "Removing container ${container}..."
             if ! docker rm -f "$container" 2>/dev/null; then
-                echo -e "${YELLOW}⚠️ Failed to remove container ${container}${NC}"
+                echo -e "\033[1;33m⚠️ Failed to remove container ${container}\033[0m"
+                exit 1
             fi
-        done
+        ' -- {} || REMOVE_FAILED=true
 
-        if [ "$STOP_FAILED" = true ]; then
-            echo -e "${YELLOW}⚠️ Some containers could not be stopped gracefully and were forcefully removed${NC}"
+        if [ "$STOP_FAILED" = true ] || [ "$REMOVE_FAILED" = true ]; then
+            echo -e "${YELLOW}⚠️ Some containers encountered issues during cleanup:${NC}"
+            [ "$STOP_FAILED" = true ] && echo -e "${YELLOW}- Some containers could not be stopped gracefully${NC}"
+            [ "$REMOVE_FAILED" = true ] && echo -e "${YELLOW}- Some containers could not be removed${NC}"
+        else
+            echo -e "${GREEN}✅ All containers successfully cleaned up${NC}"
         fi
     fi
 fi
@@ -197,12 +205,13 @@ if [ -n "$EXISTING_NETWORKS" ]; then
         echo -e "\n${YELLOW}Removing networks...${NC}"
         NETWORK_REMOVAL_FAILED=false
         
-        echo "$EXISTING_NETWORKS" | while read -r network; do
+        echo "$EXISTING_NETWORKS" | xargs -P64 -I {} bash -c '
+            network="$1"
             if ! docker network rm "$network" 2>/dev/null; then
-                NETWORK_REMOVAL_FAILED=true
-                echo -e "${RED}❌ Failed to remove network ${network}${NC}"
+                echo -e "\033[0;31m❌ Failed to remove network ${network}\033[0m"
+                exit 1
             fi
-        done
+        ' -- {} || NETWORK_REMOVAL_FAILED=true
         
         if [ "$NETWORK_REMOVAL_FAILED" = true ]; then
             echo -e "\n${YELLOW}⚠️  Warning: Some networks could not be removed due to active endpoints.${NC}"
@@ -233,3 +242,4 @@ if [ "$deep_clean" = "y" ]; then
 fi
 
 echo -e "\n${GREEN}✅ Diagnostic check complete${NC}"
+

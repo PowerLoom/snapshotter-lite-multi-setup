@@ -1,4 +1,5 @@
 import os
+import subprocess
 import sys
 import time
 import json
@@ -146,7 +147,7 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
         print(f'🟠 Deploying node for slot {slot_id} in data market {data_market_namespace}')
         if idx > 0:
             os.chdir('..')
-            collector_profile_string = '--no-collector'
+            collector_profile_string = '--no-collector --no-autoheal-launch'
         else:
             collector_profile_string = ''
         repo_name = f'powerloom-mainnet-v2-{slot_id}-{data_market_namespace}'
@@ -190,7 +191,19 @@ screen -r {repo_name} -p 0 -X stuff "./build.sh {collector_profile_string} --ski
         print(f'Sleeping for {sleep_duration} seconds to allow docker containers to spin up...')
         time.sleep(sleep_duration)
 
+def docker_running():
+    try:
+        # Check if Docker is running
+        subprocess.check_output(['docker', 'info'])
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
 def main(data_market_choice: str):
+    # check if Docker is running
+    if not docker_running():
+        print('🟡 Docker is not running, please start Docker and try again!')
+        sys.exit(1)
     # check if .env file exists
     if not os.path.exists('.env'):
         print("🟡 .env file not found, please run bootstrap.sh to create one!")
@@ -269,7 +282,7 @@ def main(data_market_choice: str):
         # Default to UNISWAPV2 if input is empty or invalid
         if not data_market or data_market not in DATA_MARKET_CHOICE_NAMESPACES:
             data_market = '2'  # Default to UNISWAPV2
-            print(f"\n�� Defaulting to UNISWAPV2")
+            print(f"\n🟢 Defaulting to UNISWAPV2")
 
         # Get namespace from the data market choice
         namespace = DATA_MARKET_CHOICE_NAMESPACES[data_market]
