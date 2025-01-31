@@ -133,7 +133,7 @@ def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
         telegram_chat_id=kwargs['telegram_chat_id'],
         telegram_reporting_url=kwargs['telegram_reporting_url'],
         subnet_third_octet=kwargs['subnet_third_octet'],
-        core_api_port=kwargs['core_api_port'],
+        core_api_port=kwargs['core_api_port']
     )
 
 def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int, data_market_namespace: str, lite_node_branch: str, **kwargs):
@@ -150,6 +150,8 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             collector_profile_string = '--no-collector --no-autoheal-launch'
         else:
             collector_profile_string = ''
+            if 'autoheal_launch' in kwargs and kwargs['autoheal_launch'] != 'true':
+                collector_profile_string = '--no-autoheal-launch'
         repo_name = f'powerloom-mainnet-v2-{slot_id}-{data_market_namespace}'
         if os.path.exists(repo_name):
             print(f'Deleting existing dir {repo_name}')
@@ -174,7 +176,7 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             telegram_reporting_url=kwargs['telegram_reporting_url'],
             slot_id=slot_id,
             subnet_third_octet=subnet_third_octet+idx,
-            core_api_port=core_api_port+idx,
+            core_api_port=core_api_port+idx
         )
         with open(f'.env-{full_namespace}', 'w+') as f:
             f.write(env_file_contents)
@@ -310,6 +312,7 @@ def main(data_market_choice: str):
         powerloom_reporting_url=os.getenv('POWERLOOM_REPORTING_URL'),
         telegram_chat_id=os.getenv('TELEGRAM_CHAT_ID'),
         telegram_reporting_url=os.getenv('TELEGRAM_REPORTING_URL', 'https://tg-testing.powerloom.io'),
+        autoheal_launch=os.getenv('AUTOHEAL_LAUNCH', 'false').lower(),
     )
 
 
