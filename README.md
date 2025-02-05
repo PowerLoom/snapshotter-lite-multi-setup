@@ -59,6 +59,7 @@ This will:
 - Back up any existing configuration
 - Guide you through setting up required variables
 - Create a new .env file with your settings
+- This step will require you to inform the RPC URL, snapshotter owner wallet address, signer wallet address and signer wallet private key. When you paste or type the private key, it will look like nothing is typed or pasted, but that´s due to the sensitive information, simply paste and press enter!
 
 ## 1. Setup Python environment
 
