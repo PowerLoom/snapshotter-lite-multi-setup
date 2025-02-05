@@ -199,8 +199,10 @@ The same instructions as above apply here in the following sequence:
 The multi setup comes bundled with a diagnostic and cleanup script.
 
 ```bash
-./diagnose.sh
+./diagnose.sh -y
 ```
+> [!NOTE]
+> The `-y` flag is recommended to be used as it will skip all the prompts and cleanup existing Powerloom containers and legacy Docker networks without asking for confirmation. If you want to run the script with prompts, you can run it without the `-y` flag.
 
 The following output may vary depending on whether you have run snapshotter node(s) before this setup or not.
 

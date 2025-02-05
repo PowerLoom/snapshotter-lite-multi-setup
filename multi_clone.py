@@ -78,7 +78,7 @@ def env_file_template(
     stream_pool_health_check_interval: int = 30,
 ) -> str:
     full_namespace = f'{powerloom_chain}-{namespace}-{source_chain}'
-    docker_network_name = f"snapshotter-lite-v2-{slot_id}-{full_namespace}"
+    docker_network_name = f"snapshotter-lite-v2-{full_namespace}"
     return f"""
 # Required
 SOURCE_RPC_URL={source_rpc_url}
@@ -141,7 +141,6 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
     core_api_port = 8002
     subnet_third_octet = 1
     full_namespace = f'{POWERLOOM_CHAIN}-{data_market_namespace}-{SOURCE_CHAIN}'
-    image_tag = 'dockerify' if lite_node_branch == 'dockerify' else 'latest'
 
     for idx, slot_id in enumerate(deploy_slots):
         print(f'🟠 Deploying node for slot {slot_id} in data market {data_market_namespace}')

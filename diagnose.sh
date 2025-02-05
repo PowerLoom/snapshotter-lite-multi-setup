@@ -37,6 +37,16 @@ get_used_subnets() {
     done
 }
 
+# Parse command line arguments
+AUTO_CLEANUP=false
+while getopts "y" opt; do
+    case $opt in
+        y) AUTO_CLEANUP=true ;;
+        *) echo "Usage: $0 [-y]" >&2
+           exit 1 ;;
+    esac
+done
+
 echo "🔍 Starting PowerLoom Node Diagnostics..."
 
 # Phase 1: System Checks
@@ -63,22 +73,6 @@ if ! command_exists docker-compose && ! docker compose version >/dev/null 2>&1; 
 fi
 echo -e "${GREEN}✅ Docker Compose is available${NC}"
 
-# Check port availability
-echo -e "\n🔌 Checking default ports..."
-DEFAULT_CORE_API_PORT=8002
-DEFAULT_LOCAL_COLLECTOR_PORT=50051
-
-AVAILABLE_CORE_API_PORT=$(find_next_available_port $DEFAULT_CORE_API_PORT)
-if [ "$AVAILABLE_CORE_API_PORT" != "$DEFAULT_CORE_API_PORT" ]; then
-    echo -e "${YELLOW}⚠️ Port ${DEFAULT_CORE_API_PORT} is in use${NC}"
-    echo -e "${GREEN}✅ Next available Core API port: ${AVAILABLE_CORE_API_PORT}${NC}"
-fi
-
-AVAILABLE_COLLECTOR_PORT=$(find_next_available_port $DEFAULT_LOCAL_COLLECTOR_PORT)
-if [ "$AVAILABLE_COLLECTOR_PORT" != "$DEFAULT_LOCAL_COLLECTOR_PORT" ]; then
-    echo -e "${YELLOW}⚠️ Port ${DEFAULT_LOCAL_COLLECTOR_PORT} is in use${NC}"
-    echo -e "${GREEN}✅ Next available Collector port: ${AVAILABLE_COLLECTOR_PORT}${NC}"
-fi
 
 # Check existing containers and networks
 echo -e "\n🔍 Checking existing PowerLoom containers..."
@@ -88,7 +82,7 @@ if [ -n "$EXISTING_CONTAINERS" ]; then
     echo "$EXISTING_CONTAINERS"
 fi
 
-echo -e "\n🌐 Checking existing PowerLoom networks..."
+echo -e "\n🌐 Checking existing Legacy Docker networks for PowerLoom Snapshotter containers..."
 EXISTING_NETWORKS=$(docker network ls --filter "name=snapshotter-lite-v2" --format "{{.Name}}")
 if [ -n "$EXISTING_NETWORKS" ]; then
     echo -e "${YELLOW}Found existing PowerLoom networks:${NC}"
@@ -96,7 +90,7 @@ if [ -n "$EXISTING_NETWORKS" ]; then
 fi
 
 # Check Docker subnet usage in 172.18.0.0/16 range
-echo -e "\n🌐 Checking Docker subnet usage in 172.18.0.0/16 range..."
+echo -e "\n🌐 Checking Legacy Docker subnet usage in 172.18.0.0/16 range..."
 NETWORK_LIST=$(docker network ls --format '{{.Name}}')
 USED_SUBNETS=$(get_used_subnets "$NETWORK_LIST" | sort -n)
 if [ -n "$USED_SUBNETS" ]; then
@@ -135,7 +129,11 @@ fi
 if [ -n "$EXISTING_DIRS" ]; then
     echo -e "${YELLOW}Found existing PowerLoom deployment directories:${NC}"
     echo "$EXISTING_DIRS"
-    read -p "Would you like to remove these directories? (y/n): " remove_dirs
+    if [ "$AUTO_CLEANUP" = true ]; then
+        remove_dirs="y"
+    else
+        read -p "Would you like to remove these directories? (y/n): " remove_dirs
+    fi
     if [ "$remove_dirs" = "y" ]; then
         echo -e "\n${YELLOW}Removing deployment directories...${NC}"
         echo "$EXISTING_DIRS" | xargs -I {} rm -rf "{}"
@@ -147,7 +145,11 @@ fi
 echo -e "\n🧹 Cleanup Options:"
 
 if [ -n "$EXISTING_CONTAINERS" ]; then
-    read -p "Would you like to stop and remove existing PowerLoom containers? (y/n): " remove_containers
+    if [ "$AUTO_CLEANUP" = true ]; then
+        remove_containers="y"
+    else
+        read -p "Would you like to stop and remove existing PowerLoom containers? (y/n): " remove_containers
+    fi
     if [ "$remove_containers" = "y" ]; then
         echo -e "\n${YELLOW}Stopping running containers... (timeout: 30s per container)${NC}"
         # Stop containers with timeout and track failures in parallel
@@ -191,7 +193,11 @@ EXISTING_SCREENS=$(screen -ls | grep -E 'powerloom-(premainnet|testnet|mainnet)-
 if [ -n "$EXISTING_SCREENS" ]; then
     echo -e "${YELLOW}Found existing PowerLoom screen sessions:${NC}"
     echo "$EXISTING_SCREENS"
-    read -p "Would you like to terminate these screen sessions? (y/n): " kill_screens
+    if [ "$AUTO_CLEANUP" = true ]; then
+        kill_screens="y"
+    else
+        read -p "Would you like to terminate these screen sessions? (y/n): " kill_screens
+    fi
     if [ "$kill_screens" = "y" ]; then
         echo -e "\n${YELLOW}Killing screen sessions...${NC}"
         echo "$EXISTING_SCREENS" | cut -d. -f1 | awk '{print $1}' | xargs -r kill
@@ -200,7 +206,11 @@ if [ -n "$EXISTING_SCREENS" ]; then
 fi
 
 if [ -n "$EXISTING_NETWORKS" ]; then
-    read -p "Would you like to remove existing PowerLoom networks? (y/n): " remove_networks
+    if [ "$AUTO_CLEANUP" = true ]; then
+        remove_networks="y"
+    else
+        read -p "Would you like to remove existing PowerLoom networks? (y/n): " remove_networks
+    fi
     if [ "$remove_networks" = "y" ]; then
         echo -e "\n${YELLOW}Removing networks...${NC}"
         NETWORK_REMOVAL_FAILED=false
@@ -228,7 +238,12 @@ if [ "$NETWORK_REMOVAL_FAILED" = true ]; then
     echo -e "\n${YELLOW}Due to network removal failures, a system-wide cleanup is recommended.${NC}"
 fi
 
-read -p "Would you like to remove unused Docker resources (only unused images, networks, and cache)? (y/n): " deep_clean
+# Skip the final system-wide cleanup prompt if AUTO_CLEANUP is true
+if [ "$AUTO_CLEANUP" = true ]; then
+    deep_clean="n"
+else
+    read -p "Would you like to remove unused Docker resources (only unused images, networks, and cache)? (y/n): " deep_clean
+fi
 if [ "$deep_clean" = "y" ]; then
     echo -e "\n${YELLOW}Removing unused Docker resources...${NC}"
     
