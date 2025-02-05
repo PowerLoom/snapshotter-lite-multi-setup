@@ -73,22 +73,6 @@ if ! command_exists docker-compose && ! docker compose version >/dev/null 2>&1; 
 fi
 echo -e "${GREEN}✅ Docker Compose is available${NC}"
 
-# Check port availability
-echo -e "\n🔌 Checking default ports..."
-DEFAULT_CORE_API_PORT=8002
-DEFAULT_LOCAL_COLLECTOR_PORT=50051
-
-AVAILABLE_CORE_API_PORT=$(find_next_available_port $DEFAULT_CORE_API_PORT)
-if [ "$AVAILABLE_CORE_API_PORT" != "$DEFAULT_CORE_API_PORT" ]; then
-    echo -e "${YELLOW}⚠️ Port ${DEFAULT_CORE_API_PORT} is in use${NC}"
-    echo -e "${GREEN}✅ Next available Core API port: ${AVAILABLE_CORE_API_PORT}${NC}"
-fi
-
-AVAILABLE_COLLECTOR_PORT=$(find_next_available_port $DEFAULT_LOCAL_COLLECTOR_PORT)
-if [ "$AVAILABLE_COLLECTOR_PORT" != "$DEFAULT_LOCAL_COLLECTOR_PORT" ]; then
-    echo -e "${YELLOW}⚠️ Port ${DEFAULT_LOCAL_COLLECTOR_PORT} is in use${NC}"
-    echo -e "${GREEN}✅ Next available Collector port: ${AVAILABLE_COLLECTOR_PORT}${NC}"
-fi
 
 # Check existing containers and networks
 echo -e "\n🔍 Checking existing PowerLoom containers..."
@@ -98,7 +82,7 @@ if [ -n "$EXISTING_CONTAINERS" ]; then
     echo "$EXISTING_CONTAINERS"
 fi
 
-echo -e "\n🌐 Checking existing PowerLoom networks..."
+echo -e "\n🌐 Checking existing Legacy Docker networks for PowerLoom Snapshotter containers..."
 EXISTING_NETWORKS=$(docker network ls --filter "name=snapshotter-lite-v2" --format "{{.Name}}")
 if [ -n "$EXISTING_NETWORKS" ]; then
     echo -e "${YELLOW}Found existing PowerLoom networks:${NC}"
@@ -106,7 +90,7 @@ if [ -n "$EXISTING_NETWORKS" ]; then
 fi
 
 # Check Docker subnet usage in 172.18.0.0/16 range
-echo -e "\n🌐 Checking Docker subnet usage in 172.18.0.0/16 range..."
+echo -e "\n🌐 Checking Legacy Docker subnet usage in 172.18.0.0/16 range..."
 NETWORK_LIST=$(docker network ls --format '{{.Name}}')
 USED_SUBNETS=$(get_used_subnets "$NETWORK_LIST" | sort -n)
 if [ -n "$USED_SUBNETS" ]; then
