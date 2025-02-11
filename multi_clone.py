@@ -302,7 +302,7 @@ def main(data_market_choice: str):
     # Get logical CPU count in a platform-agnostic way
     try:
         cpu_count = psutil.cpu_count(logical=True)
-        max_stream_pool_size = cpu_count * 10 if cpu_count < 100 else 100
+        max_stream_pool_size = cpu_count * 10 if cpu_count <= 10 else 100
         print(f'🟢 Detected {cpu_count} logical CPUs, setting max_stream_pool_size to {max_stream_pool_size}')
     except Exception as e:
         max_stream_pool_size = 2
