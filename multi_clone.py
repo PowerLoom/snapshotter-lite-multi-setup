@@ -135,6 +135,8 @@ def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
         telegram_reporting_url=kwargs['telegram_reporting_url'],
         subnet_third_octet=kwargs['subnet_third_octet'],
         core_api_port=kwargs['core_api_port'],
+        max_stream_pool_size=kwargs['max_stream_pool_size'],
+        stream_pool_health_check_interval=kwargs['stream_pool_health_check_interval'],
     )
 
 def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int, data_market_namespace: str, lite_node_branch: str, **kwargs):
