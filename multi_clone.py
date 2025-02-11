@@ -6,6 +6,7 @@ import json
 import argparse
 from dotenv import load_dotenv
 from web3 import Web3
+import psutil
 
 OUTPUT_WORTHY_ENV_VARS = [
     'SOURCE_RPC_URL', 
@@ -171,6 +172,8 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             powerloom_reporting_url=kwargs['powerloom_reporting_url'],
             telegram_chat_id=kwargs['telegram_chat_id'],
             telegram_reporting_url=kwargs['telegram_reporting_url'],
+            max_stream_pool_size=kwargs['max_stream_pool_size'],
+            stream_pool_health_check_interval=kwargs['stream_pool_health_check_interval'],
             slot_id=slot_id,
             subnet_third_octet=subnet_third_octet+idx,
             core_api_port=core_api_port+idx,
@@ -296,6 +299,17 @@ def main(data_market_choice: str):
         os.system('rm -rf snapshotter-lite-v2')
     print('⚙️ Cloning snapshotter-lite-v2 repo from main branch...')
     os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch {lite_node_branch}')
+    # Get logical CPU count in a platform-agnostic way
+    try:
+        cpu_count = psutil.cpu_count(logical=True)
+        max_stream_pool_size = cpu_count * 10 if cpu_count < 100 else 100
+        print(f'🟢 Detected {cpu_count} logical CPUs, setting max_stream_pool_size to {max_stream_pool_size}')
+    except Exception as e:
+        max_stream_pool_size = 2
+        print(f'🟡 Error getting CPU count: {e}. Setting max_stream_pool_size to 2')
+    # Fallback to a safe default if psutil fails
+    if not max_stream_pool_size:
+        max_stream_pool_size = 2
     run_snapshotter_lite_v2(
         deploy_slots,
         data_market_contract_number,
@@ -309,6 +323,8 @@ def main(data_market_choice: str):
         powerloom_reporting_url=os.getenv('POWERLOOM_REPORTING_URL'),
         telegram_chat_id=os.getenv('TELEGRAM_CHAT_ID'),
         telegram_reporting_url=os.getenv('TELEGRAM_REPORTING_URL', 'https://tg-testing.powerloom.io'),
+        max_stream_pool_size=max_stream_pool_size,
+        stream_pool_health_check_interval=os.getenv('STREAM_POOL_HEALTH_CHECK_INTERVAL', 120),
     )
 
 
