@@ -41,13 +41,17 @@ First, run the diagnostic tool to check your system and clean up any existing de
 ``` bash
 ./diagnose.sh -y
 ```
+> [!NOTE]
+> The `-y` flag is recommended to be used as it will skip all the prompts and cleanup existing Powerloom containers and legacy Docker networks without asking for confirmation. If you want to run the script with prompts, you can run it without the `-y` flag.
 
 This will help you:
-
-* Verify system requirements
-* Detect and manage running instances
-* Clean up stale deployments and Docker resources
-* Ensure a clean setup environment
+* Ensure Docker and Docker Compose Availability
+* Check if default ports (e.g., `8002`, `50051`) are in use and suggests available alternatives.
+* Scan Docker network configurations, listing used subnets and suggesting available ones.
+* Check for PowerLoom deployment directories and removes them if necessary.
+* Detect and terminate active screen sessions related to PowerLoom.
+* Stop and remove all PowerLoom containers to prevent conflicts.
+* Identify and remove unused or legacy Docker networks.
 
 ### 1.2 Install node dependences
 
