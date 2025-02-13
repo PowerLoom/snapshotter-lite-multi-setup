@@ -6,7 +6,9 @@
   - [Table of Contents](#table-of-contents)
   - [1. Preparation](#1-preparation)
     - [1.1 Run Diagnostics to cleanup old instances](#11-run-diagnostics-to-cleanup-old-instances)
-    - [1.2 Install node dependences](#12-install-node-dependences)
+    - [1.2 Choose Installation Method: Manual or Automated](#12-choose-installation-method-manual-or-automated)
+      - [1.2.1 Automated Node dependency installation](#121-automated-node-dependency-installation)
+      - [1.2.2 Manual Node dependency installation](#122-manual-node-dependency-installation)
   - [2. Setup](#2-setup)
     - [2.1 Initialize Environment](#21-initialize-environment)
       - [2.2 Run the deploy script](#22-run-the-deploy-script)
@@ -30,7 +32,7 @@
 Clone this repository and change into the repository's directory. All commands will be run within there henceforth.
 
 ``` bash
-git clone [https://github.com/PowerLoom/snapshotter-lite-multi-setup.git](https://github.com/PowerLoom/snapshotter-lite-multi-setup.git)
+git clone https://github.com/PowerLoom/snapshotter-lite-multi-setup.git snapshotter-lite-multi-setup
 cd snapshotter-lite-multi-setup
 ```
 
@@ -41,10 +43,12 @@ First, run the diagnostic tool to check your system and clean up any existing de
 ``` bash
 ./diagnose.sh -y
 ```
+
 > [!NOTE]
 > The `-y` flag is recommended to be used as it will skip all the prompts and cleanup existing Powerloom containers and legacy Docker networks without asking for confirmation. If you want to run the script with prompts, you can run it without the `-y` flag.
 
 This will help you:
+
 * Ensure Docker and Docker Compose Availability
 * Check if default ports (e.g., `8002`, `50051`) are in use and suggests available alternatives.
 * Scan Docker network configurations, listing used subnets and suggesting available ones.
@@ -53,8 +57,17 @@ This will help you:
 * Stop and remove all PowerLoom containers to prevent conflicts.
 * Identify and remove unused or legacy Docker networks.
 
-### 1.2 Install node dependences
+### 1.2 Choose Installation Method: Manual or Automated
+To proceed, choose one of the following installation methods:
 
+[1: Automated Node dependency installation](#121-automated-node-dependency-installation)
+
+[2: Manual Node dependency installation](#122-manual-node-dependency-installation)
+
+> [!NOTE]
+> Important: You only need to complete one of the methods. After installation, skip to [2. Setup](#2-setup)
+
+#### 1.2.1 Automated Node dependency installation
 Run below command to install all node dependences in one go, It might take 10-15 mins depending on VPS specs.
 
 ``` bash
@@ -71,18 +84,64 @@ This will:
 * Create and activate a virtual environment
 * Install Python 3.11.5 and their Dependencies
 
+#### 1.2.2 Manual Node dependency installation
+Run below commands to install all node dependences manually.
+
+> **Setting Up the Environment**
+ 
+Install docker and docker compose, Detailed instructions can be found at [Step 3: Setting Up the Environment](https://docs.powerloom.io/docs/build-with-powerloom/snapshotter-node/lite-node-v2/getting-started)
+
+
+> **Install `pyenv`**
+ 
+Detailed instructions and troubleshotting can be found on the [pyenv Github repo README](https://github.com/pyenv/pyenv?tab=readme-ov-file#installation). In general, the following should take care of the installation on an Ubuntu VPS.
+
+```
+sudo apt update && sudo apt install -y build-essential libssl-dev zlib1g-dev libbz2-dev \
+libreadline-dev libsqlite3-dev curl libncursesw5-dev xz-utils tk-dev libxml2-dev \
+libxmlsec1-dev libffi-dev liblzma-dev
+
+curl https://pyenv.run | bash
+
+echo 'export PATH="$HOME/.pyenv/bin:$PATH"' >> ~/.bashrc
+echo 'eval "$(pyenv init --path)"' >> ~/.bashrc
+echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+
+source ~/.bashrc
+
+pyenv install 3.11.5
+```
+
+> **Install `pyenv-virtualenv`**
+  Detailed instructions can be [found here](https://github.com/pyenv/pyenv-virtualenv).
+
+```
+pyenv virtualenv 3.11.5 ss_lite_multi_311
+pyenv local ss_lite_multi_311
+```
+
+> **Install all python requirements**
+
+```bash
+# install all python requirements
+pip install -r requirements.txt
+```
+
 ## 2\. Setup
 
 ### 2.1 Initialize Environment
 
-Run the bootstrap script to 
-* Initialize .env file 
+Run the bootstrap script to
+
+* Initialize .env file
 * re-initialize .env file
 
 ``` bash
 ./bootstrap.sh
 ```
+
 If you are Initializing .env file for first time it will output like the following:
+
 ```
 🟡 .env file not found, please follow the instructions below to create one!
 creating .env file...
@@ -100,6 +159,7 @@ creating .env file...
 ```
 
 If you already have initilized .env file and trying to re-initilize, you will see output like following
+
 ```
 🟢 .env file already found to be initialized! If you wish to change any of the values, please backup the .env file at the following prompt.
 Do you wish to backup and modify the .env file? (y/n)
@@ -118,6 +178,7 @@ creating .env file...
 
 🟢 .env file created successfully!
 ```
+
 This will:
 
 * Back up any existing configuration
@@ -125,13 +186,14 @@ This will:
 * Create a new .env file with your settings
 * This step will require you to inform the RPC URL, snapshotter owner wallet address, Signer(Burner) wallet address and signer(burner) wallet private key. When you paste or type the private key, it will look like nothing is typed or pasted, but that´s due to the sensitive information, simply paste and press enter!
 
-
 #### 2.2 Run the deploy script
 
 ``` bash
 python multi_clone.py
 ```
-When you run the deploy script it will ask you if you want to deploy all nodes? If you want to [Deploy a subset of slots](#221-deploy-a-subset-of-slots) then press  `n` else you want to [Deploy all slots](#222-deploy-all-slots) press `y`.
+
+When you run the deploy script it will ask you if you want to deploy all nodes? If you want to [Deploy a subset of slots](#221-deploy-a-subset-of-slots) then press `n` else you want to [Deploy all slots](#222-deploy-all-slots) press `y`.
+
 #### 2.2.1 Deploy a subset of slots
 
 Enter `n` when asked if you want to deploy all slots. Proceed with the begin and end slot IDs for your deployment.
@@ -360,15 +422,15 @@ BOOM! Bob did it. **Three slots running on three different RPCs and two slots sh
 
 ### 4.2 Running Slots from Different Wallets on a Single VPS
 
-Meet Alice, the queen of efficiency. Unlike Bob, who enjoys juggling multiple RPCs, Alice has a different challenge. Her 3 Powerloom slots are scattered across 3 wallets, but she wants them all running smoothly on a single VPS. Here’s how Alice pulls it off:
+Meet Alice, the queen of efficiency. Unlike Bob, who enjoys juggling multiple RPCs, Alice faces a different challenge. Her four Powerloom slots are spread across three wallets, but she wants them all running smoothly on a single VPS. Here’s how she pulls it off:
+She clones `X(#of wallets)` multiscript directories, each with different destination directory name.
 
-1. Alice logs into her VPS and follows [Preparation](#1-preparation).
-2. When initializing the environment (by `./bootstrap.sh`), she inputs all the necessary slot 1 from wallet1 info and sets **RPC1**.
-3. Alice then runs the deploy script: (by `python multi_clone.py`). Since she’s deploying a subset of slots, she follows [Deploying a subset of slots](#221-deploying-a-subset-of-slots) and sets the **start slot** and **end slot** to **slot1**. BOOM! **Slot1 is live.**
-4. Bob repeats the process for **slot2 from wallet2** using **same RPC or RPC2** and deploys **slot2 from wallet3** using the same method.
-5. She does the same for **SLOT3 from wallet3** to deploy.
+1. Alice logs into her VPS and follows [Preparation](#1-preparation), She then clones the repository three times, assigning a unique destination directory name to each clone.
+2. Now, she [Setup](#2-setup) two nodes from **Wallet 1** on a single RPC. When initializing the environment (by `./bootstrap.sh`), she inputs all the necessary for wallet1 info and sets **RPC1**.
+3. Alice then runs the deploy script: (by `python multi_clone.py`). Since she’s deploying a subset of slots, she follows [Deploy a subset of slots](#221-deploy-a-subset-of-slots) and sets the **start slot** to **slot1** and **end slot** to **slot2**. BOOM! **Slot1 and slot2 is live.**
+4. Alice then navigates to the second repository (by `cd <directory-name>`), initializes the environment (by `./bootstrap.sh`) and inputs all the necessary info for wallet2 and sets **RPC1**. She then deploys node from wallet 2 by running deploy script: (by `python multi_clone.py`) and follows [Deploy a subset of slots](#221-deploy-a-subset-of-slots)Finally, she repeats the same process for **Slot 3** from **Wallet 3**, just as she did for Slot 2.
 
-BOOM! Alice did it. **Three slots from three different wallet running on single VPS.** Mission accomplished. 🎉
+BOOM! Alice did it. **Four slots from three different wallet running on single VPS.** Mission accomplished. 🎉
 
 <br>
 ## [OPTIONAL] Dev mode setup
@@ -378,7 +440,7 @@ BOOM! Alice did it. **Three slots from three different wallet running on single 
 
 If you wish to customize the docker containers being launched by not using the published images from Powerloom, and instead clone the underlying snapshotter components locally and building their images, we support that as well now.
 
-Ref: [Step 2](#2-run-the-setup), after running `./bootstrap.sh` , you can edit the generated `.env-mainnet-UNISWAPV2-ETH ` file for the following fields
+Ref: [Step 2](https://github.com/PowerLoom/snapshotter-lite-v2/blob/main/README.md), after running `./bootstrap.sh` , you can edit the generated `.env-mainnet-UNISWAPV2-ETH` file for the following fields
 
 ``` bash
 DEV_MODE=False  # you can set this to True
