@@ -312,22 +312,30 @@ def main(data_market_choice: str):
         os.system('rm -rf snapshotter-lite-v2')
     print('⚙️ Cloning snapshotter-lite-v2 repo from main branch...')
     os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch {lite_node_branch}')
+    # recommended max stream pool size
+    cpus = psutil.cpu_count(logical=True)
+    if cpus >= 2 and cpus < 4:
+        recommended_max_stream_pool_size = 40
+    elif cpus >= 4:
+        recommended_max_stream_pool_size = 100
     if os.getenv('MAX_STREAM_POOL_SIZE'):
         try:
             max_stream_pool_size = int(os.getenv('MAX_STREAM_POOL_SIZE', '0'))
-        except Exception as e:
+        except Exception:
             max_stream_pool_size = 0
         else:
             print(f'🟢 Using MAX_STREAM_POOL_SIZE from .env file: {max_stream_pool_size}')
     if not max_stream_pool_size:
-        # Get logical CPU count in a platform-agnostic way
-        try:
-            cpu_count = psutil.cpu_count(logical=True)
-            max_stream_pool_size = cpu_count * 10 if cpu_count <= 10 else 100
-            print(f'🟢 Detected {cpu_count} logical CPUs, setting MAX_STREAM_POOL_SIZE to {max_stream_pool_size}')
-        except Exception as e:
-            max_stream_pool_size = 2
-            print(f'🟡 Error getting CPU count: {e}. Setting MAX_STREAM_POOL_SIZE to 2')
+        max_stream_pool_size = recommended_max_stream_pool_size
+        print(f'🟢 Using recommended MAX_STREAM_POOL_SIZE for {cpus} logical CPUs: {max_stream_pool_size}')
+    if max_stream_pool_size > recommended_max_stream_pool_size:
+        print(f'⚠️ MAX_STREAM_POOL_SIZE is greater than the recommended {recommended_max_stream_pool_size} for {cpus} logical CPUs, this may cause instability!')
+        print('Switching to recommended MAX_STREAM_POOL_SIZE...')
+        max_stream_pool_size = recommended_max_stream_pool_size
+    if len(deploy_slots) < max_stream_pool_size:
+        print(f'🟡 Only {len(deploy_slots)} slots are being deployed, but MAX_STREAM_POOL_SIZE is set to {max_stream_pool_size}. This may cause instability!')
+        print('Scaling down MAX_STREAM_POOL_SIZE to match the number of slots...')
+        max_stream_pool_size = len(deploy_slots)
     run_snapshotter_lite_v2(
         deploy_slots,
         data_market_contract_number,
