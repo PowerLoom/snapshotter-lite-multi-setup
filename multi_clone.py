@@ -6,6 +6,7 @@ import json
 import argparse
 from dotenv import load_dotenv
 from web3 import Web3
+import psutil
 
 OUTPUT_WORTHY_ENV_VARS = [
     'SOURCE_RPC_URL', 
@@ -76,6 +77,7 @@ def env_file_template(
     local_collector_port: int = 50051,
     max_stream_pool_size: int = 2,
     stream_pool_health_check_interval: int = 30,
+    local_collector_image_tag: str = 'latest',
 ) -> str:
     full_namespace = f'{powerloom_chain}-{namespace}-{source_chain}'
     docker_network_name = f"snapshotter-lite-v2-{full_namespace}"
@@ -105,6 +107,7 @@ MAX_STREAM_POOL_SIZE={max_stream_pool_size}
 STREAM_POOL_HEALTH_CHECK_INTERVAL={stream_pool_health_check_interval}
 DATA_MARKET_IN_REQUEST={data_market_in_request}
 # Optional
+LOCAL_COLLECTOR_IMAGE_TAG={local_collector_image_tag}
 IPFS_URL={ipfs_url}
 IPFS_API_KEY={ipfs_api_key}
 IPFS_API_SECRET={ipfs_api_secret}
@@ -134,6 +137,9 @@ def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
         telegram_reporting_url=kwargs['telegram_reporting_url'],
         subnet_third_octet=kwargs['subnet_third_octet'],
         core_api_port=kwargs['core_api_port'],
+        max_stream_pool_size=kwargs['max_stream_pool_size'],
+        stream_pool_health_check_interval=kwargs['stream_pool_health_check_interval'],
+        local_collector_image_tag=kwargs['local_collector_image_tag'],
     )
 
 def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int, data_market_namespace: str, lite_node_branch: str, **kwargs):
@@ -171,6 +177,9 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             powerloom_reporting_url=kwargs['powerloom_reporting_url'],
             telegram_chat_id=kwargs['telegram_chat_id'],
             telegram_reporting_url=kwargs['telegram_reporting_url'],
+            max_stream_pool_size=kwargs['max_stream_pool_size'],
+            stream_pool_health_check_interval=kwargs['stream_pool_health_check_interval'],
+            local_collector_image_tag=kwargs['local_collector_image_tag'],
             slot_id=slot_id,
             subnet_third_octet=subnet_third_octet+idx,
             core_api_port=core_api_port+idx,
@@ -230,6 +239,13 @@ def main(data_market_choice: str):
     slot_contract_address = os.getenv("SLOT_CONTROLLER_ADDRESS")
     prost_rpc_url = os.getenv("PROST_RPC_URL")
     lite_node_branch = os.getenv("LITE_NODE_BRANCH", 'main')
+    local_collector_image_tag = os.getenv("LOCAL_COLLECTOR_IMAGE_TAG", '')
+    if not local_collector_image_tag:
+        if lite_node_branch != 'dockerify':
+            local_collector_image_tag = 'latest'
+        else:
+            local_collector_image_tag = 'dockerify'
+    print(f'🟢 Using local collector image tag: {local_collector_image_tag}')
     if not all([wallet_holder_address, slot_contract_address, prost_rpc_url]):
         print('Missing slot configuration environment variables')
         sys.exit(1)
@@ -296,6 +312,30 @@ def main(data_market_choice: str):
         os.system('rm -rf snapshotter-lite-v2')
     print('⚙️ Cloning snapshotter-lite-v2 repo from main branch...')
     os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch {lite_node_branch}')
+    # recommended max stream pool size
+    cpus = psutil.cpu_count(logical=True)
+    if cpus >= 2 and cpus < 4:
+        recommended_max_stream_pool_size = 40
+    elif cpus >= 4:
+        recommended_max_stream_pool_size = 100
+    if os.getenv('MAX_STREAM_POOL_SIZE'):
+        try:
+            max_stream_pool_size = int(os.getenv('MAX_STREAM_POOL_SIZE', '0'))
+        except Exception:
+            max_stream_pool_size = 0
+        else:
+            print(f'🟢 Using MAX_STREAM_POOL_SIZE from .env file: {max_stream_pool_size}')
+    if not max_stream_pool_size:
+        max_stream_pool_size = recommended_max_stream_pool_size
+        print(f'🟢 Using recommended MAX_STREAM_POOL_SIZE for {cpus} logical CPUs: {max_stream_pool_size}')
+    if max_stream_pool_size > recommended_max_stream_pool_size:
+        print(f'⚠️ MAX_STREAM_POOL_SIZE is greater than the recommended {recommended_max_stream_pool_size} for {cpus} logical CPUs, this may cause instability!')
+        print('Switching to recommended MAX_STREAM_POOL_SIZE...')
+        max_stream_pool_size = recommended_max_stream_pool_size
+    if len(deploy_slots) < max_stream_pool_size and len(slot_ids) < max_stream_pool_size:
+        print(f'🟡 Only {len(deploy_slots)} slots are being deployed out of {len(slot_ids)}, but MAX_STREAM_POOL_SIZE is set to {max_stream_pool_size}. This may cause instability!')
+        print('Scaling down MAX_STREAM_POOL_SIZE to match the total number of slots...')
+        max_stream_pool_size = len(slot_ids)
     run_snapshotter_lite_v2(
         deploy_slots,
         data_market_contract_number,
@@ -309,6 +349,9 @@ def main(data_market_choice: str):
         powerloom_reporting_url=os.getenv('POWERLOOM_REPORTING_URL'),
         telegram_chat_id=os.getenv('TELEGRAM_CHAT_ID'),
         telegram_reporting_url=os.getenv('TELEGRAM_REPORTING_URL', 'https://tg-testing.powerloom.io'),
+        max_stream_pool_size=max_stream_pool_size,
+        stream_pool_health_check_interval=os.getenv('STREAM_POOL_HEALTH_CHECK_INTERVAL', 120),
+        local_collector_image_tag=local_collector_image_tag,
     )
 
 
