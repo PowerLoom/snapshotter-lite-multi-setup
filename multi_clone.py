@@ -332,10 +332,10 @@ def main(data_market_choice: str):
         print(f'⚠️ MAX_STREAM_POOL_SIZE is greater than the recommended {recommended_max_stream_pool_size} for {cpus} logical CPUs, this may cause instability!')
         print('Switching to recommended MAX_STREAM_POOL_SIZE...')
         max_stream_pool_size = recommended_max_stream_pool_size
-    if len(deploy_slots) < max_stream_pool_size:
-        print(f'🟡 Only {len(deploy_slots)} slots are being deployed, but MAX_STREAM_POOL_SIZE is set to {max_stream_pool_size}. This may cause instability!')
-        print('Scaling down MAX_STREAM_POOL_SIZE to match the number of slots...')
-        max_stream_pool_size = len(deploy_slots)
+    if len(deploy_slots) < max_stream_pool_size and len(slot_ids) < max_stream_pool_size:
+        print(f'🟡 Only {len(deploy_slots)} slots are being deployed out of {len(slot_ids)}, but MAX_STREAM_POOL_SIZE is set to {max_stream_pool_size}. This may cause instability!')
+        print('Scaling down MAX_STREAM_POOL_SIZE to match the total number of slots...')
+        max_stream_pool_size = len(slot_ids)
     run_snapshotter_lite_v2(
         deploy_slots,
         data_market_contract_number,
