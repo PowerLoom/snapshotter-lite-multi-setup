@@ -239,6 +239,13 @@ def main(data_market_choice: str):
     slot_contract_address = os.getenv("SLOT_CONTROLLER_ADDRESS")
     prost_rpc_url = os.getenv("PROST_RPC_URL")
     lite_node_branch = os.getenv("LITE_NODE_BRANCH", 'main')
+    local_collector_image_tag = os.getenv("LOCAL_COLLECTOR_IMAGE_TAG", '')
+    if not local_collector_image_tag:
+        if lite_node_branch != 'dockerify':
+            local_collector_image_tag = 'latest'
+        else:
+            local_collector_image_tag = 'dockerify'
+    print(f'🟢 Using local collector image tag: {local_collector_image_tag}')
     if not all([wallet_holder_address, slot_contract_address, prost_rpc_url]):
         print('Missing slot configuration environment variables')
         sys.exit(1)
@@ -331,7 +338,7 @@ def main(data_market_choice: str):
         telegram_reporting_url=os.getenv('TELEGRAM_REPORTING_URL', 'https://tg-testing.powerloom.io'),
         max_stream_pool_size=max_stream_pool_size,
         stream_pool_health_check_interval=os.getenv('STREAM_POOL_HEALTH_CHECK_INTERVAL', 120),
-        local_collector_image_tag=os.getenv('LOCAL_COLLECTOR_IMAGE_TAG', 'latest'),
+        local_collector_image_tag=local_collector_image_tag,
     )
 
 
