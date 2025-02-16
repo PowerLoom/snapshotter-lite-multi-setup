@@ -312,17 +312,22 @@ def main(data_market_choice: str):
         os.system('rm -rf snapshotter-lite-v2')
     print('⚙️ Cloning snapshotter-lite-v2 repo from main branch...')
     os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch {lite_node_branch}')
-    # Get logical CPU count in a platform-agnostic way
-    try:
-        cpu_count = psutil.cpu_count(logical=True)
-        max_stream_pool_size = cpu_count * 10 if cpu_count <= 10 else 100
-        print(f'🟢 Detected {cpu_count} logical CPUs, setting max_stream_pool_size to {max_stream_pool_size}')
-    except Exception as e:
-        max_stream_pool_size = 2
-        print(f'🟡 Error getting CPU count: {e}. Setting max_stream_pool_size to 2')
-    # Fallback to a safe default if psutil fails
+    if os.getenv('MAX_STREAM_POOL_SIZE'):
+        try:
+            max_stream_pool_size = int(os.getenv('MAX_STREAM_POOL_SIZE', '0'))
+        except Exception as e:
+            max_stream_pool_size = 0
+        else:
+            print(f'🟢 Using MAX_STREAM_POOL_SIZE from .env file: {max_stream_pool_size}')
     if not max_stream_pool_size:
-        max_stream_pool_size = 2
+        # Get logical CPU count in a platform-agnostic way
+        try:
+            cpu_count = psutil.cpu_count(logical=True)
+            max_stream_pool_size = cpu_count * 10 if cpu_count <= 10 else 100
+            print(f'🟢 Detected {cpu_count} logical CPUs, setting MAX_STREAM_POOL_SIZE to {max_stream_pool_size}')
+        except Exception as e:
+            max_stream_pool_size = 2
+            print(f'🟡 Error getting CPU count: {e}. Setting MAX_STREAM_POOL_SIZE to 2')
     run_snapshotter_lite_v2(
         deploy_slots,
         data_market_contract_number,
