@@ -77,6 +77,7 @@ def env_file_template(
     local_collector_port: int = 50051,
     max_stream_pool_size: int = 2,
     stream_pool_health_check_interval: int = 30,
+    local_collector_image_tag: str = 'latest',
 ) -> str:
     full_namespace = f'{powerloom_chain}-{namespace}-{source_chain}'
     docker_network_name = f"snapshotter-lite-v2-{full_namespace}"
@@ -106,6 +107,7 @@ MAX_STREAM_POOL_SIZE={max_stream_pool_size}
 STREAM_POOL_HEALTH_CHECK_INTERVAL={stream_pool_health_check_interval}
 DATA_MARKET_IN_REQUEST={data_market_in_request}
 # Optional
+LOCAL_COLLECTOR_IMAGE_TAG={local_collector_image_tag}
 IPFS_URL={ipfs_url}
 IPFS_API_KEY={ipfs_api_key}
 IPFS_API_SECRET={ipfs_api_secret}
@@ -137,6 +139,7 @@ def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
         core_api_port=kwargs['core_api_port'],
         max_stream_pool_size=kwargs['max_stream_pool_size'],
         stream_pool_health_check_interval=kwargs['stream_pool_health_check_interval'],
+        local_collector_image_tag=kwargs['local_collector_image_tag'],
     )
 
 def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int, data_market_namespace: str, lite_node_branch: str, **kwargs):
@@ -176,6 +179,7 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             telegram_reporting_url=kwargs['telegram_reporting_url'],
             max_stream_pool_size=kwargs['max_stream_pool_size'],
             stream_pool_health_check_interval=kwargs['stream_pool_health_check_interval'],
+            local_collector_image_tag=kwargs['local_collector_image_tag'],
             slot_id=slot_id,
             subnet_third_octet=subnet_third_octet+idx,
             core_api_port=core_api_port+idx,
@@ -327,6 +331,7 @@ def main(data_market_choice: str):
         telegram_reporting_url=os.getenv('TELEGRAM_REPORTING_URL', 'https://tg-testing.powerloom.io'),
         max_stream_pool_size=max_stream_pool_size,
         stream_pool_health_check_interval=os.getenv('STREAM_POOL_HEALTH_CHECK_INTERVAL', 120),
+        local_collector_image_tag=os.getenv('LOCAL_COLLECTOR_IMAGE_TAG', 'latest'),
     )
 
 
