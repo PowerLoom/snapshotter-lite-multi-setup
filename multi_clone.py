@@ -318,6 +318,8 @@ def main(data_market_choice: str):
         recommended_max_stream_pool_size = 40
     elif cpus >= 4:
         recommended_max_stream_pool_size = 100
+    else:
+        recommended_max_stream_pool_size = 20
     if os.getenv('MAX_STREAM_POOL_SIZE'):
         try:
             max_stream_pool_size = int(os.getenv('MAX_STREAM_POOL_SIZE', '0'))
