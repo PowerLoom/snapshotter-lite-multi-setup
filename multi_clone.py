@@ -207,7 +207,7 @@ def docker_running():
     except subprocess.CalledProcessError:
         return False
 
-def main(data_market_choice: str):
+def main(data_market_choice: str, non_interactive: bool = False):
     # check if Docker is running
     if not docker_running():
         print('🟡 Docker is not running, please start Docker and try again!')
@@ -225,13 +225,17 @@ def main(data_market_choice: str):
                 print(line.strip())
                 if line.strip() == '' or '<' in line.strip() or '>' in line.strip():
                     incomplete_env = True
-    if incomplete_env:
+    if incomplete_env and not non_interactive:
         print('🟡 .env file may be incomplete or corrupted during a previous faulty initialization. Do you want to clear the .env file and re-run ./bootstrap.sh? (y/n)')
         clear_env = input('🫸 ▶︎ Please enter your choice: ')
         if clear_env.lower() == 'y':
             os.remove('.env')
             print('🟢 .env file removed, please run ./bootstrap.sh to re-initialize the .env file...')
             sys.exit(0)
+    elif incomplete_env and non_interactive:
+        print('🟡 .env file may be incomplete or corrupted. Please run bootstrap.sh manually to fix it.')
+        sys.exit(1)
+        
     load_dotenv(override=True)
     
     # Setup Web3 connections
@@ -273,36 +277,47 @@ def main(data_market_choice: str):
     print(slot_ids)
     deploy_slots = list()
     # choose range of slots to deploy
-    deploy_all_slots = input('☑️ Do you want to deploy all slots? (y/n)')
-    if deploy_all_slots.lower() == 'n':
-        start_slot = input('🫸 ▶︎ Enter the start slot ID: ')
-        end_slot = input('🫸 ▶︎ Enter the end slot ID: ')
-        start_slot = int(start_slot)
-        end_slot = int(end_slot)
-        # find index of start_slot and end_slot in slot_ids
-        start_slot_idx = slot_ids.index(start_slot)
-        end_slot_idx = slot_ids.index(end_slot)
-        deploy_slots = slot_ids[start_slot_idx:end_slot_idx+1]
-    else:
+    if non_interactive:
         deploy_slots = slot_ids
+        print('🟢 Non-interactive mode: Deploying all slots')
+    else:
+        deploy_all_slots = input('☑️ Do you want to deploy all slots? (y/n)')
+        if deploy_all_slots.lower() == 'n':
+            start_slot = input('🫸 ▶︎ Enter the start slot ID: ')
+            end_slot = input('🫸 ▶︎ Enter the end slot ID: ')
+            start_slot = int(start_slot)
+            end_slot = int(end_slot)
+            # find index of start_slot and end_slot in slot_ids
+            start_slot_idx = slot_ids.index(start_slot)
+            end_slot_idx = slot_ids.index(end_slot)
+            deploy_slots = slot_ids[start_slot_idx:end_slot_idx+1]
+        else:
+            deploy_slots = slot_ids
 
     print(f'🎰 Final list of slots to deploy: {deploy_slots}')
     data_market_contract_number = int(data_market_choice, 10) if data_market_choice != '0' else 0
     if not data_market_contract_number:
-        print("\n🔍 Select a data market contract (UNISWAPV2 is default):")
-        for key, value in DATA_MARKET_CHOICE_NAMESPACES.items():
-            print(f"{key}. {value}")
-        data_market = input("\n🫸 ▶︎ Please enter your choice (1/2) [default: 2 - UNISWAPV2]: ").strip()
-        
-        # Default to UNISWAPV2 if input is empty or invalid
-        if not data_market or data_market not in DATA_MARKET_CHOICE_NAMESPACES:
-            data_market = '2'  # Default to UNISWAPV2
-            print(f"\n🟢 Defaulting to UNISWAPV2")
+        if non_interactive:
+            # Default to UNISWAPV2 in non-interactive mode
+            data_market = '2'
+            namespace = DATA_MARKET_CHOICE_NAMESPACES[data_market]
+            data_market_contract_number = int(data_market, 10)
+            print(f"\n🟢 Non-interactive mode: Defaulting to {namespace}")
+        else:
+            print("\n🔍 Select a data market contract (UNISWAPV2 is default):")
+            for key, value in DATA_MARKET_CHOICE_NAMESPACES.items():
+                print(f"{key}. {value}")
+            data_market = input("\n🫸 ▶︎ Please enter your choice (1/2) [default: 2 - UNISWAPV2]: ").strip()
+            
+            # Default to UNISWAPV2 if input is empty or invalid
+            if not data_market or data_market not in DATA_MARKET_CHOICE_NAMESPACES:
+                data_market = '2'  # Default to UNISWAPV2
+                print(f"\n🟢 Defaulting to UNISWAPV2")
 
-        # Get namespace from the data market choice
-        namespace = DATA_MARKET_CHOICE_NAMESPACES[data_market]
-        data_market_contract_number = int(data_market, 10)
-        print(f"\n🟢 Selected data market namespace: {namespace}")
+            # Get namespace from the data market choice
+            namespace = DATA_MARKET_CHOICE_NAMESPACES[data_market]
+            data_market_contract_number = int(data_market, 10)
+            print(f"\n🟢 Selected data market namespace: {namespace}")
     else:
         namespace = DATA_MARKET_CHOICE_NAMESPACES[data_market_choice]
         print(f"\n🟢 Selected data market namespace: {namespace}")
@@ -361,8 +376,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PowerLoom mainnet multi-node setup')
     parser.add_argument('--data-market', choices=['1', '2'],
                     help='Data market choice (1: AAVEV3, 2: UNISWAPV2)')
+    parser.add_argument('-y', '--yes', action='store_true',
+                    help='Deploy all nodes without prompting for confirmation')
     
     args = parser.parse_args()
     
     data_market = args.data_market if args.data_market else '0'
-    main(data_market_choice=data_market)
+    main(data_market_choice=data_market, non_interactive=args.yes)
