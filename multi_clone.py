@@ -21,6 +21,8 @@ OUTPUT_WORTHY_ENV_VARS = [
 MIGRATION_INJECTIONS = {
     'POWERLOOM_RPC_URL': 'https://rpc-prost1j-emrlsr8nrc.t.conduit.xyz',
     'PROST_RPC_URL': 'https://rpc-devnet.powerloom.io',  # TODO: change to mainnet RPC URL before final merge
+    'PROTOCOL_STATE_OLD': '0x865EFcdA6A4a46177dFddff3BeDa2dbD98a892F3', # TODO: change to mainnet LEGACY address before final merge
+    'PROTOCOL_STATE_NEW': '0xe752bbcbE21572d66889DFBe29439EF096802CE1', # TODO: change to mainnet NEW address before final merge
     'UNISWAPV2': {
         'DATA_MARKET_CONTRACT': "0x249961792f28b796A5dce17F3BC562Cba1dce40D",
         'SNAPSHOTTER_COMPUTE_REPO': 'https://github.com/PowerLoom/snapshotter-computes.git',
@@ -64,6 +66,7 @@ DATA_MARKET_CHOICES_PROTOCOL_STATE = {
 # TODO: change to mainnet before final merge
 POWERLOOM_CHAIN = 'devnet'
 SOURCE_CHAIN = 'ETH'
+
 
 def get_user_slots(contract_obj, wallet_owner_addr):
     holder_slots = contract_obj.functions.getUserOwnedNodeIds(wallet_owner_addr).call()
@@ -262,18 +265,39 @@ def main(data_market_choice: str, non_interactive: bool = False):
         sys.exit(1)
 
     # Initialize Web3 and contract connections
-    w3 = Web3(Web3.HTTPProvider(prost_rpc_url))
-    
+    w3_old = Web3(Web3.HTTPProvider(MIGRATION_INJECTIONS['PROST_RPC_URL']))
+    w3_new = Web3(Web3.HTTPProvider(MIGRATION_INJECTIONS['POWERLOOM_RPC_URL']))
     # Load contract ABIs
+    with open('ProtocolState.json', 'r') as f:
+        protocol_state_abi = json.load(f)
     with open('PowerloomNodes.json', 'r') as f:
         powerloom_nodes_abi = json.load(f)
 
-    # Setup contract instances
-    wallet_holder_address = Web3.to_checksum_address(wallet_holder_address)
-    slot_contract = w3.eth.contract(
-        address=Web3.to_checksum_address(slot_contract_address),
-        abi=powerloom_nodes_abi,
-    )
+    try:
+        block_number = w3_old.eth.get_block_number()
+        print(f"✅ Successfully fetched the latest block number {block_number}. Your ISP is supported!")
+    except Exception as e:
+        print(f"❌ Failed to fetch the latest block number. Your ISP/VPS region is not supported ⛔️ . Exception: {e}")
+        sys.exit(1)
+    protocol_state_contract_old = w3_old.eth.contract(address=MIGRATION_INJECTIONS['PROTOCOL_STATE_OLD'], abi=protocol_state_abi)
+    protocol_state_contract = w3_new.eth.contract(address=MIGRATION_INJECTIONS['PROTOCOL_STATE_NEW'], abi=protocol_state_abi)
+    current_epoch_old = protocol_state_contract_old.functions.currentEpoch(MIGRATION_INJECTIONS['OLD_DATA_MARKET_CONTRACT']).call()
+    latest_epoch_id_old = current_epoch_old[2]
+    print('Latest epoch ID detected on old chain: ', latest_epoch_id_old)
+    # TODO: for testing we are using the switchover epoch id as explicitly specified in the .env file. hardcode the mainnet value before final merge
+    switchover_epoch_id = os.getenv('SWITCHOVER_EPOCH_ID', '1')
+    if switchover_epoch_id == '1':
+        print(f'❌ No switchover epoch id specified in .env file, please specify a valid switchover epoch id before final merge!')
+        sys.exit(1)
+    if latest_epoch_id_old < int(switchover_epoch_id, 10):
+        print('🎰 Using old chain for fetching slots...')
+        slot_contract_address = protocol_state_contract_old.functions.snapshotterState().call()
+        slot_contract = w3_old.eth.contract(address=slot_contract_address, abi=powerloom_nodes_abi)
+    else:
+        print('🎰 Using new chain for fetching slots...')
+        slot_contract_address = protocol_state_contract.functions.snapshotterState().call()
+        slot_contract = w3_new.eth.contract(address=slot_contract_address, abi=powerloom_nodes_abi)
+    print(f'🔎 Against protocol state contract {slot_contract_address} found snapshotter state {slot_contract_address}')
     # Get all slots
     slot_ids = get_user_slots(slot_contract, wallet_holder_address)
     if not slot_ids:
