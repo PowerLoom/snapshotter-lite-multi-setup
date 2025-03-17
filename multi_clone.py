@@ -18,11 +18,33 @@ OUTPUT_WORTHY_ENV_VARS = [
     'PROST_CHAIN_ID',
 ]
 
+MIGRATION_INJECTIONS = {
+    'POWERLOOM_RPC_URL': 'https://rpc-prost1j-emrlsr8nrc.t.conduit.xyz',
+    'PROST_RPC_URL': 'https://rpc-devnet.powerloom.io',  # TODO: change to mainnet RPC URL before final merge
+    'UNISWAPV2': {
+        'DATA_MARKET_CONTRACT': "0x249961792f28b796A5dce17F3BC562Cba1dce40D",
+        'SNAPSHOTTER_COMPUTE_REPO': 'https://github.com/PowerLoom/snapshotter-computes.git',
+        'SNAPSHOTTER_CONFIG_REPO': 'https://github.com/PowerLoom/snapshotter-configs.git',
+        'SNAPSHOTTER_COMPUTE_REPO_BRANCH': 'eth_uniswapv2_lite_v2',
+        'SNAPSHOT_CONFIG_REPO_BRANCH': 'chain_migration',
+    },
+    'AAVEV3': {
+        'DATA_MARKET_CONTRACT': "0x0000000000000000000000000000000000000000",
+        'SNAPSHOTTER_COMPUTE_REPO': 'https://github.com/PowerLoom/snapshotter-computes.git',
+        'SNAPSHOTTER_CONFIG_REPO': 'https://github.com/PowerLoom/snapshotter-configs.git',
+        'SNAPSHOTTER_COMPUTE_REPO_BRANCH': 'eth_aavev3_lite_v2',
+        'SNAPSHOT_CONFIG_REPO_BRANCH': 'chain_migration',
+    }
+}
+
 DATA_MARKET_CHOICE_NAMESPACES = {
     '1': 'AAVEV3',
     '2': 'UNISWAPV2'
 }
-PROST_RPC_URL = 'https://rpc-prost1m.powerloom.io'
+
+# legacy data market choices
+# devnet addresses follow to be used for testing
+# TODO: change back to mainnet addresses before final merge
 DATA_MARKET_CHOICES_PROTOCOL_STATE = {
     'AAVEV3': {
         'DATA_MARKET_CONTRACT': "0xdE95f6d0D1A7B8411fCbfc60d5c2C5Df69d667a9",
@@ -32,14 +54,15 @@ DATA_MARKET_CHOICES_PROTOCOL_STATE = {
         'SNAPSHOTTER_COMPUTE_REPO_BRANCH': "eth_aavev3_lite"
     },
     'UNISWAPV2': {
-        'DATA_MARKET_CONTRACT': "0xC53ad4C6A8A978fC4A91F08A21DcE847f5Bc0E27",
+        'DATA_MARKET_CONTRACT': "0xFd3216d7B918E1760807A45fE53633e342b9C578",
         'SNAPSHOTTER_CONFIG_REPO': 'https://github.com/PowerLoom/snapshotter-configs.git',
         'SNAPSHOTTER_COMPUTE_REPO': 'https://github.com/PowerLoom/snapshotter-computes.git',
         'SNAPSHOTTER_CONFIG_REPO_BRANCH': "eth_uniswapv2-lite_v2",
         'SNAPSHOTTER_COMPUTE_REPO_BRANCH': "eth_uniswapv2_lite_v2",
     }
 }
-POWERLOOM_CHAIN = 'mainnet'
+# TODO: change to mainnet before final merge
+POWERLOOM_CHAIN = 'devnet'
 SOURCE_CHAIN = 'ETH'
 
 def get_user_slots(contract_obj, wallet_owner_addr):
@@ -51,25 +74,20 @@ def env_file_template(
     source_rpc_url: str,
     signer_addr: str,
     signer_pkey: str,
-    prost_chain_id: str,
     prost_rpc_url: str,
+    powerloom_rpc_url: str,
     namespace: str,
     data_market_contract: str,
+    old_data_market_contract: str,
     slot_id: str,
     snapshot_config_repo: str,
     snapshot_config_repo_branch: str,
     snapshotter_compute_repo: str,
     snapshotter_compute_repo_branch: str,
     powerloom_reporting_url: str,
-    subnet_third_octet: int,
-    core_api_port: int,
     data_market_in_request: str = 'false',
-    ipfs_url: str = '',
-    ipfs_api_key: str = '',
-    ipfs_api_secret: str = '',
     slack_reporting_url: str = '',
     web3_storage_token: str = '',
-    dashboard_enabled: str = 'false',
     telegram_reporting_url: str = '',
     telegram_chat_id: str = '',
     powerloom_chain: str = POWERLOOM_CHAIN,
@@ -93,27 +111,22 @@ SNAPSHOTTER_COMPUTE_REPO={snapshotter_compute_repo}
 SNAPSHOTTER_COMPUTE_REPO_BRANCH={snapshotter_compute_repo_branch}
 DOCKER_NETWORK_NAME={docker_network_name}
 PROST_RPC_URL={prost_rpc_url}
+POWERLOOM_RPC_URL={powerloom_rpc_url}
+OLD_DATA_MARKET_CONTRACT={old_data_market_contract}
 DATA_MARKET_CONTRACT={data_market_contract}
 NAMESPACE={namespace}
 POWERLOOM_CHAIN={powerloom_chain}
 SOURCE_CHAIN={source_chain}
 FULL_NAMESPACE={full_namespace}
 POWERLOOM_REPORTING_URL={powerloom_reporting_url}
-PROST_CHAIN_ID={prost_chain_id}
 LOCAL_COLLECTOR_PORT={local_collector_port}
-CORE_API_PORT={core_api_port}
-SUBNET_THIRD_OCTET={subnet_third_octet}
 MAX_STREAM_POOL_SIZE={max_stream_pool_size}
 STREAM_POOL_HEALTH_CHECK_INTERVAL={stream_pool_health_check_interval}
 DATA_MARKET_IN_REQUEST={data_market_in_request}
 # Optional
 LOCAL_COLLECTOR_IMAGE_TAG={local_collector_image_tag}
-IPFS_URL={ipfs_url}
-IPFS_API_KEY={ipfs_api_key}
-IPFS_API_SECRET={ipfs_api_secret}
 SLACK_REPORTING_URL={slack_reporting_url}
 WEB3_STORAGE_TOKEN={web3_storage_token}
-DASHBOARD_ENABLED={dashboard_enabled}
 TELEGRAM_REPORTING_URL={telegram_reporting_url}
 TELEGRAM_CHAT_ID={telegram_chat_id}
 """
@@ -123,10 +136,11 @@ def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
         source_rpc_url=kwargs['source_rpc_url'],
         signer_addr=kwargs['signer_addr'],
         signer_pkey=kwargs['signer_pkey'],
-        prost_chain_id=kwargs['prost_chain_id'],
         prost_rpc_url=kwargs['prost_rpc_url'],
+        powerloom_rpc_url=kwargs['powerloom_rpc_url'],
         namespace=data_market_namespace,
         data_market_contract=kwargs['data_market_contract'],
+        old_data_market_contract=kwargs['old_data_market_contract'],
         slot_id=kwargs['slot_id'],
         snapshot_config_repo=kwargs['snapshotter_config_repo'],
         snapshot_config_repo_branch=kwargs['snapshotter_config_repo_branch'],
@@ -135,17 +149,14 @@ def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
         powerloom_reporting_url=kwargs['powerloom_reporting_url'],
         telegram_chat_id=kwargs['telegram_chat_id'],
         telegram_reporting_url=kwargs['telegram_reporting_url'],
-        subnet_third_octet=kwargs['subnet_third_octet'],
-        core_api_port=kwargs['core_api_port'],
         max_stream_pool_size=kwargs['max_stream_pool_size'],
         stream_pool_health_check_interval=kwargs['stream_pool_health_check_interval'],
         local_collector_image_tag=kwargs['local_collector_image_tag'],
     )
 
-def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int, data_market_namespace: str, lite_node_branch: str, **kwargs):
+def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int, data_market_namespace: str, **kwargs):
     protocol_state = DATA_MARKET_CHOICES_PROTOCOL_STATE[data_market_namespace]
-    core_api_port = 8002
-    subnet_third_octet = 1
+    migration_protocol_state_injection = MIGRATION_INJECTIONS[data_market_namespace]
     full_namespace = f'{POWERLOOM_CHAIN}-{data_market_namespace}-{SOURCE_CHAIN}'
 
     for idx, slot_id in enumerate(deploy_slots):
@@ -166,14 +177,15 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             source_rpc_url=kwargs['source_rpc_url'],
             signer_addr=kwargs['signer_addr'],
             signer_pkey=kwargs['signer_pkey'],
-            prost_chain_id=kwargs['prost_chain_id'],
             prost_rpc_url=kwargs['prost_rpc_url'],
+            powerloom_rpc_url=MIGRATION_INJECTIONS['POWERLOOM_RPC_URL'],
             namespace=data_market_namespace,
-            data_market_contract=protocol_state['DATA_MARKET_CONTRACT'],
-            snapshotter_config_repo_branch=protocol_state['SNAPSHOTTER_CONFIG_REPO_BRANCH'],
-            snapshotter_compute_repo_branch=protocol_state['SNAPSHOTTER_COMPUTE_REPO_BRANCH'],
-            snapshotter_config_repo=protocol_state['SNAPSHOTTER_CONFIG_REPO'],
-            snapshotter_compute_repo=protocol_state['SNAPSHOTTER_COMPUTE_REPO'],
+            data_market_contract=migration_protocol_state_injection['DATA_MARKET_CONTRACT'],
+            old_data_market_contract=protocol_state['DATA_MARKET_CONTRACT'],
+            snapshotter_config_repo_branch=migration_protocol_state_injection['SNAPSHOTTER_CONFIG_REPO_BRANCH'],
+            snapshotter_compute_repo_branch=migration_protocol_state_injection['SNAPSHOTTER_COMPUTE_REPO_BRANCH'],
+            snapshotter_config_repo=migration_protocol_state_injection['SNAPSHOTTER_CONFIG_REPO'],
+            snapshotter_compute_repo=migration_protocol_state_injection['SNAPSHOTTER_COMPUTE_REPO'],
             powerloom_reporting_url=kwargs['powerloom_reporting_url'],
             telegram_chat_id=kwargs['telegram_chat_id'],
             telegram_reporting_url=kwargs['telegram_reporting_url'],
@@ -181,14 +193,9 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             stream_pool_health_check_interval=kwargs['stream_pool_health_check_interval'],
             local_collector_image_tag=kwargs['local_collector_image_tag'],
             slot_id=slot_id,
-            subnet_third_octet=subnet_third_octet+idx,
-            core_api_port=core_api_port+idx,
         )
         with open(f'.env-{full_namespace}', 'w+') as f:
             f.write(env_file_contents)
-        env_file_name = f'.env-{full_namespace}'
-        project_name = f'snapshotter-lite-v2-{slot_id}-{full_namespace}'
-        project_name_lower = project_name.lower()
         # docker build and run
         print('--'*20 + f'Spinning up docker containers for slot {slot_id}' + '--'*20) 
         os.system(f"""
@@ -296,6 +303,9 @@ def main(data_market_choice: str, non_interactive: bool = False):
 
     print(f'🎰 Final list of slots to deploy: {deploy_slots}')
     data_market_contract_number = int(data_market_choice, 10) if data_market_choice != '0' else 0
+    # force uniswapv2 for now
+    data_market_contract_number = 2
+    namespace = DATA_MARKET_CHOICE_NAMESPACES[str(data_market_contract_number)]
     if not data_market_contract_number:
         if non_interactive:
             # Default to UNISWAPV2 in non-interactive mode
@@ -357,11 +367,9 @@ def main(data_market_choice: str, non_interactive: bool = False):
         deploy_slots,
         data_market_contract_number,
         namespace,
-        lite_node_branch,
         source_rpc_url=os.getenv('SOURCE_RPC_URL'),
         signer_addr=os.getenv('SIGNER_ACCOUNT_ADDRESS'),
         signer_pkey=os.getenv('SIGNER_ACCOUNT_PRIVATE_KEY'),
-        prost_chain_id=os.getenv('PROST_CHAIN_ID'),
         prost_rpc_url=os.getenv('PROST_RPC_URL'),
         powerloom_reporting_url=os.getenv('POWERLOOM_REPORTING_URL'),
         telegram_chat_id=os.getenv('TELEGRAM_CHAT_ID'),
