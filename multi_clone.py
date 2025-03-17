@@ -28,14 +28,14 @@ MIGRATION_INJECTIONS = {
         'SNAPSHOTTER_COMPUTE_REPO': 'https://github.com/PowerLoom/snapshotter-computes.git',
         'SNAPSHOTTER_CONFIG_REPO': 'https://github.com/PowerLoom/snapshotter-configs.git',
         'SNAPSHOTTER_COMPUTE_REPO_BRANCH': 'eth_uniswapv2_lite_v2',
-        'SNAPSHOTTER_CONFIG_REPO_BRANCH': 'chain_migration',
+        'SNAPSHOTTER_CONFIG_REPO_BRANCH': 'eth_uniswapv2-lite_v2',
     },
     'AAVEV3': {
         'DATA_MARKET_CONTRACT': "0x0000000000000000000000000000000000000000",
         'SNAPSHOTTER_COMPUTE_REPO': 'https://github.com/PowerLoom/snapshotter-computes.git',
         'SNAPSHOTTER_CONFIG_REPO': 'https://github.com/PowerLoom/snapshotter-configs.git',
         'SNAPSHOTTER_COMPUTE_REPO_BRANCH': 'eth_aavev3_lite_v2',
-        'SNAPSHOTTER_CONFIG_REPO_BRANCH': 'chain_migration',
+        'SNAPSHOTTER_CONFIG_REPO_BRANCH': 'eth_aavev3_lite_v2',
     }
 }
 
