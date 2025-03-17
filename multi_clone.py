@@ -19,23 +19,23 @@ OUTPUT_WORTHY_ENV_VARS = [
 ]
 
 MIGRATION_INJECTIONS = {
-    'POWERLOOM_RPC_URL': 'https://rpc-prost1j-emrlsr8nrc.t.conduit.xyz',
-    'PROST_RPC_URL': 'https://rpc-devnet.powerloom.io',  # TODO: change to mainnet RPC URL before final merge
-    'PROTOCOL_STATE_OLD': '0x865EFcdA6A4a46177dFddff3BeDa2dbD98a892F3', # TODO: change to mainnet LEGACY address before final merge
-    'PROTOCOL_STATE_NEW': '0xe752bbcbE21572d66889DFBe29439EF096802CE1', # TODO: change to mainnet NEW address before final merge
+    'POWERLOOM_RPC_URL': 'https://rpc-v2.powerloom.network',
+    'PROST_RPC_URL': 'https://rpc.powerloom.network',
+    'PROTOCOL_STATE_OLD': '0x670E0Cf8c8dF15B326D5E2Db4982172Ff8504909', 
+    'PROTOCOL_STATE_NEW': '0x000AA7d3a6a2556496f363B59e56D9aA1881548F',
     'UNISWAPV2': {
-        'DATA_MARKET_CONTRACT': "0x249961792f28b796A5dce17F3BC562Cba1dce40D",
+        'DATA_MARKET_CONTRACT': "0x21cb57C1f2352ad215a463DD867b838749CD3b8f",
         'SNAPSHOTTER_COMPUTE_REPO': 'https://github.com/PowerLoom/snapshotter-computes.git',
         'SNAPSHOTTER_CONFIG_REPO': 'https://github.com/PowerLoom/snapshotter-configs.git',
         'SNAPSHOTTER_COMPUTE_REPO_BRANCH': 'eth_uniswapv2_lite_v2',
-        'SNAPSHOT_CONFIG_REPO_BRANCH': 'chain_migration',
+        'SNAPSHOTTER_CONFIG_REPO_BRANCH': 'chain_migration',
     },
     'AAVEV3': {
         'DATA_MARKET_CONTRACT': "0x0000000000000000000000000000000000000000",
         'SNAPSHOTTER_COMPUTE_REPO': 'https://github.com/PowerLoom/snapshotter-computes.git',
         'SNAPSHOTTER_CONFIG_REPO': 'https://github.com/PowerLoom/snapshotter-configs.git',
         'SNAPSHOTTER_COMPUTE_REPO_BRANCH': 'eth_aavev3_lite_v2',
-        'SNAPSHOT_CONFIG_REPO_BRANCH': 'chain_migration',
+        'SNAPSHOTTER_CONFIG_REPO_BRANCH': 'chain_migration',
     }
 }
 
@@ -45,8 +45,6 @@ DATA_MARKET_CHOICE_NAMESPACES = {
 }
 
 # legacy data market choices
-# devnet addresses follow to be used for testing
-# TODO: change back to mainnet addresses before final merge
 DATA_MARKET_CHOICES_PROTOCOL_STATE = {
     'AAVEV3': {
         'DATA_MARKET_CONTRACT': "0xdE95f6d0D1A7B8411fCbfc60d5c2C5Df69d667a9",
@@ -56,15 +54,14 @@ DATA_MARKET_CHOICES_PROTOCOL_STATE = {
         'SNAPSHOTTER_COMPUTE_REPO_BRANCH': "eth_aavev3_lite"
     },
     'UNISWAPV2': {
-        'DATA_MARKET_CONTRACT': "0xFd3216d7B918E1760807A45fE53633e342b9C578",
+        'DATA_MARKET_CONTRACT': "0xC53ad4C6A8A978fC4A91F08A21DcE847f5Bc0E27",
         'SNAPSHOTTER_CONFIG_REPO': 'https://github.com/PowerLoom/snapshotter-configs.git',
         'SNAPSHOTTER_COMPUTE_REPO': 'https://github.com/PowerLoom/snapshotter-computes.git',
         'SNAPSHOTTER_CONFIG_REPO_BRANCH': "eth_uniswapv2-lite_v2",
         'SNAPSHOTTER_COMPUTE_REPO_BRANCH': "eth_uniswapv2_lite_v2",
     }
 }
-# TODO: change to mainnet before final merge
-POWERLOOM_CHAIN = 'devnet'
+POWERLOOM_CHAIN = 'mainnet'
 SOURCE_CHAIN = 'ETH'
 
 
@@ -247,11 +244,14 @@ def main(data_market_choice: str, non_interactive: bool = False):
         sys.exit(1)
         
     load_dotenv(override=True)
-    
+    # force uniswapv2 for now
+    data_market_choice = '2'
+    data_market_contract_number = int(data_market_choice, 10)
+    namespace = DATA_MARKET_CHOICE_NAMESPACES[str(data_market_contract_number)]
     # Setup Web3 connections
     wallet_holder_address = os.getenv("WALLET_HOLDER_ADDRESS")
     slot_contract_address = os.getenv("SLOT_CONTROLLER_ADDRESS")
-    prost_rpc_url = os.getenv("PROST_RPC_URL")
+    prost_rpc_url = MIGRATION_INJECTIONS['PROST_RPC_URL']
     lite_node_branch = os.getenv("LITE_NODE_BRANCH", 'main')
     local_collector_image_tag = os.getenv("LOCAL_COLLECTOR_IMAGE_TAG", '')
     if not local_collector_image_tag:
@@ -265,7 +265,7 @@ def main(data_market_choice: str, non_interactive: bool = False):
         sys.exit(1)
 
     # Initialize Web3 and contract connections
-    w3_old = Web3(Web3.HTTPProvider(MIGRATION_INJECTIONS['PROST_RPC_URL']))
+    w3_old = Web3(Web3.HTTPProvider(prost_rpc_url))
     w3_new = Web3(Web3.HTTPProvider(MIGRATION_INJECTIONS['POWERLOOM_RPC_URL']))
     # Load contract ABIs
     with open('ProtocolState.json', 'r') as f:
@@ -281,14 +281,13 @@ def main(data_market_choice: str, non_interactive: bool = False):
         sys.exit(1)
     protocol_state_contract_old = w3_old.eth.contract(address=MIGRATION_INJECTIONS['PROTOCOL_STATE_OLD'], abi=protocol_state_abi)
     protocol_state_contract = w3_new.eth.contract(address=MIGRATION_INJECTIONS['PROTOCOL_STATE_NEW'], abi=protocol_state_abi)
-    current_epoch_old = protocol_state_contract_old.functions.currentEpoch(MIGRATION_INJECTIONS['OLD_DATA_MARKET_CONTRACT']).call()
+    current_epoch_old = protocol_state_contract_old.functions.currentEpoch(DATA_MARKET_CHOICES_PROTOCOL_STATE[namespace]['DATA_MARKET_CONTRACT']).call()
     latest_epoch_id_old = current_epoch_old[2]
     print('Latest epoch ID detected on old chain: ', latest_epoch_id_old)
-    # TODO: for testing we are using the switchover epoch id as explicitly specified in the .env file. hardcode the mainnet value before final merge
     switchover_epoch_id = os.getenv('SWITCHOVER_EPOCH_ID', '1')
     if switchover_epoch_id == '1':
-        print(f'❌ No switchover epoch id specified in .env file, please specify a valid switchover epoch id before final merge!')
-        sys.exit(1)
+        print(f'❌ No switchover epoch id specified in .env file, using 55001 as default')
+        switchover_epoch_id = '55001'
     if latest_epoch_id_old < int(switchover_epoch_id, 10):
         print('🎰 Using old chain for fetching slots...')
         slot_contract_address = protocol_state_contract_old.functions.snapshotterState().call()
@@ -326,10 +325,7 @@ def main(data_market_choice: str, non_interactive: bool = False):
             deploy_slots = slot_ids
 
     print(f'🎰 Final list of slots to deploy: {deploy_slots}')
-    data_market_contract_number = int(data_market_choice, 10) if data_market_choice != '0' else 0
-    # force uniswapv2 for now
-    data_market_contract_number = 2
-    namespace = DATA_MARKET_CHOICE_NAMESPACES[str(data_market_contract_number)]
+    
     if not data_market_contract_number:
         if non_interactive:
             # Default to UNISWAPV2 in non-interactive mode
@@ -394,7 +390,7 @@ def main(data_market_choice: str, non_interactive: bool = False):
         source_rpc_url=os.getenv('SOURCE_RPC_URL'),
         signer_addr=os.getenv('SIGNER_ACCOUNT_ADDRESS'),
         signer_pkey=os.getenv('SIGNER_ACCOUNT_PRIVATE_KEY'),
-        prost_rpc_url=os.getenv('PROST_RPC_URL'),
+        prost_rpc_url=prost_rpc_url,
         powerloom_reporting_url=os.getenv('POWERLOOM_REPORTING_URL'),
         telegram_chat_id=os.getenv('TELEGRAM_CHAT_ID'),
         telegram_reporting_url=os.getenv('TELEGRAM_REPORTING_URL', 'https://tg-testing.powerloom.io'),
