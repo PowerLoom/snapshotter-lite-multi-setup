@@ -279,9 +279,13 @@ def main(data_market_choice: str, non_interactive: bool = False):
     except Exception as e:
         print(f"❌ Failed to fetch the latest block number. Your ISP/VPS region is not supported ⛔️ . Exception: {e}")
         sys.exit(1)
-    protocol_state_contract_old = w3_old.eth.contract(address=MIGRATION_INJECTIONS['PROTOCOL_STATE_OLD'], abi=protocol_state_abi)
-    protocol_state_contract = w3_new.eth.contract(address=MIGRATION_INJECTIONS['PROTOCOL_STATE_NEW'], abi=protocol_state_abi)
-    current_epoch_old = protocol_state_contract_old.functions.currentEpoch(DATA_MARKET_CHOICES_PROTOCOL_STATE[namespace]['DATA_MARKET_CONTRACT']).call()
+    protocol_state_old_address = w3_new.to_checksum_address(MIGRATION_INJECTIONS['PROTOCOL_STATE_OLD'])
+    protocol_state_new_address = w3_new.to_checksum_address(MIGRATION_INJECTIONS['PROTOCOL_STATE_NEW'])
+    data_market_address = w3_new.to_checksum_address(DATA_MARKET_CHOICES_PROTOCOL_STATE[namespace]['DATA_MARKET_CONTRACT'])
+
+    protocol_state_contract_old = w3_old.eth.contract(address=protocol_state_old_address, abi=protocol_state_abi)
+    protocol_state_contract = w3_new.eth.contract(address=protocol_state_new_address, abi=protocol_state_abi)
+    current_epoch_old = protocol_state_contract_old.functions.currentEpoch(data_market_address).call()
     latest_epoch_id_old = current_epoch_old[2]
     print('Latest epoch ID detected on old chain: ', latest_epoch_id_old)
     switchover_epoch_id = os.getenv('SWITCHOVER_EPOCH_ID', '1')
@@ -291,13 +295,16 @@ def main(data_market_choice: str, non_interactive: bool = False):
     if latest_epoch_id_old < int(switchover_epoch_id, 10):
         print('🎰 Using old chain for fetching slots...')
         slot_contract_address = protocol_state_contract_old.functions.snapshotterState().call()
+        slot_contract_address = w3_old.to_checksum_address(slot_contract_address)
         slot_contract = w3_old.eth.contract(address=slot_contract_address, abi=powerloom_nodes_abi)
     else:
         print('🎰 Using new chain for fetching slots...')
         slot_contract_address = protocol_state_contract.functions.snapshotterState().call()
+        slot_contract_address = w3_new.to_checksum_address(slot_contract_address)
         slot_contract = w3_new.eth.contract(address=slot_contract_address, abi=powerloom_nodes_abi)
     print(f'🔎 Against protocol state contract {slot_contract_address} found snapshotter state {slot_contract_address}')
     # Get all slots
+    wallet_holder_address = w3_new.to_checksum_address(wallet_holder_address)
     slot_ids = get_user_slots(slot_contract, wallet_holder_address)
     if not slot_ids:
         print('No slots found for wallet holder address')
