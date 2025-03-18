@@ -298,6 +298,7 @@ def main(data_market_choice: str, non_interactive: bool = False):
         slot_contract = w3_new.eth.contract(address=slot_contract_address, abi=powerloom_nodes_abi)
     print(f'🔎 Against protocol state contract {slot_contract_address} found snapshotter state {slot_contract_address}')
     # Get all slots
+    wallet_holder_address = w3_new.to_checksum_address(wallet_holder_address)
     slot_ids = get_user_slots(slot_contract, wallet_holder_address)
     if not slot_ids:
         print('No slots found for wallet holder address')
