@@ -291,7 +291,7 @@ def main(data_market_choice: str, non_interactive: bool = False):
     switchover_epoch_id = os.getenv('SWITCHOVER_EPOCH_ID', '1')
     if switchover_epoch_id == '1':
         print(f'❌ No switchover epoch id specified in .env file, using 55001 as default')
-        switchover_epoch_id = '55001'
+        switchover_epoch_id = '55000'
     if latest_epoch_id_old < int(switchover_epoch_id, 10):
         print('🎰 Using old chain for fetching slots...')
         slot_contract_address = protocol_state_contract_old.functions.snapshotterState().call()
