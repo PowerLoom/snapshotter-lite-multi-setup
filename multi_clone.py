@@ -18,27 +18,6 @@ OUTPUT_WORTHY_ENV_VARS = [
     'PROST_CHAIN_ID',
 ]
 
-MIGRATION_INJECTIONS = {
-    'POWERLOOM_RPC_URL': 'https://rpc-v2.powerloom.network',
-    'PROST_RPC_URL': 'https://rpc.powerloom.network',
-    'PROTOCOL_STATE_OLD': '0x670E0Cf8c8dF15B326D5E2Db4982172Ff8504909', 
-    'PROTOCOL_STATE_NEW': '0x000AA7d3a6a2556496f363B59e56D9aA1881548F',
-    'UNISWAPV2': {
-        'DATA_MARKET_CONTRACT': "0x21cb57C1f2352ad215a463DD867b838749CD3b8f",
-        'SNAPSHOTTER_COMPUTE_REPO': 'https://github.com/PowerLoom/snapshotter-computes.git',
-        'SNAPSHOTTER_CONFIG_REPO': 'https://github.com/PowerLoom/snapshotter-configs.git',
-        'SNAPSHOTTER_COMPUTE_REPO_BRANCH': 'eth_uniswapv2_lite_v2',
-        'SNAPSHOTTER_CONFIG_REPO_BRANCH': 'eth_uniswapv2-lite_v2',
-    },
-    'AAVEV3': {
-        'DATA_MARKET_CONTRACT': "0x0000000000000000000000000000000000000000",
-        'SNAPSHOTTER_COMPUTE_REPO': 'https://github.com/PowerLoom/snapshotter-computes.git',
-        'SNAPSHOTTER_CONFIG_REPO': 'https://github.com/PowerLoom/snapshotter-configs.git',
-        'SNAPSHOTTER_COMPUTE_REPO_BRANCH': 'eth_aavev3_lite_v2',
-        'SNAPSHOTTER_CONFIG_REPO_BRANCH': 'eth_aavev3_lite_v2',
-    }
-}
-
 DATA_MARKET_CHOICE_NAMESPACES = {
     '1': 'AAVEV3',
     '2': 'UNISWAPV2'
@@ -74,11 +53,9 @@ def env_file_template(
     source_rpc_url: str,
     signer_addr: str,
     signer_pkey: str,
-    prost_rpc_url: str,
     powerloom_rpc_url: str,
     namespace: str,
     data_market_contract: str,
-    old_data_market_contract: str,
     slot_id: str,
     snapshot_config_repo: str,
     snapshot_config_repo_branch: str,
@@ -110,9 +87,7 @@ SNAPSHOT_CONFIG_REPO_BRANCH={snapshot_config_repo_branch}
 SNAPSHOTTER_COMPUTE_REPO={snapshotter_compute_repo}
 SNAPSHOTTER_COMPUTE_REPO_BRANCH={snapshotter_compute_repo_branch}
 DOCKER_NETWORK_NAME={docker_network_name}
-PROST_RPC_URL={prost_rpc_url}
 POWERLOOM_RPC_URL={powerloom_rpc_url}
-OLD_DATA_MARKET_CONTRACT={old_data_market_contract}
 DATA_MARKET_CONTRACT={data_market_contract}
 NAMESPACE={namespace}
 POWERLOOM_CHAIN={powerloom_chain}
@@ -136,11 +111,9 @@ def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
         source_rpc_url=kwargs['source_rpc_url'],
         signer_addr=kwargs['signer_addr'],
         signer_pkey=kwargs['signer_pkey'],
-        prost_rpc_url=kwargs['prost_rpc_url'],
         powerloom_rpc_url=kwargs['powerloom_rpc_url'],
         namespace=data_market_namespace,
         data_market_contract=kwargs['data_market_contract'],
-        old_data_market_contract=kwargs['old_data_market_contract'],
         slot_id=kwargs['slot_id'],
         snapshot_config_repo=kwargs['snapshotter_config_repo'],
         snapshot_config_repo_branch=kwargs['snapshotter_config_repo_branch'],
@@ -156,7 +129,6 @@ def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
 
 def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int, data_market_namespace: str, **kwargs):
     protocol_state = DATA_MARKET_CHOICES_PROTOCOL_STATE[data_market_namespace]
-    migration_protocol_state_injection = MIGRATION_INJECTIONS[data_market_namespace]
     full_namespace = f'{POWERLOOM_CHAIN}-{data_market_namespace}-{SOURCE_CHAIN}'
 
     for idx, slot_id in enumerate(deploy_slots):
@@ -177,15 +149,13 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             source_rpc_url=kwargs['source_rpc_url'],
             signer_addr=kwargs['signer_addr'],
             signer_pkey=kwargs['signer_pkey'],
-            prost_rpc_url=kwargs['prost_rpc_url'],
-            powerloom_rpc_url=MIGRATION_INJECTIONS['POWERLOOM_RPC_URL'],
+            powerloom_rpc_url=kwargs['powerloom_rpc_url'],
             namespace=data_market_namespace,
-            data_market_contract=migration_protocol_state_injection['DATA_MARKET_CONTRACT'],
-            old_data_market_contract=protocol_state['DATA_MARKET_CONTRACT'],
-            snapshotter_config_repo_branch=migration_protocol_state_injection['SNAPSHOTTER_CONFIG_REPO_BRANCH'],
-            snapshotter_compute_repo_branch=migration_protocol_state_injection['SNAPSHOTTER_COMPUTE_REPO_BRANCH'],
-            snapshotter_config_repo=migration_protocol_state_injection['SNAPSHOTTER_CONFIG_REPO'],
-            snapshotter_compute_repo=migration_protocol_state_injection['SNAPSHOTTER_COMPUTE_REPO'],
+            data_market_contract=protocol_state['DATA_MARKET_CONTRACT'],
+            snapshotter_config_repo_branch=protocol_state['SNAPSHOTTER_CONFIG_REPO_BRANCH'],
+            snapshotter_compute_repo_branch=protocol_state['SNAPSHOTTER_COMPUTE_REPO_BRANCH'],
+            snapshotter_config_repo=protocol_state['SNAPSHOTTER_CONFIG_REPO'],
+            snapshotter_compute_repo=protocol_state['SNAPSHOTTER_COMPUTE_REPO'],
             powerloom_reporting_url=kwargs['powerloom_reporting_url'],
             telegram_chat_id=kwargs['telegram_chat_id'],
             telegram_reporting_url=kwargs['telegram_reporting_url'],
@@ -251,7 +221,7 @@ def main(data_market_choice: str, non_interactive: bool = False):
     # Setup Web3 connections
     wallet_holder_address = os.getenv("WALLET_HOLDER_ADDRESS")
     slot_contract_address = os.getenv("SLOT_CONTROLLER_ADDRESS")
-    prost_rpc_url = MIGRATION_INJECTIONS['PROST_RPC_URL']
+    powerloom_rpc_url = os.getenv("POWERLOOM_RPC_URL")
     lite_node_branch = os.getenv("LITE_NODE_BRANCH", 'main')
     local_collector_image_tag = os.getenv("LOCAL_COLLECTOR_IMAGE_TAG", '')
     if not local_collector_image_tag:
@@ -260,51 +230,24 @@ def main(data_market_choice: str, non_interactive: bool = False):
         else:
             local_collector_image_tag = 'dockerify'
     print(f'🟢 Using local collector image tag: {local_collector_image_tag}')
-    if not all([wallet_holder_address, slot_contract_address, prost_rpc_url]):
+    if not all([wallet_holder_address, slot_contract_address, powerloom_rpc_url]):
         print('Missing slot configuration environment variables')
         sys.exit(1)
 
     # Initialize Web3 and contract connections
-    w3_old = Web3(Web3.HTTPProvider(prost_rpc_url))
-    w3_new = Web3(Web3.HTTPProvider(MIGRATION_INJECTIONS['POWERLOOM_RPC_URL']))
+    w3 = Web3(Web3.HTTPProvider(powerloom_rpc_url))
     # Load contract ABIs
-    with open('ProtocolState.json', 'r') as f:
-        protocol_state_abi = json.load(f)
     with open('PowerloomNodes.json', 'r') as f:
         powerloom_nodes_abi = json.load(f)
 
-    try:
-        block_number = w3_old.eth.get_block_number()
-        print(f"✅ Successfully fetched the latest block number {block_number}. Your ISP is supported!")
-    except Exception as e:
-        print(f"❌ Failed to fetch the latest block number. Your ISP/VPS region is not supported ⛔️ . Exception: {e}")
-        sys.exit(1)
-    protocol_state_old_address = w3_new.to_checksum_address(MIGRATION_INJECTIONS['PROTOCOL_STATE_OLD'])
-    protocol_state_new_address = w3_new.to_checksum_address(MIGRATION_INJECTIONS['PROTOCOL_STATE_NEW'])
-    data_market_address = w3_new.to_checksum_address(DATA_MARKET_CHOICES_PROTOCOL_STATE[namespace]['DATA_MARKET_CONTRACT'])
+    # Setup contract instances
+    wallet_holder_address = Web3.to_checksum_address(wallet_holder_address)
+    slot_contract = w3.eth.contract(
+        address=Web3.to_checksum_address(slot_contract_address),
+        abi=powerloom_nodes_abi,
+    )
 
-    protocol_state_contract_old = w3_old.eth.contract(address=protocol_state_old_address, abi=protocol_state_abi)
-    protocol_state_contract = w3_new.eth.contract(address=protocol_state_new_address, abi=protocol_state_abi)
-    current_epoch_old = protocol_state_contract_old.functions.currentEpoch(data_market_address).call()
-    latest_epoch_id_old = current_epoch_old[2]
-    print('Latest epoch ID detected on old chain: ', latest_epoch_id_old)
-    switchover_epoch_id = os.getenv('SWITCHOVER_EPOCH_ID', '1')
-    if switchover_epoch_id == '1':
-        print(f'❌ No switchover epoch id specified in .env file, using 55001 as default')
-        switchover_epoch_id = '55000'
-    if latest_epoch_id_old < int(switchover_epoch_id, 10):
-        print('🎰 Using old chain for fetching slots...')
-        slot_contract_address = protocol_state_contract_old.functions.snapshotterState().call()
-        slot_contract_address = w3_old.to_checksum_address(slot_contract_address)
-        slot_contract = w3_old.eth.contract(address=slot_contract_address, abi=powerloom_nodes_abi)
-    else:
-        print('🎰 Using new chain for fetching slots...')
-        slot_contract_address = protocol_state_contract.functions.snapshotterState().call()
-        slot_contract_address = w3_new.to_checksum_address(slot_contract_address)
-        slot_contract = w3_new.eth.contract(address=slot_contract_address, abi=powerloom_nodes_abi)
-    print(f'🔎 Against protocol state contract {slot_contract_address} found snapshotter state {slot_contract_address}')
     # Get all slots
-    wallet_holder_address = w3_new.to_checksum_address(wallet_holder_address)
     slot_ids = get_user_slots(slot_contract, wallet_holder_address)
     if not slot_ids:
         print('No slots found for wallet holder address')
@@ -397,7 +340,7 @@ def main(data_market_choice: str, non_interactive: bool = False):
         source_rpc_url=os.getenv('SOURCE_RPC_URL'),
         signer_addr=os.getenv('SIGNER_ACCOUNT_ADDRESS'),
         signer_pkey=os.getenv('SIGNER_ACCOUNT_PRIVATE_KEY'),
-        prost_rpc_url=prost_rpc_url,
+        powerloom_rpc_url=os.getenv('POWERLOOM_RPC_URL'),
         powerloom_reporting_url=os.getenv('POWERLOOM_REPORTING_URL'),
         telegram_chat_id=os.getenv('TELEGRAM_CHAT_ID'),
         telegram_reporting_url=os.getenv('TELEGRAM_REPORTING_URL', 'https://tg-testing.powerloom.io'),
