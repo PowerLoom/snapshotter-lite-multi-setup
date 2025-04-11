@@ -207,7 +207,6 @@ SIGNER_ACCOUNT_ADDRESS=<your signer account address>
 WALLET_HOLDER_ADDRESS=<your slot holding wallet address>
 PROST_RPC_URL=[[https://rpc.powerloom.network\](https://rpc.powerloom.network)](https://rpc.powerloom.network](https://rpc.powerloom.network)) PROST_CHAIN_ID=7865
 TELEGRAM_CHAT_ID=<your telegram chat id>
-POWERLOOM_REPORTING_URL=[[https://mainnet-lite-reporting.powerloom.network\](https://mainnet-lite-reporting.powerloom.network)](https://mainnet-lite-reporting.powerloom.network](https://mainnet-lite-reporting.powerloom.network))
 Found n slots for wallet holder address
 [xxx1, xxx2, xxx3,xxx4]
 ☑️ Do you want to deploy all slots? (y/n)n
@@ -259,7 +258,6 @@ WALLET_HOLDER_ADDRESS=<your slot holding wallet address>
 PROST_RPC_URL=[https://rpc.powerloom.network](https://rpc.powerloom.network)
 PROST_CHAIN_ID=7865
 TELEGRAM_CHAT_ID=<your telegram chat id>
-POWERLOOM_REPORTING_URL=[https://mainnet-lite-reporting.powerloom.network](https://mainnet-lite-reporting.powerloom.network)
 Found n slots for wallet holder address
 [list of slot ids]
 ☑️ Do you want to deploy all slots? (y/n)n

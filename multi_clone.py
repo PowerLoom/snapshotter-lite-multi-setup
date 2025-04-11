@@ -13,7 +13,6 @@ OUTPUT_WORTHY_ENV_VARS = [
     'SIGNER_ACCOUNT_ADDRESS', 
     'WALLET_HOLDER_ADDRESS', 
     'TELEGRAM_CHAT_ID',
-    'POWERLOOM_REPORTING_URL',
     'PROST_RPC_URL',
     'PROST_CHAIN_ID',
 ]
@@ -61,9 +60,7 @@ def env_file_template(
     snapshot_config_repo_branch: str,
     snapshotter_compute_repo: str,
     snapshotter_compute_repo_branch: str,
-    powerloom_reporting_url: str,
     data_market_in_request: str = 'false',
-    slack_reporting_url: str = '',
     web3_storage_token: str = '',
     telegram_reporting_url: str = '',
     telegram_chat_id: str = '',
@@ -94,14 +91,12 @@ NAMESPACE={namespace}
 POWERLOOM_CHAIN={powerloom_chain}
 SOURCE_CHAIN={source_chain}
 FULL_NAMESPACE={full_namespace}
-POWERLOOM_REPORTING_URL={powerloom_reporting_url}
 LOCAL_COLLECTOR_PORT={local_collector_port}
 MAX_STREAM_POOL_SIZE={max_stream_pool_size}
 STREAM_POOL_HEALTH_CHECK_INTERVAL={stream_pool_health_check_interval}
 DATA_MARKET_IN_REQUEST={data_market_in_request}
 # Optional
 LOCAL_COLLECTOR_IMAGE_TAG={local_collector_image_tag}
-SLACK_REPORTING_URL={slack_reporting_url}
 WEB3_STORAGE_TOKEN={web3_storage_token}
 TELEGRAM_REPORTING_URL={telegram_reporting_url}
 TELEGRAM_CHAT_ID={telegram_chat_id}
@@ -121,7 +116,6 @@ def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
         snapshot_config_repo_branch=kwargs['snapshotter_config_repo_branch'],
         snapshotter_compute_repo=kwargs['snapshotter_compute_repo'],
         snapshotter_compute_repo_branch=kwargs['snapshotter_compute_repo_branch'],
-        powerloom_reporting_url=kwargs['powerloom_reporting_url'],
         telegram_chat_id=kwargs['telegram_chat_id'],
         telegram_reporting_url=kwargs['telegram_reporting_url'],
         max_stream_pool_size=kwargs['max_stream_pool_size'],
@@ -158,7 +152,6 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             snapshotter_compute_repo_branch=protocol_state['SNAPSHOTTER_COMPUTE_REPO_BRANCH'],
             snapshotter_config_repo=protocol_state['SNAPSHOTTER_CONFIG_REPO'],
             snapshotter_compute_repo=protocol_state['SNAPSHOTTER_COMPUTE_REPO'],
-            powerloom_reporting_url=kwargs['powerloom_reporting_url'],
             telegram_chat_id=kwargs['telegram_chat_id'],
             telegram_reporting_url=kwargs['telegram_reporting_url'],
             max_stream_pool_size=kwargs['max_stream_pool_size'],
@@ -343,7 +336,6 @@ def main(data_market_choice: str, non_interactive: bool = False):
         signer_addr=os.getenv('SIGNER_ACCOUNT_ADDRESS'),
         signer_pkey=os.getenv('SIGNER_ACCOUNT_PRIVATE_KEY'),
         powerloom_rpc_url=os.getenv('POWERLOOM_RPC_URL'),
-        powerloom_reporting_url=os.getenv('POWERLOOM_REPORTING_URL'),
         telegram_chat_id=os.getenv('TELEGRAM_CHAT_ID'),
         telegram_reporting_url=os.getenv('TELEGRAM_REPORTING_URL', 'https://tg-testing.powerloom.io'),
         max_stream_pool_size=max_stream_pool_size,
