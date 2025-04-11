@@ -33,7 +33,7 @@ DATA_MARKET_CHOICES_PROTOCOL_STATE = {
         'SNAPSHOTTER_COMPUTE_REPO_BRANCH': "eth_aavev3_lite"
     },
     'UNISWAPV2': {
-        'DATA_MARKET_CONTRACT': "0xC53ad4C6A8A978fC4A91F08A21DcE847f5Bc0E27",
+        'DATA_MARKET_CONTRACT': "0x21cb57C1f2352ad215a463DD867b838749CD3b8f",
         'SNAPSHOTTER_CONFIG_REPO': 'https://github.com/PowerLoom/snapshotter-configs.git',
         'SNAPSHOTTER_COMPUTE_REPO': 'https://github.com/PowerLoom/snapshotter-computes.git',
         'SNAPSHOTTER_CONFIG_REPO_BRANCH': "eth_uniswapv2-lite_v2",
@@ -73,6 +73,7 @@ def env_file_template(
     max_stream_pool_size: int = 2,
     stream_pool_health_check_interval: int = 30,
     local_collector_image_tag: str = 'latest',
+    telegram_notification_cooldown: int = 300,
 ) -> str:
     full_namespace = f'{powerloom_chain}-{namespace}-{source_chain}'
     docker_network_name = f"snapshotter-lite-v2-{full_namespace}"
@@ -104,6 +105,7 @@ SLACK_REPORTING_URL={slack_reporting_url}
 WEB3_STORAGE_TOKEN={web3_storage_token}
 TELEGRAM_REPORTING_URL={telegram_reporting_url}
 TELEGRAM_CHAT_ID={telegram_chat_id}
+TELEGRAM_NOTIFICATION_COOLDOWN={telegram_notification_cooldown}
 """
 
 def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
