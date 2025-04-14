@@ -24,7 +24,7 @@ DATA_MARKET_CHOICE_NAMESPACES = {
 # legacy data market choices
 DATA_MARKET_CHOICES_PROTOCOL_STATE = {
     'AAVEV3': {
-        'DATA_MARKET_CONTRACT': "0xdE95f6d0D1A7B8411fCbfc60d5c2C5Df69d667a9",
+        'DATA_MARKET_CONTRACT': "0x0000000000000000000000000000000000000000",
         'SNAPSHOTTER_CONFIG_REPO': 'https://github.com/PowerLoom/snapshotter-configs.git',
         'SNAPSHOTTER_COMPUTE_REPO': 'https://github.com/PowerLoom/snapshotter-computes.git',
         'SNAPSHOTTER_CONFIG_REPO_BRANCH': "eth_aavev3_lite_v2",
@@ -40,6 +40,8 @@ DATA_MARKET_CHOICES_PROTOCOL_STATE = {
 }
 POWERLOOM_CHAIN = 'mainnet'
 SOURCE_CHAIN = 'ETH'
+POWERLOOM_RPC_URL = 'https://rpc-v2.powerloom.network'
+PROTOCOL_STATE_CONTRACT = "0x000AA7d3a6a2556496f363B59e56D9aA1881548F"
 
 
 def get_user_slots(contract_obj, wallet_owner_addr):
@@ -212,12 +214,11 @@ def main(data_market_choice: str, non_interactive: bool = False):
     namespace = DATA_MARKET_CHOICE_NAMESPACES[str(data_market_contract_number)]
     # Setup Web3 connections
     wallet_holder_address = os.getenv("WALLET_HOLDER_ADDRESS")
-    slot_contract_address = os.getenv("SLOT_CONTROLLER_ADDRESS")
     powerloom_rpc_url = os.getenv("POWERLOOM_RPC_URL")
 
     if not powerloom_rpc_url:
         print('🟡 POWERLOOM_RPC_URL is not set in .env file, using default value...')
-        powerloom_rpc_url = 'https://rpc-v2.powerloom.network'
+        powerloom_rpc_url = POWERLOOM_RPC_URL
 
     lite_node_branch = os.getenv("LITE_NODE_BRANCH", 'main')
     local_collector_image_tag = os.getenv("LOCAL_COLLECTOR_IMAGE_TAG", '')
@@ -227,15 +228,35 @@ def main(data_market_choice: str, non_interactive: bool = False):
         else:
             local_collector_image_tag = 'dockerify'
     print(f'🟢 Using local collector image tag: {local_collector_image_tag}')
-    if not all([wallet_holder_address, slot_contract_address, powerloom_rpc_url]):
-        print('Missing slot configuration environment variables')
+    if not wallet_holder_address:
+        print('Missing wallet holder address environment variable')
         sys.exit(1)
 
     # Initialize Web3 and contract connections
     w3 = Web3(Web3.HTTPProvider(powerloom_rpc_url))
     # Load contract ABIs
+    with open('ProtocolState.json', 'r') as f:
+        protocol_state_abi = json.load(f)
     with open('PowerloomNodes.json', 'r') as f:
         powerloom_nodes_abi = json.load(f)
+
+    try:
+        block_number = w3.eth.get_block_number()
+        print(f"✅ Successfully fetched the latest block number {block_number}. Your ISP is supported!")
+    except Exception as e:
+        print(f"❌ Failed to fetch the latest block number. Your ISP/VPS region is not supported ⛔️ . Exception: {e}")
+        sys.exit(1)
+
+    protocol_state_address = w3.to_checksum_address(PROTOCOL_STATE_CONTRACT)
+    protocol_state_contract = w3.eth.contract(
+        address=protocol_state_address,
+        abi=protocol_state_abi,
+    )
+
+    slot_contract_address = protocol_state_contract.functions.snapshotterState().call()
+    slot_contract_address = w3.to_checksum_address(slot_contract_address)
+
+    print(f'🔎 Against protocol state contract {protocol_state_address} found snapshotter state contract {slot_contract_address}')
 
     # Setup contract instances
     wallet_holder_address = Web3.to_checksum_address(wallet_holder_address)
