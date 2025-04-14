@@ -13,8 +13,7 @@ OUTPUT_WORTHY_ENV_VARS = [
     'SIGNER_ACCOUNT_ADDRESS', 
     'WALLET_HOLDER_ADDRESS', 
     'TELEGRAM_CHAT_ID',
-    'PROST_RPC_URL',
-    'PROST_CHAIN_ID',
+    'POWERLOOM_RPC_URL',
 ]
 
 DATA_MARKET_CHOICE_NAMESPACES = {
@@ -61,7 +60,6 @@ def env_file_template(
     snapshotter_compute_repo: str,
     snapshotter_compute_repo_branch: str,
     data_market_in_request: str = 'false',
-    web3_storage_token: str = '',
     telegram_reporting_url: str = '',
     telegram_chat_id: str = '',
     powerloom_chain: str = POWERLOOM_CHAIN,
@@ -97,7 +95,6 @@ STREAM_POOL_HEALTH_CHECK_INTERVAL={stream_pool_health_check_interval}
 DATA_MARKET_IN_REQUEST={data_market_in_request}
 # Optional
 LOCAL_COLLECTOR_IMAGE_TAG={local_collector_image_tag}
-WEB3_STORAGE_TOKEN={web3_storage_token}
 TELEGRAM_REPORTING_URL={telegram_reporting_url}
 TELEGRAM_CHAT_ID={telegram_chat_id}
 TELEGRAM_NOTIFICATION_COOLDOWN={telegram_notification_cooldown}
