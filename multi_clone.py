@@ -214,6 +214,11 @@ def main(data_market_choice: str, non_interactive: bool = False):
     wallet_holder_address = os.getenv("WALLET_HOLDER_ADDRESS")
     slot_contract_address = os.getenv("SLOT_CONTROLLER_ADDRESS")
     powerloom_rpc_url = os.getenv("POWERLOOM_RPC_URL")
+
+    if not powerloom_rpc_url:
+        print('🟡 POWERLOOM_RPC_URL is not set in .env file, using default value...')
+        powerloom_rpc_url = 'https://rpc-v2.powerloom.network'
+
     lite_node_branch = os.getenv("LITE_NODE_BRANCH", 'main')
     local_collector_image_tag = os.getenv("LOCAL_COLLECTOR_IMAGE_TAG", '')
     if not local_collector_image_tag:
