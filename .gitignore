@@ -3,5 +3,6 @@ powerloom-testnet-*/
 .python-version
 *snapshotter-lite*/
 powerloom-premainnet-*/
-__pycache__/
-*dist*/
+powerloom-mainnet-*/
+dist*/
+*__pycache__*/
