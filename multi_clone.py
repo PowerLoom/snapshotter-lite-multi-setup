@@ -178,7 +178,7 @@ def docker_running():
     except subprocess.CalledProcessError:
         return False
 
-def main(data_market_choice: str, non_interactive: bool = False):
+def main(data_market_choice: str, non_interactive: bool = False, latest_only: bool = False):
     # check if Docker is running
     if not docker_running():
         print('🟡 Docker is not running, please start Docker and try again!')
@@ -275,7 +275,12 @@ def main(data_market_choice: str, non_interactive: bool = False):
     print(slot_ids)
     deploy_slots = list()
     # choose range of slots to deploy
-    if non_interactive:
+    if latest_only:
+        # Deploy only the latest (highest) slot
+        latest_slot = max(slot_ids)
+        deploy_slots = [latest_slot]
+        print(f'🟢 Latest-only mode: Deploying only the latest slot {latest_slot}')
+    elif non_interactive:
         deploy_slots = slot_ids
         print('🟢 Non-interactive mode: Deploying all slots')
     else:
@@ -373,8 +378,10 @@ if __name__ == '__main__':
                     help='Data market choice (1: AAVEV3, 2: UNISWAPV2)')
     parser.add_argument('-y', '--yes', action='store_true',
                     help='Deploy all nodes without prompting for confirmation')
+    parser.add_argument('--latest-only', action='store_true',
+                    help='Deploy only the latest (highest) slot')
     
     args = parser.parse_args()
     
     data_market = args.data_market if args.data_market else '0'
-    main(data_market_choice=data_market, non_interactive=args.yes)
+    main(data_market_choice=data_market, non_interactive=args.yes, latest_only=args.latest_only)
