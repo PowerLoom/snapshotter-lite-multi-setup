@@ -71,6 +71,7 @@ def env_file_template(
     stream_pool_health_check_interval: int = 30,
     local_collector_image_tag: str = 'latest',
     telegram_notification_cooldown: int = 300,
+    connection_refresh_interval_sec: int = 60,
 ) -> str:
     full_namespace = f'{powerloom_chain}-{namespace}-{source_chain}'
     docker_network_name = f"snapshotter-lite-v2-{full_namespace}"
@@ -99,6 +100,7 @@ DATA_MARKET_IN_REQUEST={data_market_in_request}
 LOCAL_COLLECTOR_IMAGE_TAG={local_collector_image_tag}
 TELEGRAM_REPORTING_URL={telegram_reporting_url}
 TELEGRAM_CHAT_ID={telegram_chat_id}
+CONNECTION_REFRESH_INTERVAL_SEC={connection_refresh_interval_sec}
 TELEGRAM_NOTIFICATION_COOLDOWN={telegram_notification_cooldown}
 """
 
@@ -120,6 +122,7 @@ def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
         max_stream_pool_size=kwargs['max_stream_pool_size'],
         stream_pool_health_check_interval=kwargs['stream_pool_health_check_interval'],
         local_collector_image_tag=kwargs['local_collector_image_tag'],
+        connection_refresh_interval_sec=kwargs['connection_refresh_interval_sec'],
     )
 
 def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int, data_market_namespace: str, **kwargs):
@@ -157,6 +160,7 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             stream_pool_health_check_interval=kwargs['stream_pool_health_check_interval'],
             local_collector_image_tag=kwargs['local_collector_image_tag'],
             slot_id=slot_id,
+            connection_refresh_interval_sec=kwargs['connection_refresh_interval_sec'],
         )
         with open(f'.env-{full_namespace}', 'w+') as f:
             f.write(env_file_contents)
@@ -178,7 +182,7 @@ def docker_running():
     except subprocess.CalledProcessError:
         return False
 
-def main(data_market_choice: str, non_interactive: bool = False):
+def main(data_market_choice: str, non_interactive: bool = False, latest_only: bool = False):
     # check if Docker is running
     if not docker_running():
         print('🟡 Docker is not running, please start Docker and try again!')
@@ -275,7 +279,12 @@ def main(data_market_choice: str, non_interactive: bool = False):
     print(slot_ids)
     deploy_slots = list()
     # choose range of slots to deploy
-    if non_interactive:
+    if latest_only:
+        # Deploy only the latest (highest) slot
+        latest_slot = max(slot_ids)
+        deploy_slots = [latest_slot]
+        print(f'🟢 Latest-only mode: Deploying only the latest slot {latest_slot}')
+    elif non_interactive:
         deploy_slots = slot_ids
         print('🟢 Non-interactive mode: Deploying all slots')
     else:
@@ -364,6 +373,7 @@ def main(data_market_choice: str, non_interactive: bool = False):
         max_stream_pool_size=max_stream_pool_size,
         stream_pool_health_check_interval=os.getenv('STREAM_POOL_HEALTH_CHECK_INTERVAL', 120),
         local_collector_image_tag=local_collector_image_tag,
+        connection_refresh_interval_sec=os.getenv('CONNECTION_REFRESH_INTERVAL_SEC', 60),
     )
 
 
@@ -373,8 +383,10 @@ if __name__ == '__main__':
                     help='Data market choice (1: AAVEV3, 2: UNISWAPV2)')
     parser.add_argument('-y', '--yes', action='store_true',
                     help='Deploy all nodes without prompting for confirmation')
+    parser.add_argument('--latest-only', action='store_true',
+                    help='Deploy only the latest (highest) slot')
     
     args = parser.parse_args()
     
     data_market = args.data_market if args.data_market else '0'
-    main(data_market_choice=data_market, non_interactive=args.yes)
+    main(data_market_choice=data_market, non_interactive=args.yes, latest_only=args.latest_only)
