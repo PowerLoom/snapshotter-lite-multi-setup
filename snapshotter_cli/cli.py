@@ -40,38 +40,45 @@ def fetch_markets_config() -> List[PowerloomChainConfig]:
 
 def load_default_config(ctx: typer.Context):
     """Load default configuration, available markets, and user settings"""
-    markets_config = fetch_markets_config()
-    user_settings = load_user_identity_settings()
-    
-    chain_markets_map: Dict[str, ChainMarketData] = {}
-    available_environments_set = set()
-    for chain_config_obj in markets_config:
-        chain_name_upper = chain_config_obj.powerloomChain.name.upper()
-        available_environments_set.add(chain_name_upper)
+    try:
+        markets_config = fetch_markets_config()
+        user_settings = load_user_identity_settings()
         
-        current_markets_for_chain: Dict[str, MarketConfig] = {}
-        if chain_config_obj.dataMarkets:
-            for market_def in chain_config_obj.dataMarkets:
-                current_markets_for_chain[market_def.name.upper()] = market_def 
+        chain_markets_map: Dict[str, ChainMarketData] = {}
+        available_environments_set = set()
+        for chain_config_obj in markets_config:
+            chain_name_upper = chain_config_obj.powerloomChain.name.upper()
+            available_environments_set.add(chain_name_upper)
+            
+            current_markets_for_chain: Dict[str, MarketConfig] = {}
+            if chain_config_obj.dataMarkets:
+                for market_def in chain_config_obj.dataMarkets:
+                    current_markets_for_chain[market_def.name.upper()] = market_def 
+            
+            chain_markets_map[chain_name_upper] = ChainMarketData(
+                chain_config=chain_config_obj.powerloomChain,
+                markets=current_markets_for_chain # Use the safely created dict
+            )
         
-        chain_markets_map[chain_name_upper] = ChainMarketData(
-            chain_config=chain_config_obj.powerloomChain,
-            markets=current_markets_for_chain # Use the safely created dict
+        # Prepare CLIContext first to pass to identity commands if they need it for validation
+        cli_obj = CLIContext(
+            markets_config=markets_config,
+            chain_markets_map=chain_markets_map,
+            available_environments=available_environments_set,
+            available_markets={
+                market_name 
+                for chain_data in chain_markets_map.values() 
+                for market_name in chain_data.markets.keys()
+            },
+            user_settings=user_settings 
         )
-    
-    # Prepare CLIContext first to pass to identity commands if they need it for validation
-    cli_obj = CLIContext(
-        markets_config=markets_config,
-        chain_markets_map=chain_markets_map,
-        available_environments=available_environments_set,
-        available_markets={
-            market_name 
-            for chain_data in chain_markets_map.values() 
-            for market_name in chain_data.markets.keys()
-        },
-        user_settings=user_settings 
-    )
-    ctx.obj = cli_obj
+        ctx.obj = cli_obj
+    except Exception as e:
+        console.print(f"🚨 Error in load_default_config: {e}", style="bold red")
+        import traceback
+        console.print(traceback.format_exc())
+        # It's often better to re-raise the exception or exit if the setup is critical
+        raise typer.Exit(code=1)
 
 app = typer.Typer(
     name="powerloom",
@@ -83,11 +90,11 @@ app = typer.Typer(
 
 app.add_typer(identity_app, name="identity")
 
-class Environment(str, Enum):
-    pass
-
-class DataMarket(str, Enum):
-    pass
+# class Environment(str, Enum):
+#     pass
+#
+# class DataMarket(str, Enum):
+#     pass
 
 @app.command()
 def diagnose(
