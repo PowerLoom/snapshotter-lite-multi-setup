@@ -14,7 +14,7 @@ CHAIN_PROTOCOL_STATE_CONTRACTS = {
     "MAINNET": "0x000AA7d3a6a2556496f363B59e56D9aA1881548F", # From multi_clone.py
 }
 
-ABI_DIR = Path(__file__).parent.parent / "abi" # Assumes abi folder is at snapshotter_cli/abi
+ABI_DIR = Path(__file__).parent.parent / "utils/abi" # Assumes abi folder is at snapshotter_cli/utils/abi
 
 def fetch_owned_slots(
     wallet_address: str,

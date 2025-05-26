@@ -7,14 +7,19 @@ from typing import Dict, List, Optional
 import json
 from enum import Enum
 from pathlib import Path
+import shutil
 from .commands.diagnose import diagnose_command
 from rich.table import Table
 from rich.panel import Panel
 from rich.tree import Tree
 from .commands.configure import configure_command
 from .commands.identity import identity_app, load_settings as load_user_identity_settings
-from .utils.models import CLIContext, ChainConfig, ChainMarketData, MarketConfig, ComputeConfig, PowerloomChainConfig, UserSettings
+from .utils.models import CLIContext, ChainConfig, ChainMarketData, MarketConfig, ComputeConfig, PowerloomChainConfig, UserSettings, ChainSpecificIdentity
 from .utils.evm import fetch_owned_slots
+from .utils.deployment import deploy_snapshotter_instance, parse_env_file_vars, CONFIG_ENV_FILENAME_TEMPLATE, run_git_command
+from .utils.config_helpers import get_credential, get_source_chain_rpc_url
+from .utils.system_checks import is_docker_running, list_snapshotter_screen_sessions
+from .utils.docker_utils import get_docker_container_status_for_instance
 
 
 console = Console()
@@ -38,29 +43,35 @@ def load_default_config(ctx: typer.Context):
     markets_config = fetch_markets_config()
     user_settings = load_user_identity_settings()
     
-    # Create chain-to-markets mapping
     chain_markets_map: Dict[str, ChainMarketData] = {}
-    for chain in markets_config:
-        chain_name = chain.powerloomChain.name.upper()
-        chain_markets_map[chain_name] = ChainMarketData(
-            chain_config=chain.powerloomChain,
-            markets={
-                market.name.upper(): market
-                for market in chain.dataMarkets
-            }
+    available_environments_set = set()
+    for chain_config_obj in markets_config:
+        chain_name_upper = chain_config_obj.powerloomChain.name.upper()
+        available_environments_set.add(chain_name_upper)
+        
+        current_markets_for_chain: Dict[str, MarketConfig] = {}
+        if chain_config_obj.dataMarkets:
+            for market_def in chain_config_obj.dataMarkets:
+                current_markets_for_chain[market_def.name.upper()] = market_def 
+        
+        chain_markets_map[chain_name_upper] = ChainMarketData(
+            chain_config=chain_config_obj.powerloomChain,
+            markets=current_markets_for_chain # Use the safely created dict
         )
     
-    ctx.obj = CLIContext(
+    # Prepare CLIContext first to pass to identity commands if they need it for validation
+    cli_obj = CLIContext(
         markets_config=markets_config,
         chain_markets_map=chain_markets_map,
-        available_environments=set(chain_markets_map.keys()),
+        available_environments=available_environments_set,
         available_markets={
             market_name 
             for chain_data in chain_markets_map.values() 
             for market_name in chain_data.markets.keys()
         },
-        user_settings=user_settings
+        user_settings=user_settings 
     )
+    ctx.obj = cli_obj
 
 app = typer.Typer(
     name="powerloom",
@@ -91,191 +102,399 @@ def diagnose(
 @app.command()
 def deploy(
     ctx: typer.Context,
-    environment: str = typer.Option(..., "--env", "-e", help="Deployment environment"),
-    data_markets: List[str] = typer.Option(None, "--market", "-m", help="Data markets to deploy"),
-    slots: Optional[List[int]] = typer.Option(None, "--slot", "-s", help="Specific slot IDs to deploy. If not provided, all owned slots will be used."),
-    wallet_address: Optional[str] = typer.Option(None, "--wallet", "-w", help="Wallet address (0x...) holding the slots. Overrides configured identity and env var."),
-    signer_address: Optional[str] = typer.Option(None, "--signer-address", help="Signer account address (0x...). Overrides configured identity and env var."),
-    signer_key: Optional[str] = typer.Option(None, "--signer-key", help="Signer account private key. Overrides configured identity and env var. USE WITH CAUTION.", hide_input=True)
+    environment: Optional[str] = typer.Option(None, "--env", "-e", help="Deployment environment (Powerloom chain name). If not provided, you will be prompted."),
+    data_markets_opt: Optional[List[str]] = typer.Option(None, "--market", "-m", help="Data markets to deploy. If --env is provided but this is not, you will be prompted."),
+    slots: Optional[List[int]] = typer.Option(None, "--slot", "-s", help="Specific slot IDs to deploy."),
+    wallet_address_opt: Optional[str] = typer.Option(None, "--wallet", "-w", help="Wallet address (0x...) holding the slots."),
+    signer_address_opt: Optional[str] = typer.Option(None, "--signer-address", help="Signer account address (0x...)."),
+    signer_key_opt: Optional[str] = typer.Option(None, "--signer-key", help="Signer account private key.", hide_input=True)
 ):
-    """Deploy snapshotter nodes for specified environment and data markets"""
+    """Deploy snapshotter nodes for specified environment and data markets."""
+    # --- Docker Check --- 
+    if not is_docker_running():
+        console.print("❌ Docker daemon is not running or not responsive. Please start Docker and try again.", style="bold red")
+        raise typer.Exit(1)
+    console.print("🐳 Docker daemon is running.", style="green")
+
     cli_context: CLIContext = ctx.obj
     user_settings: UserSettings = cli_context.user_settings
     
-    # Validate environment
-    env_config = next((chain for chain in cli_context.markets_config 
-                      if chain.powerloomChain.name.upper() == environment.upper()), None)
-    if not env_config:
-        console.print(f"❌ Invalid environment: {environment}", style="bold red")
-        console.print(f"Available environments are: {', '.join(cli_context.available_environments)}")
-        raise typer.Exit(1)
+    selected_powerloom_chain_name_upper: Optional[str] = None
+    env_config: Optional[ChainMarketData] = None
+
+    base_snapshotter_clone_path = Path(os.getcwd()) / ".tmp_snapshotter_base_clone"
+
+    try:
+        if environment:
+            selected_powerloom_chain_name_upper = environment.upper()
+            env_config = cli_context.chain_markets_map.get(selected_powerloom_chain_name_upper)
+            if not env_config:
+                console.print(f"❌ Invalid environment provided via --env: {environment}. Valid: {', '.join(cli_context.available_environments)}", style="bold red")
+                raise typer.Exit(1)
+        else:
+            all_powerloom_chains_from_config = cli_context.markets_config
+            if not all_powerloom_chains_from_config:
+                console.print("❌ No Powerloom chains found in the remote configuration. Cannot proceed.", style="bold red")
+                raise typer.Exit(1)
+
+            chain_list_display = "\n".join(
+                f"[bold green]{i+1}.[/] [cyan]{chain.powerloomChain.name}[/]"
+                for i, chain in enumerate(all_powerloom_chains_from_config)
+            )
+            panel = Panel(chain_list_display, title="[bold blue]Select Powerloom Chain for Deployment[/]", border_style="blue", padding=(1,2))
+            console.print(panel)
+            selected_chain_input = typer.prompt("👉🏼 Select a Powerloom chain (number or name)", type=str)
+            
+            temp_chain_config_obj: Optional[PowerloomChainConfig] = None
+            if selected_chain_input.isdigit():
+                index = int(selected_chain_input) - 1
+                if 0 <= index < len(all_powerloom_chains_from_config):
+                    temp_chain_config_obj = all_powerloom_chains_from_config[index]
+            else:
+                temp_chain_config_obj = next((cfg for cfg in all_powerloom_chains_from_config if cfg.powerloomChain.name.upper() == selected_chain_input.upper()), None)
+
+            if not temp_chain_config_obj:
+                console.print(f"❌ Invalid Powerloom chain selection: '{selected_chain_input}'.", style="bold red")
+                raise typer.Exit(1)
+            
+            selected_powerloom_chain_name_upper = temp_chain_config_obj.powerloomChain.name.upper()
+            env_config = cli_context.chain_markets_map.get(selected_powerloom_chain_name_upper)
+        if not env_config:
+            console.print(f"INTERNAL ERROR: Could not find market data for selected chain {selected_powerloom_chain_name_upper}.", style="bold red")
+            raise typer.Exit(1)
+        
+        if not env_config.markets:
+            console.print(f"❌ No data markets found for {selected_powerloom_chain_name_upper} in sources.json.", style="bold red")
+            raise typer.Exit(1)
     
-    console.print(f"🚀 Deploying to {environment}...", style="bold green")
+        console.print(f"🚀 Deploying to environment: [bold magenta]{selected_powerloom_chain_name_upper}[/bold magenta]...", style="bold green")
 
-    # Determine Wallet Holder Address
-    final_wallet_address = wallet_address 
-    if not final_wallet_address:
-        final_wallet_address = os.getenv("WALLET_HOLDER_ADDRESS")
-        if final_wallet_address:
-            console.print(f"ℹ️ Using wallet holder address from WALLET_HOLDER_ADDRESS env var: {final_wallet_address}", style="dim")
-        elif user_settings.wallet_address:
-            final_wallet_address = user_settings.wallet_address
-            console.print(f"ℹ️ Using wallet holder address from configured identity: {final_wallet_address}", style="dim")
-        else:
-            console.print("❌ Wallet Holder Address not provided or configured.", style="bold red")
-            console.print("   Use --wallet, set WALLET_HOLDER_ADDRESS, or run 'snapshotter-cli identity set'.", style="yellow")
-            raise typer.Exit(1)
-    else:
-        console.print(f"ℹ️ Using wallet holder address from --wallet option: {final_wallet_address}", style="dim")
+        configured_chain_identity = user_settings.chain_identities.get(selected_powerloom_chain_name_upper)
 
-    # Determine Signer Account Address
-    final_signer_address = signer_address
-    if not final_signer_address:
-        final_signer_address = os.getenv("SIGNER_ACCOUNT_ADDRESS")
-        if final_signer_address:
-            console.print(f"ℹ️ Using signer address from SIGNER_ACCOUNT_ADDRESS env var: {final_signer_address}", style="dim")
-        elif user_settings.signer_account_address:
-            final_signer_address = user_settings.signer_account_address
-            console.print(f"ℹ️ Using signer address from configured identity: {final_signer_address}", style="dim")
-        else:
-            console.print("❌ Signer Account Address not provided or configured.", style="bold red")
-            console.print("   Use --signer-address, set SIGNER_ACCOUNT_ADDRESS, or run 'snapshotter-cli identity set'.", style="yellow")
-            raise typer.Exit(1)
-    else:
-        console.print(f"ℹ️ Using signer address from --signer-address option: {final_signer_address}", style="dim")
-
-    # Determine Signer Account Private Key
-    final_signer_key = signer_key
-    if not final_signer_key:
-        final_signer_key = os.getenv("SIGNER_ACCOUNT_PRIVATE_KEY")
-        if final_signer_key:
-            console.print(f"ℹ️ Using signer private key from SIGNER_ACCOUNT_PRIVATE_KEY env var.", style="dim")
-        elif user_settings.signer_account_private_key:
-            final_signer_key = user_settings.signer_account_private_key
-            console.print(f"ℹ️ Using signer private key from configured identity.", style="dim")
-        else:
-            console.print("❌ Signer Account Private Key not provided or configured.", style="bold red")
-            console.print("   Use --signer-key, set SIGNER_ACCOUNT_PRIVATE_KEY, or run 'snapshotter-cli identity set'.", style="yellow")
-            console.print("   [yellow]Warning: Passing private keys via CLI history or insecure environment variables can be risky.[/yellow]")
-            raise typer.Exit(1)
-    else:
-        console.print(f"ℹ️ Using signer private key from --signer-key option.", style="dim")
-        console.print("   [yellow]Warning: Passing private keys via CLI history can be risky.[/yellow]")
-
-    # Fetch owned slots if specific slots are not provided
-    deploy_slots: Optional[List[int]] = slots
-    if not deploy_slots:
-        console.print(f"ℹ️ No specific slots provided. Fetching all slots owned by {final_wallet_address} on {env_config.powerloomChain.name}...", style="dim")
-        owned_slots = fetch_owned_slots(
-            wallet_address=final_wallet_address,
-            powerloom_chain_name=env_config.powerloomChain.name,
-            rpc_url=env_config.powerloomChain.rpcURL
+        final_wallet_address = get_credential(
+            "WALLET_HOLDER_ADDRESS", 
+            selected_powerloom_chain_name_upper, 
+            wallet_address_opt, 
+            configured_chain_identity, 
+            None # No market-specific env vars for this initial wallet lookup
         )
-        if owned_slots is None: # Error occurred during fetch
-            console.print(f"❌ Could not fetch slots for wallet {final_wallet_address}. Please check errors above.", style="bold red")
+        if not final_wallet_address: 
+            error_message_lines = [
+                f"❌ Wallet Holder Address for Powerloom chain [bold magenta]{selected_powerloom_chain_name_upper}[/bold magenta] could not be resolved.",
+                f"   The CLI attempted to find it via:",
+                f"     1. The --wallet CLI option",
+                f"     2. The `WALLET_HOLDER_ADDRESS` shell environment variable",
+                f"     3. A `WALLET_HOLDER_ADDRESS` entry in a `.env` file in your current directory",
+                f"     4. The identity settings for the {selected_powerloom_chain_name_upper} chain (see 'snapshotter-cli identity show --chain {selected_powerloom_chain_name_upper}')"
+            ]
+            console.print("\n".join(error_message_lines), style="bold red")
             raise typer.Exit(1)
-        if not owned_slots:
-            console.print(f"🤷 No slots found for wallet {final_wallet_address} on {env_config.powerloomChain.name}. Nothing to deploy.", style="yellow")
+    
+        deploy_slots: Optional[List[int]] = slots
+        if not deploy_slots:
+            console.print(f"ℹ️ No specific slots provided. Fetching all slots owned by {final_wallet_address} on {env_config.chain_config.name}...", style="dim")
+            fetched_slots_result = fetch_owned_slots(
+                wallet_address=final_wallet_address,
+                powerloom_chain_name=env_config.chain_config.name,
+                rpc_url=str(env_config.chain_config.rpcURL)
+            )
+            if fetched_slots_result is None: 
+                console.print(f"❌ Could not fetch slots. Please check errors above.", style="bold red"); raise typer.Exit(1)
+            if not fetched_slots_result:
+                console.print(f"🤷 No slots found for wallet {final_wallet_address}. Nothing to deploy.", style="yellow"); raise typer.Exit(0)
+            
+            console.print(f"ℹ️ Found slots for wallet {final_wallet_address}: {fetched_slots_result}", style="dim")
+            deploy_all_slots_prompt = typer.prompt("☑️ Do you want to deploy all of these fetched slots? (y/n)", default="y", show_default=True)
+            if deploy_all_slots_prompt.lower() == 'n':
+                while True:
+                    start_slot_str = typer.prompt("🫸 ▶︎ Enter the start slot ID from the list above to deploy")
+                    end_slot_str = typer.prompt("🫸 ▶︎ Enter the end slot ID from the list above to deploy (or same as start for single)")
+                    try:
+                        start_slot_val = int(start_slot_str)
+                        end_slot_val = int(end_slot_str)
+                        if start_slot_val not in fetched_slots_result or end_slot_val not in fetched_slots_result:
+                            console.print("❌ One or both slot IDs are not in the list of your owned slots. Please try again.", style="red")
+                            continue
+                        if fetched_slots_result.index(start_slot_val) > fetched_slots_result.index(end_slot_val):
+                            console.print("❌ Start slot ID must appear before or be the same as end slot ID in your list. Please try again.", style="red")
+                            continue
+                        
+                        start_idx = fetched_slots_result.index(start_slot_val)
+                        end_idx = fetched_slots_result.index(end_slot_val)
+                        deploy_slots = fetched_slots_result[start_idx : end_idx + 1]
+                        break # Valid selection
+                    except ValueError:
+                        console.print("❌ Invalid slot ID format. Please enter numbers only.", style="red")
+                    except Exception as e: # Catch any other unexpected errors during parsing/indexing
+                        console.print(f"❌ Error processing slot selection: {e}. Please try again.", style="red")
+            else:
+                deploy_slots = fetched_slots_result # Deploy all fetched slots
+        
+        if not deploy_slots:
+            console.print(f"🤷 No slots to deploy.", style="yellow"); raise typer.Exit(0)
+
+        console.print(f"🎰 Targeting slots for deployment: {deploy_slots}", style="bold blue")
+
+        if not env_config:
+            console.print("INTERNAL ERROR: env_config not set before market selection.", style="bold red") # Should be caught earlier
+            raise typer.Exit(1)
+        available_market_names_on_chain = list(env_config.markets.keys())
+        final_selected_markets_str_list: List[str] = []
+
+        if data_markets_opt:
+            final_selected_markets_str_list = data_markets_opt
+        else:
+            if not available_market_names_on_chain:
+                console.print(f"🤷 No data markets available for {selected_powerloom_chain_name_upper} in sources.json.", style="yellow")
+                raise typer.Exit(0)
+            
+            market_display_list = "\n".join(
+                f"[bold green]{i+1}.[/] [cyan]{name}[/] ([dim]Source: {env_config.markets[name].sourceChain}[/])" 
+                for i, name in enumerate(available_market_names_on_chain)
+            )
+            market_panel = Panel(market_display_list, title=f"[bold blue]Select Data Markets on {selected_powerloom_chain_name_upper}[/]", border_style="blue", padding=(1,2))
+            console.print(market_panel)
+            
+            market_names_for_prompt = available_market_names_on_chain if available_market_names_on_chain else []
+            default_market_prompt = ",".join(market_names_for_prompt) 
+            if len(available_market_names_on_chain) == 1:
+                default_market_prompt = available_market_names_on_chain[0]
+
+            markets_input_str = typer.prompt(f"👉🏼 Select data markets (comma-separated, e.g., {default_market_prompt})", type=str, default=default_market_prompt)
+            final_selected_markets_str_list = [m.strip() for m in markets_input_str.split(",") if m.strip()]
+
+        selected_market_objects: List[MarketConfig] = []
+        for market_name_raw in final_selected_markets_str_list:
+            market_name_upper = market_name_raw.strip().upper()
+            if env_config and env_config.markets:
+                market_obj = env_config.markets.get(market_name_upper)
+            else:
+                console.print(f"INTERNAL ERROR: env_config or markets became unset before market object retrieval.", style="bold red")
+                raise typer.Exit(1)
+            
+            if not market_obj:
+                error_market_list = available_market_names_on_chain if available_market_names_on_chain else []
+                console.print(f"❌ Invalid market '{market_name_raw}' for {selected_powerloom_chain_name_upper}. Available: {', '.join(error_market_list)}", style="bold red")
+                raise typer.Exit(1)
+            selected_market_objects.append(market_obj)
+        
+        if not selected_market_objects:
+            console.print("🤷 No data markets selected for deployment.", style="yellow")
             raise typer.Exit(0)
-        deploy_slots = owned_slots
-    
-    if not deploy_slots:
-        console.print(f"🤷 No slots to deploy. If you provided slots via --slot, check your input. Otherwise, no slots were found for the wallet.", style="yellow")
-        raise typer.Exit(0)
 
-    console.print(f"🎰 Targeting the following slots for deployment: {deploy_slots}", style="bold blue")
-    console.print(f"🔑 Using Signer Address: {final_signer_address}", style="bold blue")
-    # (Private key is not printed for security)
-
-    # Handle data markets selection
-    available_markets = [m.name for m in env_config.dataMarkets]
-    if not data_markets:
-        markets_str = ",".join(available_markets)
-        data_markets = typer.prompt(
-            "Select data markets (comma-separated)", 
-            type=str,
-            default=markets_str
-        ).split(",")
-    
-    # Validate selected markets
-    for market_name_raw in data_markets:
-        market_name_upper = market_name_raw.strip().upper()
-        if market_name_upper not in [m.upper() for m in available_markets]:
-            console.print(f"❌ Invalid market for {environment}: {market_name_raw}", style="bold red")
-            console.print(f"Available markets for {environment}: {', '.join(available_markets)}", style="yellow")
+        console.print(f"🛠️ Preparing base snapshotter-lite-v2 clone at {base_snapshotter_clone_path}...", style="blue")
+        if base_snapshotter_clone_path.exists():
+            console.print(f"  🗑️ Removing existing temporary clone directory: {base_snapshotter_clone_path}", style="dim")
+            try:
+                shutil.rmtree(base_snapshotter_clone_path)
+            except OSError as e:
+                console.print(f"  ❌ Could not remove existing temporary clone directory {base_snapshotter_clone_path}: {e}", style="bold red")
+                raise typer.Exit(1)
+        
+        try:
+            base_snapshotter_clone_path.mkdir(parents=True, exist_ok=False) # exist_ok=False to ensure it was just created
+        except OSError as e:
+            console.print(f"  ❌ Could not create temporary clone directory {base_snapshotter_clone_path}: {e}", style="bold red")
             raise typer.Exit(1)
-    
-    # Use the market configurations for deployment
-    selected_markets_configs = [
-        market_config for market_config in env_config.dataMarkets
-        if market_config.name.upper() in [m.strip().upper() for m in data_markets]
-    ]
-    
-    # Actual deployment loop will go here
-    for market_conf in selected_markets_configs:
-        console.print(f"📦 Processing market {market_conf.name}...", style="bold blue")
-        for slot_id in deploy_slots:
-            console.print(f"   🔩 Deploying slot {slot_id} for market {market_conf.name}...", style="green")
-            # TODO: Here call a function similar to generate_env_file_contents and run_snapshotter_lite_v2
-            # Pass: market_conf, slot_id, final_signer_address, final_signer_key, 
-            #       env_config.powerloomChain.rpcURL, env_config.powerloomChain.name, etc.
-            pass 
+
+        snapshotter_lite_repo_url = "https://github.com/PowerLoom/snapshotter-lite-v2.git"
+        if not run_git_command(["git", "clone", snapshotter_lite_repo_url, "."], cwd=base_snapshotter_clone_path, desc="Cloning base snapshotter-lite-v2 repository from {snapshotter_lite_repo_url}"):
+            console.print(f"❌ Failed to clone base snapshotter-lite-v2 repository from {snapshotter_lite_repo_url}.", style="bold red")
+            # Cleanup already created directory before exiting
+            if base_snapshotter_clone_path.exists(): shutil.rmtree(base_snapshotter_clone_path)
+            raise typer.Exit(1)
+        console.print(f"  ✅ Base snapshotter-lite-v2 cloned successfully.", style="green")
+
+        successful_deployments = 0
+        failed_deployments = 0
+
+        for market_conf_obj in selected_market_objects:
+            console.print(f"📦 Processing market [bold cyan]{market_conf_obj.name}[/bold cyan] on [bold magenta]{selected_powerloom_chain_name_upper}[/bold magenta]...", style="green")
+            
+            # --- Load market-specific namespaced .env file ---
+            namespaced_env_content: Optional[Dict[str,str]] = None
+            norm_pl_chain_name_for_file = selected_powerloom_chain_name_upper.lower()
+            norm_market_name_for_file = market_conf_obj.name.lower()
+            norm_source_chain_name_for_file = market_conf_obj.sourceChain.lower().replace('-', '_')
+            potential_config_filename = CONFIG_ENV_FILENAME_TEMPLATE.format(
+                norm_pl_chain_name_for_file, 
+                norm_market_name_for_file, 
+                norm_source_chain_name_for_file
+            )
+            cwd_config_file_path = Path(os.getcwd()) / potential_config_filename
+            if cwd_config_file_path.exists():
+                console.print(f"  ℹ️ Found namespaced .env for market {market_conf_obj.name}: {cwd_config_file_path}. Will use for credential override.", style="dim")
+                namespaced_env_content = parse_env_file_vars(str(cwd_config_file_path))
+
+            # --- Resolve Signer Credentials & Source RPC URL FOR THIS MARKET ---
+            # Uses the loaded namespaced_env_content for this specific market
+            market_signer_address = get_credential(
+                "SIGNER_ACCOUNT_ADDRESS", 
+                selected_powerloom_chain_name_upper, 
+                signer_address_opt, 
+                configured_chain_identity, 
+                namespaced_env_content
+            )
+            if not market_signer_address:
+                error_message_lines_signer_addr = [
+                    f"❌ Signer Address for market [bold cyan]{market_conf_obj.name}[/] on [bold magenta]{selected_powerloom_chain_name_upper}[/bold magenta] not resolved.",
+                    f"   Looked via: CLI option, SIGNER_ACCOUNT_ADDRESS env var, namespaced .env ({potential_config_filename}), settings.json for {selected_powerloom_chain_name_upper}."
+                ]
+                console.print("\n".join(error_message_lines_signer_addr), style="bold red"); 
+                failed_deployments += len(deploy_slots); continue
+
+            market_signer_key = get_credential(
+                "SIGNER_ACCOUNT_PRIVATE_KEY", 
+                selected_powerloom_chain_name_upper, 
+                signer_key_opt, 
+                configured_chain_identity, 
+                namespaced_env_content
+            )
+            if not market_signer_key:
+                error_message_lines_signer_key = [
+                    f"❌ Signer Key for market [bold cyan]{market_conf_obj.name}[/] on [bold magenta]{selected_powerloom_chain_name_upper}[/bold magenta] not resolved.",
+                    f"   Looked via: CLI option, SIGNER_ACCOUNT_PRIVATE_KEY env var, namespaced .env ({potential_config_filename}), settings.json for {selected_powerloom_chain_name_upper}."
+                ]
+                console.print("\n".join(error_message_lines_signer_key), style="bold red"); 
+                failed_deployments += len(deploy_slots); continue
+            
+            console.print(f"🔑 Using Signer: {market_signer_address} for market {market_conf_obj.name}", style="bold blue")
+
+            source_rpc_url = get_source_chain_rpc_url(
+                market_conf_obj.sourceChain, 
+                user_settings, 
+                namespaced_env_content
+            )
+            if not source_rpc_url:
+                error_message_lines_source_rpc = [
+                    f"❌ RPC URL for source chain [bold yellow]{market_conf_obj.sourceChain}[/bold yellow] (market {market_conf_obj.name}) not found.",
+                    f"   Looked via: SOURCE_RPC_{market_conf_obj.sourceChain.upper().replace('-', '_')} env var, CWD .env (SOURCE_RPC_URL or SOURCE_RPC_{market_conf_obj.sourceChain.upper().replace('-', '_')}), namespaced .env ({potential_config_filename}), settings.json."
+                ]
+                console.print("\n".join(error_message_lines_source_rpc), style="red")
+                failed_deployments += len(deploy_slots)
+                continue
+
+            for idx, slot_id_val in enumerate(deploy_slots):
+                # Determine build.sh arguments based on index (first slot for market gets collector)
+                build_sh_args_for_instance: str
+                if idx == 0:
+                    build_sh_args_for_instance = "--skip-credential-update"
+                else:
+                    build_sh_args_for_instance = "--no-collector --skip-credential-update"
+
+                console.print(f"   🔩 Deploying slot {slot_id_val} for market {market_conf_obj.name} (Source RPC: {source_rpc_url}) with build_sh args: \"{build_sh_args_for_instance}\"", style="green")
+                success = deploy_snapshotter_instance(
+                    powerloom_chain_config=env_config.chain_config,
+                    market_config=market_conf_obj,
+                    slot_id=slot_id_val,
+                    signer_address=market_signer_address, 
+                    signer_private_key=market_signer_key, 
+                    source_chain_rpc_url=source_rpc_url,
+                    base_snapshotter_lite_repo_path=base_snapshotter_clone_path,
+                    build_sh_args_param=build_sh_args_for_instance # Pass dynamic args
+                )
+                if success:
+                    successful_deployments += 1
+                else:
+                    failed_deployments += 1
+                    console.print(f"  ❌ Failed deployment for slot {slot_id_val}, market {market_conf_obj.name}. Check errors above.", style="bold red")
+
+        console.print("\n[bold]----- Deployment Summary -----[/bold]")
+        if successful_deployments > 0:
+            console.print(f"✅ Successfully deployed {successful_deployments} snapshotter instance(s).", style="bold green")
+        if failed_deployments > 0:
+            console.print(f"❌ Failed to deploy {failed_deployments} snapshotter instance(s).", style="bold red")
+        if successful_deployments == 0 and failed_deployments == 0:
+            console.print("🤷 No deployments were attempted or completed.", style="yellow")
+
+    finally:
+        # --- Cleanup temporary base clone --- 
+        if base_snapshotter_clone_path.exists():
+            console.print(f"🧹 Cleaning up temporary base snapshotter clone at {base_snapshotter_clone_path}...", style="dim")
+            try:
+                shutil.rmtree(base_snapshotter_clone_path)
+                console.print("  ✅ Cleanup successful.", style="dim green")
+            except OSError as e:
+                console.print(f"  ⚠️ Error cleaning up temporary clone {base_snapshotter_clone_path}: {e}", style="yellow")
+
+app.command("configure")(configure_command)
 
 @app.command()
-def configure(ctx: typer.Context):
+def status(ctx: typer.Context):
     """
-    Configure environment settings and credentials (Legacy - consider using 'identity set')
+    Show status of deployed snapshotter instances (screen sessions and Docker containers).
     """
-    console.print("ℹ️  For wallet configuration, please use: [bold cyan]snapshotter-cli identity set[/bold cyan]")
-    console.print(" This command is placeholder. For other configurations, direct file edit might be needed or expand this command.")
+    console.print("📊 Checking snapshotter instances status...", style="bold magenta")
 
-@app.command()
-def status():
-    """
-    Show status of all deployed nodes
-    """
-    console.print("📊 Checking node status...", style="bold magenta")
+    screen_sessions = list_snapshotter_screen_sessions()
 
-@app.command()
-def list(ctx: typer.Context):
+    if not screen_sessions:
+        console.print("🤷 No running snapshotter screen sessions found with the 'pl_...' naming convention.", style="yellow")
+        return
+
+    table = Table(title="Snapshotter Instances Status", show_header=True, header_style="bold blue")
+    table.add_column("Screen Session Name", style="cyan", min_width=20)
+    table.add_column("Screen PID", style="magenta")
+    table.add_column("Screen Status", style="green")
+    table.add_column("Docker Containers", style="dim")
+
+    for session in screen_sessions:
+        session_name = session["name"]
+        session_pid = session["pid"]
+        session_status_str = session["status_str"]
+        
+        # For Docker container search, we use the session_name as the base pattern.
+        # Container names might be like: pl_mainnet_uniswapv2_5481_snapshotter_1, pl_mainnet_uniswapv2_5481_redis_1 etc.
+        # The filter `name={session_name}` in `get_docker_container_status_for_instance` will find these.
+        docker_containers = get_docker_container_status_for_instance(instance_name_pattern=session_name)
+        
+        docker_info_parts = []
+        if docker_containers:
+            for dc in docker_containers:
+                dc_status_color = "green" if "Up" in dc['status'] else ("yellow" if "Exited" in dc['status'] else "red")
+                docker_info_parts.append(f"  - {dc['name']} ([{dc_status_color}]{dc['status']}[/{dc_status_color}])")
+        else:
+            docker_info_parts.append("  [dim]No matching Docker containers found.[/dim]")
+        
+        docker_info_str = "\n".join(docker_info_parts)
+        table.add_row(session_name, session_pid, session_status_str, docker_info_str)
+
+    console.print(table)
+
+@app.command(name="list")
+def list_chains_and_markets(ctx: typer.Context):
     """
     Display available PowerLoom chains and their data markets
     """
     cli_context: CLIContext = ctx.obj
     chain_markets_map = cli_context.chain_markets_map
     
-    # Create a tree for hierarchical display
     tree = Tree("🌐 [bold cyan]Available PowerLoom Chains[/]")
     
-    for chain_name, chain_data in chain_markets_map.items():
-        chain_config = chain_data.chain_config
-        markets = chain_data.markets
+    for chain_name, chain_data_val in sorted(chain_markets_map.items()): # sorted for consistent order
+        chain_config_val = chain_data_val.chain_config
+        markets_dict = chain_data_val.markets
         
-        # Create chain branch with details
-        chain_details = f"[bold green]{chain_name}[/] ([dim]Chain ID: {chain_config.chainId}[/])"
+        chain_details = f"[bold green]{chain_name}[/] ([dim]Chain ID: {chain_config_val.chainId}, RPC: {str(chain_config_val.rpcURL)}[/])"
         chain_branch = tree.add(chain_details)
         
-        # Add markets under this chain
-        for market_name, market_config in markets.items():
-            market_details = (
+        if not markets_dict:
+            chain_branch.add("[dim italic]No data markets listed for this chain.[/dim italic]")
+            continue
+
+        for market_name, market_config_val in sorted(markets_dict.items()):
+            market_details_str = (
                 f"[bold blue]{market_name}[/] - "
-                f"Source: [yellow]{market_config.sourceChain}[/]"
+                f"Source: [yellow]{market_config_val.sourceChain}[/]"
             )
-            market_branch = chain_branch.add(market_details)
+            market_branch_item = chain_branch.add(market_details_str)
             
-            # Add compute and config details
-            compute = market_config.compute
-            config = market_config.config
-            market_branch.add(f"[dim]Compute: {compute.repo} ({compute.branch})[/]")
-            market_branch.add(f"[dim]Config: {config.repo} ({config.branch})[/]")
-            if hasattr(market_config, 'sequencer') and market_config.sequencer:
-                 market_branch.add(f"[dim]Sequencer: {market_config.sequencer}[/]")
-            if hasattr(market_config, 'contractAddress') and market_config.contractAddress:
-                 market_branch.add(f"[dim]Market Contract: {market_config.contractAddress}[/]")
-            if hasattr(market_config, 'powerloomProtocolStateContractAddress') and market_config.powerloomProtocolStateContractAddress:
-                 market_branch.add(f"[dim]Market Protocol State: {market_config.powerloomProtocolStateContractAddress}[/]")
-    
-    # Print the tree
+            market_branch_item.add(f"[dim]Market Contract: {market_config_val.contractAddress}[/]")
+            market_branch_item.add(f"[dim]Market Protocol State: {market_config_val.powerloomProtocolStateContractAddress}[/]")
+            market_branch_item.add(f"[dim]Sequencer: {market_config_val.sequencer}[/]")
+            market_branch_item.add(f"[dim]Compute: {str(market_config_val.compute.repo)} ({market_config_val.compute.branch}) Commit: {market_config_val.compute.commit[:7] if market_config_val.compute.commit else 'N/A'}[/]")
+            market_branch_item.add(f"[dim]Config: {str(market_config_val.config.repo)} ({market_config_val.config.branch}) Commit: {market_config_val.config.commit[:7] if market_config_val.config.commit else 'N/A'}[/]")
+
     console.print("\n")
     console.print(tree)
     console.print("\n")
