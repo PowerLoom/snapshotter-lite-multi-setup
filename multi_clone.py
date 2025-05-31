@@ -182,7 +182,22 @@ def docker_running():
     except subprocess.CalledProcessError:
         return False
 
-def main(data_market_choice: str, non_interactive: bool = False, latest_only: bool = False):
+def calculate_connection_refresh_interval(num_slots):
+    # Base minimum interval
+    MIN_INTERVAL = 60  # seconds
+    
+    if num_slots <= 10:
+        return MIN_INTERVAL
+    
+    # Linear scaling with some adjustments
+    # Formula: 4 seconds per slot + baseline of 60
+    interval = (4 * num_slots) + MIN_INTERVAL
+    
+    # Cap at reasonable maximum
+    MAX_INTERVAL = 900  # 15 minutes
+    return min(interval, MAX_INTERVAL)
+
+def main(data_market_choice: str, non_interactive: bool = False, latest_only: bool = False, use_env_refresh_interval: bool = False):
     # check if Docker is running
     if not docker_running():
         print('🟡 Docker is not running, please start Docker and try again!')
@@ -360,6 +375,25 @@ def main(data_market_choice: str, non_interactive: bool = False, latest_only: bo
         print(f'🟡 Only {len(deploy_slots)} slots are being deployed out of {len(slot_ids)}, but MAX_STREAM_POOL_SIZE is set to {max_stream_pool_size}. This may cause instability!')
         print('Scaling down MAX_STREAM_POOL_SIZE to match the total number of slots...')
         max_stream_pool_size = len(slot_ids)
+    
+    # Calculate appropriate connection refresh interval based on number of slots
+    suggested_refresh_interval = calculate_connection_refresh_interval(len(deploy_slots))
+    connection_refresh_interval = os.getenv('CONNECTION_REFRESH_INTERVAL_SEC')
+    
+    if use_env_refresh_interval and connection_refresh_interval:
+        connection_refresh_interval = int(connection_refresh_interval)
+        print(f'🔧 Using CONNECTION_REFRESH_INTERVAL_SEC from environment: {connection_refresh_interval} seconds')
+        if connection_refresh_interval < suggested_refresh_interval:
+            print(f'⚠️ Warning: This value is lower than the suggested {suggested_refresh_interval}s for {len(deploy_slots)} slots')
+    elif not connection_refresh_interval:
+        connection_refresh_interval = suggested_refresh_interval
+        print(f'🟢 Using calculated CONNECTION_REFRESH_INTERVAL_SEC based on {len(deploy_slots)} slots: {connection_refresh_interval} seconds')
+    else:
+        connection_refresh_interval = int(connection_refresh_interval)
+        if connection_refresh_interval < suggested_refresh_interval:
+            print(f'⚠️ Current CONNECTION_REFRESH_INTERVAL_SEC ({connection_refresh_interval}s) is lower than the suggested value ({suggested_refresh_interval}s) for {len(deploy_slots)} slots')
+            print('This may cause connection instability under high load!')
+    
     run_snapshotter_lite_v2(
         deploy_slots,
         data_market_contract_number,
@@ -373,7 +407,7 @@ def main(data_market_choice: str, non_interactive: bool = False, latest_only: bo
         max_stream_pool_size=max_stream_pool_size,
         stream_pool_health_check_interval=os.getenv('STREAM_POOL_HEALTH_CHECK_INTERVAL', 120),
         local_collector_image_tag=local_collector_image_tag,
-        connection_refresh_interval_sec=os.getenv('CONNECTION_REFRESH_INTERVAL_SEC', 60),
+        connection_refresh_interval_sec=connection_refresh_interval,
     )
 
 
@@ -385,8 +419,13 @@ if __name__ == '__main__':
                     help='Deploy all nodes without prompting for confirmation')
     parser.add_argument('--latest-only', action='store_true',
                     help='Deploy only the latest (highest) slot')
+    parser.add_argument('--use-env-connection-refresh-interval', action='store_true',
+                    help='Use CONNECTION_REFRESH_INTERVAL_SEC from environment instead of calculating based on slots')
     
     args = parser.parse_args()
     
     data_market = args.data_market if args.data_market else '0'
-    main(data_market_choice=data_market, non_interactive=args.yes, latest_only=args.latest_only)
+    main(data_market_choice=data_market, 
+         non_interactive=args.yes, 
+         latest_only=args.latest_only,
+         use_env_refresh_interval=args.use_env_connection_refresh_interval)
