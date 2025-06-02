@@ -427,33 +427,121 @@ def deploy(
 app.command("configure")(configure_command)
 
 @app.command()
-def status(ctx: typer.Context):
+def status(
+    ctx: typer.Context,
+    environment: Optional[str] = typer.Option(None, "--env", "-e", help="Filter by Powerloom chain environment name."),
+    data_market: Optional[str] = typer.Option(None, "--market", "-m", help="Filter by data market name.")
+):
     """
     Show status of deployed snapshotter instances (screen sessions and Docker containers).
+    Optionally filter by environment and/or data market.
     """
     console.print("📊 Checking snapshotter instances status...", style="bold magenta")
+    if environment:
+        console.print(f"🔍 Filtering for environment: [bold cyan]{environment}[/bold cyan]", style="info")
+    if data_market:
+        console.print(f"🔍 Filtering for data market: [bold cyan]{data_market}[/bold cyan]", style="info")
 
-    screen_sessions = list_snapshotter_screen_sessions()
+    all_screen_sessions = list_snapshotter_screen_sessions()
+    filtered_sessions = []
 
-    if not screen_sessions:
+    if not all_screen_sessions:
         console.print("🤷 No running snapshotter screen sessions found with the 'pl_...' naming convention.", style="yellow")
         return
 
+    for session in all_screen_sessions:
+        session_name = session["name"]
+        # Expected format: pl_{chain}_{market}_{slot_id}
+        # Example: pl_mainnet_uniswapv2_123
+        # Example with market underscores: pl_arbitrum-goerli_aave_v3_liquidity_789
+        
+        parsed_chain_name = None
+        parsed_market_name = None
+        parsed_slot_id = None
+
+        if session_name.startswith("pl_") and session_name.count('_') >= 3:
+            try:
+                name_parts_str = session_name[3:] # Remove "pl_"
+                name_parts_list = name_parts_str.split('_')
+                
+                parsed_slot_id = name_parts_list[-1]
+                parsed_chain_name = name_parts_list[0]
+                parsed_market_name = "_".join(name_parts_list[1:-1])
+                
+                # Validate slot_id is a number
+                if not parsed_slot_id.isdigit():
+                    parsed_chain_name, parsed_market_name, parsed_slot_id = None, None, None # Invalidate parse
+                    console.print(f"  [dim yellow]⚠️ Skipping session '{session_name}': Slot ID part '{parsed_slot_id}' is not a number.[/dim]")
+
+
+            except IndexError: # Not enough parts after split
+                console.print(f"  [dim yellow]⚠️ Skipping session '{session_name}': Could not parse chain, market, slot ID due to unexpected format.[/dim]")
+                parsed_chain_name, parsed_market_name, parsed_slot_id = None, None, None
+
+
+        passes_env_filter = True
+        if environment and parsed_chain_name:
+            passes_env_filter = (parsed_chain_name.lower() == environment.lower())
+        elif environment and not parsed_chain_name: # Env filter active, but couldn't parse chain
+            passes_env_filter = False
+            
+        passes_market_filter = True
+        if data_market and parsed_market_name:
+            passes_market_filter = (parsed_market_name.lower() == data_market.lower())
+        elif data_market and not parsed_market_name: # Market filter active, but couldn't parse market
+            passes_market_filter = False
+
+        if passes_env_filter and passes_market_filter:
+            session_details = {
+                **session, # pid, name, status_str
+                "chain_name": parsed_chain_name or "N/A",
+                "market_name": parsed_market_name or "N/A",
+                "slot_id": parsed_slot_id or "N/A"
+            }
+            filtered_sessions.append(session_details)
+
+    if not filtered_sessions:
+        if environment or data_market:
+            console.print("🤷 No snapshotter instances found matching your filter criteria.", style="yellow")
+        else:
+            # This case should ideally be caught by the initial `all_screen_sessions` check,
+            # but as a fallback if parsing fails for all.
+            console.print("🤷 No processable snapshotter screen sessions found.", style="yellow")
+        return
+
     table = Table(title="Snapshotter Instances Status", show_header=True, header_style="bold blue")
-    table.add_column("Screen Session Name", style="cyan", min_width=20)
-    table.add_column("Screen PID", style="magenta")
+    table.add_column("Powerloom Chain", style="magenta", min_width=15)
+    table.add_column("Data Market", style="cyan", min_width=20)
+    table.add_column("Slot ID", style="green", min_width=7)
+    table.add_column("Full Session Name", style="dim", min_width=25)
+    table.add_column("PID", style="magenta", min_width=7)
     table.add_column("Screen Status", style="green")
     table.add_column("Docker Containers", style="dim")
 
-    for session in screen_sessions:
-        session_name = session["name"]
-        session_pid = session["pid"]
-        session_status_str = session["status_str"]
+    for session_detail in filtered_sessions:
+        # session_name = session_detail["name"] # Original full name for Docker search, no longer primary key
         
-        # For Docker container search, we use the session_name as the base pattern.
-        # Container names might be like: pl_mainnet_uniswapv2_5481_snapshotter_1, pl_mainnet_uniswapv2_5481_redis_1 etc.
-        # The filter `name={session_name}` in `get_docker_container_status_for_instance` will find these.
-        docker_containers = get_docker_container_status_for_instance(instance_name_pattern=session_name)
+        # Prepare params for the updated Docker search function
+        parsed_slot_id = session_detail["slot_id"]
+        parsed_chain_name_for_docker = session_detail["chain_name"] # This is already parsed
+        parsed_market_name_for_docker = session_detail["market_name"] # This is already parsed
+
+        # Convert to UPPER for the docker utility, ensure they are not "N/A"
+        chain_name_upper_for_docker = parsed_chain_name_for_docker.upper() if parsed_chain_name_for_docker != "N/A" else None
+        market_name_upper_for_docker = parsed_market_name_for_docker.upper() if parsed_market_name_for_docker != "N/A" else None
+        slot_id_for_docker = parsed_slot_id if parsed_slot_id != "N/A" else None
+        
+        docker_containers = [] # Default to empty list
+        if chain_name_upper_for_docker and market_name_upper_for_docker: # slot_id can be None for collector search
+            docker_containers = get_docker_container_status_for_instance(
+                slot_id=slot_id_for_docker,
+                chain_name_upper=chain_name_upper_for_docker,
+                market_name_upper=market_name_upper_for_docker
+            )
+        elif parsed_slot_id != "N/A": # Fallback if only slot_id is available and valid (less likely to match well)
+             console.print(f"[dim yellow]⚠️ Only slot ID {parsed_slot_id} is available for Docker search for session '{session_detail['name']}'. Results may be limited or incorrect.[/dim]")
+             # Potentially call with only slot_id if the utility supported it, or skip.
+             # For now, the utility expects chain & market for effective filtering.
         
         docker_info_parts = []
         if docker_containers:
@@ -463,8 +551,17 @@ def status(ctx: typer.Context):
         else:
             docker_info_parts.append("  [dim]No matching Docker containers found.[/dim]")
         
-        docker_info_str = "\n".join(docker_info_parts)
-        table.add_row(session_name, session_pid, session_status_str, docker_info_str)
+        docker_info_str = "\n".join(docker_info_parts) # Use literal \n for Rich table cell
+        
+        table.add_row(
+            session_detail["chain_name"],
+            session_detail["market_name"],
+            session_detail["slot_id"],
+            session_detail["name"], # Full original name
+            session_detail["pid"], 
+            session_detail["status_str"], 
+            docker_info_str
+        )
 
     console.print(table)
 
