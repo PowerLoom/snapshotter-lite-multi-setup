@@ -189,7 +189,7 @@ fi
 
 # Check for existing screen sessions
 echo -e "\n🖥️ Checking existing PowerLoom screen sessions..."
-EXISTING_SCREENS=$(screen -ls | grep -E 'powerloom-(premainnet|testnet|mainnet)-v2|snapshotter' || true)
+EXISTING_SCREENS=$(screen -ls | grep -E 'powerloom-(premainnet|testnet|mainnet)-v2|snapshotter|pl_.*_.*_[0-9]+' || true)
 if [ -n "$EXISTING_SCREENS" ]; then
     echo -e "${YELLOW}Found existing PowerLoom screen sessions:${NC}"
     echo "$EXISTING_SCREENS"
