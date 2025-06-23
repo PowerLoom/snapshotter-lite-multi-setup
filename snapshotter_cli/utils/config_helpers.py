@@ -1,114 +1,84 @@
 import os
-from typing import Optional, Dict
+from pathlib import Path
+from typing import Dict, Optional
 from rich.console import Console
-from pathlib import Path # Added for CWD .env logic
-
-# Import models carefully to avoid circular dependencies if this grows
-from .models import ChainSpecificIdentity, UserSettings 
 
 console = Console()
 
-
-# Utility function to parse .env files
-def parse_env_file_vars(file_path: str) -> Dict[str, str]:
-    """Parses a .env file and returns a dictionary of key-value pairs."""
-    env_vars = {}
-    if os.path.exists(file_path):
-        with open(file_path, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line and '=' in line and not line.startswith('#'):
-                    key, value = line.split('=', 1)
-                    env_vars[key.strip()] = value.strip()
-    return env_vars
-
 def get_credential(
-    cred_type: str, 
-    chain_name_for_env: str, # Still needed for settings.json context
+    env_var_name: str,
+    powerloom_chain_name: str,
     cli_option_value: Optional[str],
-    configured_chain_identity: Optional[ChainSpecificIdentity],
-    namespaced_env_vars: Optional[Dict[str, str]] = None
+    namespaced_env_content: Optional[Dict[str, str]] = None
 ) -> Optional[str]:
-    # 1. CLI option
+    """Get a credential value from various sources in order of priority:
+    1. CLI option
+    2. Environment variable
+    3. CWD .env file
+    4. Namespaced .env file
+    """
+    # Priority 1: CLI option
     if cli_option_value:
-        # console.print(f"ℹ️ Using {cred_type.replace('_', ' ').title()} from command-line option.", style="dim")
-        # if cred_type == "SIGNER_ACCOUNT_PRIVATE_KEY": console.print("   [yellow]Warning: Passing private keys via CLI history can be risky.[/yellow]")
         return cli_option_value
 
-    # 2. Global Environment Variable (e.g., WALLET_HOLDER_ADDRESS)
-    # No chain-specific prefix for shell env vars for credentials like WALLET_HOLDER_ADDRESS
-    env_val = os.getenv(cred_type) 
-    if env_val:
-        # console.print(f"ℹ️ Using {cred_type.replace('_', ' ').title()} from {cred_type} env var.", style="dim")
-        return env_val
+    # Priority 2: Environment variable
+    env_value = os.environ.get(env_var_name)
+    if env_value:
+        return env_value
 
-    # 3. Check CWD .env file if no explicit namespaced_env_vars were passed
-    if namespaced_env_vars is None: # Only if we are not already in a market-specific context
+    # Priority 3: Check CWD .env file if no explicit namespaced_env_content was passed
+    if namespaced_env_content is None:
         cwd_dot_env_path = Path(os.getcwd()) / ".env"
         if cwd_dot_env_path.exists():
-            # console.print(f"  ℹ️ Checking for {cred_type} in {cwd_dot_env_path}", style="dim")
-            cwd_env_vars = parse_env_file_vars(str(cwd_dot_env_path))
-            if cred_type in cwd_env_vars:
-                # console.print(f"    Found {cred_type} in {cwd_dot_env_path}", style="dim")
-                return cwd_env_vars[cred_type]
+            try:
+                from dotenv import dotenv_values
+                cwd_env_vars = dotenv_values(cwd_dot_env_path)
+                if env_var_name in cwd_env_vars:
+                    return cwd_env_vars[env_var_name]
+            except Exception as e:
+                console.print(f"⚠️ Error reading .env file: {e}", style="yellow")
 
-    # 4. Namespaced .env file (e.g., from .env.chain.market.source)
-    if namespaced_env_vars and cred_type in namespaced_env_vars:
-        # console.print(f"ℹ️ Using {cred_type.replace('_', ' ').title()} from namespaced .env file.", style="dim")
-        return namespaced_env_vars[cred_type]
+    # Priority 4: Namespaced .env file
+    if namespaced_env_content and env_var_name in namespaced_env_content:
+        return namespaced_env_content[env_var_name]
 
-    # 5. Configured Identity for the specific chain (settings.json)
-    # This is where chain_name_for_env becomes relevant for WALLET_HOLDER_ADDRESS
-    if configured_chain_identity: # This object is already chain-specific
-        if cred_type == "WALLET_HOLDER_ADDRESS" and configured_chain_identity.wallet_address:
-            # console.print(f"ℹ️ Using Wallet Holder Address from configured identity for {chain_name_for_env}.", style="dim")
-            return configured_chain_identity.wallet_address
-        if cred_type == "SIGNER_ACCOUNT_ADDRESS" and configured_chain_identity.signer_account_address:
-            # console.print(f"ℹ️ Using Signer Account Address from configured identity for {chain_name_for_env}.", style="dim")
-            return configured_chain_identity.signer_account_address
-        if cred_type == "SIGNER_ACCOUNT_PRIVATE_KEY" and configured_chain_identity.signer_account_private_key:
-            # console.print(f"ℹ️ Using Signer Private Key from configured identity for {chain_name_for_env}.", style="dim")
-            return configured_chain_identity.signer_account_private_key
-            
     return None
 
 def get_source_chain_rpc_url(
-    source_chain_name: str, 
-    user_settings: UserSettings,
-    namespaced_env_vars: Optional[Dict[str, str]] = None
+    source_chain_name: str,
+    namespaced_env_content: Optional[Dict[str, str]] = None
 ) -> Optional[str]:
+    """Get source chain RPC URL from various sources in order of priority:
+    1. SOURCE_RPC_{CHAIN} environment variable
+    2. CWD .env file
+    3. Namespaced .env file
+    """
     env_var_suffix = source_chain_name.upper().replace("-", "_")
-    
-    # Priority 1: Environment Variable (e.g., SOURCE_RPC_ETH_MAINNET)
-    env_var_name = f"SOURCE_RPC_{env_var_suffix}" # No prefix
-    env_rpc_url = os.getenv(env_var_name)
-    if env_rpc_url:
-        # console.print(f"ℹ️ Using Source RPC URL for {source_chain_name} from {env_var_name} env var.", style="dim")
-        return env_rpc_url
+    source_chain_specific_env_var = f"SOURCE_RPC_{env_var_suffix}"
 
-    # Priority 2: Check CWD .env file if no explicit namespaced_env_vars were passed
-    if namespaced_env_vars is None: 
+    # Priority 1: Environment variable (chain-specific)
+    env_value = os.environ.get(source_chain_specific_env_var)
+    if env_value:
+        return env_value
+
+    # Priority 2: Check CWD .env file if no explicit namespaced_env_content was passed
+    if namespaced_env_content is None:
         cwd_dot_env_path = Path(os.getcwd()) / ".env"
         if cwd_dot_env_path.exists():
-            cwd_env_vars = parse_env_file_vars(str(cwd_dot_env_path))
-            # Try generic SOURCE_RPC_URL first
-            if "SOURCE_RPC_URL" in cwd_env_vars:
-                return cwd_env_vars["SOURCE_RPC_URL"]
-            # Then try source-chain specific, e.g. SOURCE_RPC_ETH_MAINNET, from CWD .env
-            source_specific_key_in_cwd_env = f"SOURCE_RPC_{env_var_suffix}"
-            if source_specific_key_in_cwd_env in cwd_env_vars:
-                return cwd_env_vars[source_specific_key_in_cwd_env]
+            try:
+                from dotenv import dotenv_values
+                cwd_env_vars = dotenv_values(cwd_dot_env_path)
+                # Try chain-specific var first
+                if source_chain_specific_env_var in cwd_env_vars:
+                    return cwd_env_vars[source_chain_specific_env_var]
+                # Fallback to generic SOURCE_RPC_URL
+                if "SOURCE_RPC_URL" in cwd_env_vars:
+                    return cwd_env_vars["SOURCE_RPC_URL"]
+            except Exception as e:
+                console.print(f"⚠️ Error reading .env file: {e}", style="yellow")
 
-    # Priority 3: Namespaced .env file (e.g., from .env.chain.market.source, passed in explicitly)
-    # The key in the market-specific namespaced .env file is expected to be SOURCE_RPC_URL
-    if namespaced_env_vars and "SOURCE_RPC_URL" in namespaced_env_vars:
-        # console.print(f"ℹ️ Using Source RPC URL for {source_chain_name} from namespaced .env file.", style="dim")
-        return namespaced_env_vars["SOURCE_RPC_URL"]
+    # Priority 3: Namespaced .env file
+    if namespaced_env_content and "SOURCE_RPC_URL" in namespaced_env_content:
+        return namespaced_env_content["SOURCE_RPC_URL"]
 
-    # Priority 4: Configured user settings (settings.json)
-    if source_chain_name.upper() in user_settings.source_chain_rpcs:
-        conf_rpc_url_obj = user_settings.source_chain_rpcs[source_chain_name.upper()]
-        # console.print(f"ℹ️ Using Source RPC URL for {source_chain_name} from configured settings.", style="dim")
-        return str(conf_rpc_url_obj)
-    
     return None 

@@ -155,6 +155,7 @@ def deploy_snapshotter_instance(
         console.print(f"  ℹ️ No pre-configured .env template found at {cwd_config_file_path}. Using minimal core settings.", style="dim")
 
     # 2. Set essential/resolved values (these take highest precedence and will overwrite template if keys conflict)
+    final_env_vars["OVERRIDE_DEFAULTS"] = "true"
     final_env_vars["SLOT_ID"] = str(slot_id)
     final_env_vars["SIGNER_ACCOUNT_ADDRESS"] = signer_address
     final_env_vars["SIGNER_ACCOUNT_PRIVATE_KEY"] = signer_private_key

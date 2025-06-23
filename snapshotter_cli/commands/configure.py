@@ -1,12 +1,15 @@
-import os
 import typer
 from rich.console import Console
-from rich.panel import Panel
-from typing import Dict, List, Optional
-from glob import glob
+from rich.prompt import Prompt
 from pathlib import Path
-from snapshotter_cli.utils.models import CLIContext, MarketConfig, PowerloomChainConfig, UserSettings, ChainSpecificIdentity
-from snapshotter_cli.utils.config_helpers import get_credential, get_source_chain_rpc_url
+from typing import Dict, Optional
+import os
+from dotenv import dotenv_values
+from snapshotter_cli.utils.models import CLIContext, MarketConfig, PowerloomChainConfig
+from snapshotter_cli.utils.deployment import CONFIG_ENV_FILENAME_TEMPLATE
+import psutil
+from multi_clone import calculate_connection_refresh_interval
+from rich.panel import Panel
 
 console = Console()
 
@@ -32,183 +35,174 @@ def get_default_env_vars() -> Dict[str, str]:
     return parse_env_file_vars(str(env_example_path))
 
 
-def configure_command(ctx: typer.Context):
-    """Configure a namespaced .env file for a specific chain and data market."""
+def configure_command(
+    ctx: typer.Context,
+    environment: Optional[str] = typer.Option(None, "--env", "-e", help="Powerloom chain name (e.g., DEVNET, MAINNET)"),
+    data_market: Optional[str] = typer.Option(None, "--market", "-m", help="Data market name (e.g., UNISWAPV2)"),
+    wallet_address: Optional[str] = typer.Option(None, "--wallet", "-w", help="Wallet address (0x...) holding the slots"),
+    signer_address: Optional[str] = typer.Option(None, "--signer", "-s", help="Signer account address (0x...)"),
+    signer_key: Optional[str] = typer.Option(None, "--signer-key", "-k", help="Signer account private key", hide_input=True),
+    source_rpc_url: Optional[str] = typer.Option(None, "--source-rpc", "-r", help="Source chain RPC URL"),
+    telegram_chat_id: Optional[str] = typer.Option(None, "--telegram-chat", "-t", help="Telegram chat ID for notifications"),
+    telegram_reporting_url: Optional[str] = typer.Option("", "--telegram-url", "-u", help="Telegram reporting URL"),
+    max_stream_pool_size: Optional[int] = typer.Option(None, "--max-stream-pool-size", "-p", help="Max stream pool size for local collector"),
+    connection_refresh_interval: Optional[int] = typer.Option(None, "--connection-refresh-interval", "-c", help="Connection refresh interval for local collector to sequencer"),
+):
+    """Configure credentials and settings for a specific chain and market combination."""
     cli_context: CLIContext = ctx.obj
-    user_settings: UserSettings = cli_context.user_settings
-    
-    all_powerloom_chains = cli_context.markets_config
-    
-    if not all_powerloom_chains:
-        console.print("❌ No Powerloom chains found in the configuration. Cannot proceed.", style="bold red")
+    if not cli_context or not cli_context.chain_markets_map:
+        console.print("❌ Could not load markets configuration. Cannot proceed.", style="bold red")
         raise typer.Exit(1)
 
-    chain_list_display = "\n".join(
-        f"[bold green]{i+1}.[/] [cyan]{chain.powerloomChain.name}[/]" 
-        for i, chain in enumerate(all_powerloom_chains)
-    )
-    panel = Panel(
-        chain_list_display,
-        title="[bold blue]Available Powerloom Chains[/]",
-        border_style="blue",
-        padding=(1, 2)
-    )
-    console.print(panel)
-    
-    selected_chain_name_input = typer.prompt("👉🏼 Select a Powerloom chain (enter number or name)", type=str)
-    
-    selected_powerloom_chain_config: Optional[PowerloomChainConfig] = None
-    if selected_chain_name_input.isdigit():
-        index = int(selected_chain_name_input) - 1
-        if 0 <= index < len(all_powerloom_chains):
-            selected_powerloom_chain_config = all_powerloom_chains[index]
-        else:
-            console.print("❌ Invalid selection number for Powerloom chain.", style="bold red")
+    # --- Select Powerloom Chain ---
+    selected_chain_name_upper: str
+    if environment:
+        selected_chain_name_upper = environment.upper()
+        if selected_chain_name_upper not in cli_context.available_environments:
+            console.print(f"❌ Invalid environment: {environment}. Valid: {', '.join(cli_context.available_environments)}", style="bold red")
             raise typer.Exit(1)
     else:
-        selected_powerloom_chain_config = next((chain for chain in all_powerloom_chains 
-                                             if chain.powerloomChain.name.upper() == selected_chain_name_input.upper()), None)
+        chain_list = sorted(cli_context.available_environments)
+        for i, chain in enumerate(chain_list, 1):
+            console.print(f"[bold green]{i}.[/] [cyan]{chain}[/]")
+        while True:
+            chain_input = Prompt.ask("👉 Select Powerloom chain (number or name)")
+            if chain_input.isdigit():
+                idx = int(chain_input) - 1
+                if 0 <= idx < len(chain_list):
+                    selected_chain_name_upper = chain_list[idx]
+                    break
+            elif chain_input.upper() in cli_context.available_environments:
+                selected_chain_name_upper = chain_input.upper()
+                break
+            console.print("❌ Invalid selection. Please try again.", style="red")
 
-    if not selected_powerloom_chain_config:
-        console.print(f"❌ Powerloom chain '{selected_chain_name_input}' not found.", style="bold red")
+    # --- Select Data Market ---
+    chain_data = cli_context.chain_markets_map[selected_chain_name_upper]
+    available_markets = sorted(chain_data.markets.keys())
+    if not available_markets:
+        console.print(f"❌ No data markets available for {selected_chain_name_upper}.", style="bold red")
         raise typer.Exit(1)
 
-    chain_name_upper = selected_powerloom_chain_config.powerloomChain.name.upper()
-    console.print(f"✅ Selected Powerloom Chain: [bold cyan]{selected_powerloom_chain_config.powerloomChain.name}[/bold cyan]")
-
-    # --- Prompt for Data Market ---
-    available_markets_for_chain = selected_powerloom_chain_config.dataMarkets
-    if not available_markets_for_chain:
-        console.print(f"🤷 No data markets found for chain {selected_powerloom_chain_config.powerloomChain.name}.", style="yellow")
-        raise typer.Exit(0)
-
-    market_list_display = "\n".join(
-        f"[bold green]{i+1}.[/] [cyan]{market.name}[/] ([dim]Source: {market.sourceChain}[/])"
-        for i, market in enumerate(available_markets_for_chain)
-    )
-    market_panel = Panel(
-        market_list_display,
-        title=f"[bold blue]Available Data Markets on {selected_powerloom_chain_config.powerloomChain.name}[/]",
-        border_style="blue",
-        padding=(1,2)
-    )
-    console.print(market_panel)
-
-    selected_market_name_input = typer.prompt("👉🏼 Select a Data Market (enter number or name)", type=str)
-    selected_market_config: Optional[MarketConfig] = None
-
-    if selected_market_name_input.isdigit():
-        market_idx = int(selected_market_name_input) - 1
-        if 0 <= market_idx < len(available_markets_for_chain):
-            selected_market_config = available_markets_for_chain[market_idx]
-        else:
-            console.print("❌ Invalid selection number for Data Market.", style="bold red")
+    selected_market_name_upper: str
+    if data_market:
+        selected_market_name_upper = data_market.upper()
+        if selected_market_name_upper not in available_markets:
+            console.print(f"❌ Invalid market: {data_market}. Valid: {', '.join(available_markets)}", style="bold red")
             raise typer.Exit(1)
     else:
-        selected_market_config = next((market for market in available_markets_for_chain
-                                       if market.name.upper() == selected_market_name_input.upper()), None)
-    
-    if not selected_market_config:
-        console.print(f"❌ Data Market '{selected_market_name_input}' not found on {selected_powerloom_chain_config.powerloomChain.name}.", style="bold red")
-        raise typer.Exit(1)
+        for i, market in enumerate(available_markets, 1):
+            market_obj = chain_data.markets[market]
+            console.print(f"[bold green]{i}.[/] [cyan]{market}[/] ([dim]Source: {market_obj.sourceChain}[/])")
+        while True:
+            market_input = Prompt.ask("👉 Select data market (number or name)")
+            if market_input.isdigit():
+                idx = int(market_input) - 1
+                if 0 <= idx < len(available_markets):
+                    selected_market_name_upper = available_markets[idx]
+                    break
+            elif market_input.upper() in available_markets:
+                selected_market_name_upper = market_input.upper()
+                break
+            console.print("❌ Invalid selection. Please try again.", style="red")
 
-    console.print(f"✅ Selected Data Market: [bold cyan]{selected_market_config.name}[/bold cyan] (Source: {selected_market_config.sourceChain})")
+    selected_market_obj = chain_data.markets[selected_market_name_upper]
 
-    # --- Determine Filename and Path ---
-    # Normalize names for filename (e.g. lower, replace spaces/special chars if any, though names are usually clean)
-    norm_chain_name = selected_powerloom_chain_config.powerloomChain.name.lower()
-    norm_market_name = selected_market_config.name.lower()
-    norm_source_chain_name = selected_market_config.sourceChain.lower().replace('-', '_') # e.g. eth_mainnet
+    # --- Create Namespaced .env File ---
+    norm_chain_name = selected_chain_name_upper.lower()
+    norm_market_name = selected_market_name_upper.lower()
+    norm_source_chain = selected_market_obj.sourceChain.lower().replace('-', '_')
     
-    env_filename = ENV_FILENAME_TEMPLATE.format(norm_chain_name, norm_market_name, norm_source_chain_name)
-    # Assume project root is where the snapshotter-cli is run from, or where settings.json would be.
-    # For simplicity, let's assume the current working directory.
+    env_filename = CONFIG_ENV_FILENAME_TEMPLATE.format(norm_chain_name, norm_market_name, norm_source_chain)
     env_file_path = Path(os.getcwd()) / env_filename
-    
-    console.print(f"ℹ️  The configuration will be saved to: [bold yellow]{env_file_path}[/bold yellow]")
 
-    # --- Load base template and existing specific config (if any) ---
-    default_env_vars = get_default_env_vars()
-    if not default_env_vars:
-        console.print("⚠️ Could not load 'env.example'. Using an empty template.", style="yellow")
-    
-    existing_specific_env_vars = parse_env_file_vars(str(env_file_path))
-    
-    if existing_specific_env_vars:
-        console.print(f"🔍 Found existing configuration at [bold yellow]{env_file_path}[/bold yellow].")
-        overwrite = typer.confirm("Do you want to overwrite/update it?", default=True)
+    # Load existing env file values if it exists
+    existing_env_vars = {}
+    if env_file_path.exists():
+        existing_env_vars = dotenv_values(env_file_path)
+        console.print(f"ℹ️ Existing configuration found for {env_filename}. Using existing values as defaults.", style="yellow")
+
+    # Calculate recommended max stream pool size based on CPU count
+    cpus = psutil.cpu_count(logical=True)
+    if cpus >= 2 and cpus < 4:
+        recommended_max_stream_pool_size = 40
+    elif cpus >= 4:
+        recommended_max_stream_pool_size = 100
+    else:
+        recommended_max_stream_pool_size = 20
+    # --- Collect Credentials ---
+    final_wallet_address = wallet_address or Prompt.ask("👉 Enter wallet address (0x...)", default=existing_env_vars.get("WALLET_HOLDER_ADDRESS", ""))
+    final_signer_address = signer_address or Prompt.ask("👉 Enter signer address (0x...)", default=existing_env_vars.get("SIGNER_ACCOUNT_ADDRESS", ""))
+    final_signer_key = signer_key
+    if not final_signer_key:
+        existing_key = existing_env_vars.get("SIGNER_ACCOUNT_PRIVATE_KEY", "")
+        final_signer_key = Prompt.ask(
+            "👉 Enter signer private key",
+            password=True,
+            default="(hidden)" if existing_key else ""
+        )
+        if final_signer_key == "(hidden)" or final_signer_key == "":
+            final_signer_key = existing_key
+        else:
+            confirm_key = Prompt.ask("👉 Confirm signer private key", password=True)
+            if final_signer_key != confirm_key:
+                console.print("❌ Private keys do not match.", style="bold red")
+                raise typer.Exit(1)
+
+    final_source_rpc = source_rpc_url or Prompt.ask(f"👉 Enter RPC URL for {selected_market_obj.sourceChain}", default=existing_env_vars.get("SOURCE_RPC_URL", ""))
+    final_telegram_chat = telegram_chat_id or Prompt.ask("👉 Enter Telegram chat ID (optional)", default=existing_env_vars.get("TELEGRAM_CHAT_ID", ""))
+    final_telegram_url = telegram_reporting_url or Prompt.ask("👉 Enter Telegram reporting URL (optional)", default=existing_env_vars.get("TELEGRAM_REPORTING_URL", ""))
+
+    # Prompt user for max stream pool size
+    final_max_stream_pool_size = max_stream_pool_size or Prompt.ask(
+        "👉 Enter max stream pool size for local collector",
+        default=str(recommended_max_stream_pool_size)
+    )
+    if int(final_max_stream_pool_size) > recommended_max_stream_pool_size:
+        console.print(f"⚠️ MAX_STREAM_POOL_SIZE is greater than the recommended {recommended_max_stream_pool_size} for {cpus} logical CPUs, this may cause instability! Choosing the recommended value.", style="bold red")
+        final_max_stream_pool_size = str(recommended_max_stream_pool_size)
+
+    # Prompt user for connection refresh interval with a default of 120 seconds
+    final_connection_refresh_interval = connection_refresh_interval or Prompt.ask(
+        "👉 Enter connection refresh interval for local collector to sequencer",
+        default="75"
+    )
+    env_contents = []
+    if final_wallet_address:
+        env_contents.append(f"WALLET_HOLDER_ADDRESS={final_wallet_address}")
+    if final_signer_address:
+        env_contents.append(f"SIGNER_ACCOUNT_ADDRESS={final_signer_address}")
+    if final_signer_key:
+        env_contents.append(f"SIGNER_ACCOUNT_PRIVATE_KEY={final_signer_key}")
+    if final_source_rpc:
+        env_contents.append(f"SOURCE_RPC_URL={final_source_rpc}")
+    if final_telegram_chat:
+        env_contents.append(f"TELEGRAM_CHAT_ID={final_telegram_chat}")
+    if final_telegram_url:
+        env_contents.append(f"TELEGRAM_REPORTING_URL={final_telegram_url}")
+    if final_max_stream_pool_size:
+        env_contents.append(f"MAX_STREAM_POOL_SIZE={final_max_stream_pool_size}")
+    if final_connection_refresh_interval:
+        env_contents.append(f"CONNECTION_REFRESH_INTERVAL_SEC={final_connection_refresh_interval}")
+
+    if env_file_path.exists():
+        overwrite = typer.confirm(f"⚠️ {env_filename} already exists. Overwrite?", default=False)
         if not overwrite:
-            console.print("Skipping configuration update.", style="dim")
-            raise typer.Exit(0)
-    
-    output_env_vars: Dict[str, str] = {}
-    configured_chain_identity = user_settings.chain_identities.get(chain_name_upper)
+            console.print("❌ Aborted.", style="yellow")
+            raise typer.Exit(1)
 
-    # --- Interactive Prompting ---
-    console.print(f"⚙️ Please provide values for the {env_filename} configuration. Press Enter to keep default/current.", style="bold blue")
-
-    # Key order from env.example is preferred, but it's a dict, so we iterate over a fixed list
-    # or keys from default_env_vars (which should maintain order if Python >= 3.7)
-    keys_to_configure = list(default_env_vars.keys()) 
-    # Add any keys from an existing specific file that might not be in env.example (legacy or custom)
-    for k in existing_specific_env_vars.keys():
-        if k not in keys_to_configure:
-            keys_to_configure.append(k)
-    if not keys_to_configure and not default_env_vars: # if env.example was empty and no existing file
-         console.print("🤷 No keys to configure (env.example might be empty or missing).", style="yellow")
-         raise typer.Exit(1)
-
-
-    for key in keys_to_configure:
-        default_value = default_env_vars.get(key, "") # Default from env.example
-        current_value = existing_specific_env_vars.get(key, default_value) # Current from specific file, or default
-        prompt_message_rich = f"  Enter value for [green]{key}[/green]"
-        
-        # Pre-fill with resolved credentials where applicable
-        prefilled_value = None
-        if key == "WALLET_HOLDER_ADDRESS":
-            prefilled_value = get_credential("WALLET_HOLDER_ADDRESS", chain_name_upper, None, configured_chain_identity)
-        elif key == "SIGNER_ACCOUNT_ADDRESS":
-            prefilled_value = get_credential("SIGNER_ACCOUNT_ADDRESS", chain_name_upper, None, configured_chain_identity)
-        elif key == "SIGNER_ACCOUNT_PRIVATE_KEY":
-            prefilled_value = get_credential("SIGNER_ACCOUNT_PRIVATE_KEY", chain_name_upper, None, configured_chain_identity)
-        elif key == "SOURCE_RPC_URL": # This should be specific to the market's source chain
-             prefilled_value = get_source_chain_rpc_url(selected_market_config.sourceChain, user_settings)
-        elif key == "POWERLOOM_RPC_URL": # This should be specific to the selected Powerloom chain
-            prefilled_value = str(selected_powerloom_chain_config.powerloomChain.rpcURL)
-
-        if prefilled_value:
-            current_value = prefilled_value # Prioritize identity/market config over existing file content for prompt
-            prompt_message_rich += f" (default from identity/market: [cyan]{'(hidden for private key)' if 'PRIVATE_KEY' in key and prefilled_value else prefilled_value}[/cyan])"
-        elif current_value:
-             prompt_message_rich += f" (current: [cyan]{'(hidden for private key)' if 'PRIVATE_KEY' in key and current_value else current_value}[/cyan])"
-        else:
-            prompt_message_rich += " (no current value)"
-
-        is_sensitive = "PRIVATE_KEY" in key
-        
-        # Print the Rich-formatted prompt first
-        console.print(prompt_message_rich, end=" ")
-        # Then use Typer prompt with a minimal actual prompt string, using default for display
-        user_input = typer.prompt("", default=current_value if not is_sensitive else "(hidden)", hide_input=is_sensitive, show_default=not is_sensitive)
-        
-        if is_sensitive and user_input == "(hidden)" and current_value:
-            # If sensitive and user effectively chose the default (which was displayed as "(hidden)")
-            output_env_vars[key] = current_value
-        elif is_sensitive and not user_input and current_value: # User pressed enter on sensitive field with existing value, typer returns empty string
-            output_env_vars[key] = current_value
-        else:
-            output_env_vars[key] = user_input
-
-    # --- Write Configuration File ---
     try:
         with open(env_file_path, 'w') as f:
-            f.write(f"# Configuration for Powerloom Chain: {selected_powerloom_chain_config.powerloomChain.name}\n")
-            f.write(f"# Data Market: {selected_market_config.name} (Source: {selected_market_config.sourceChain})\n")
-            f.write(f"# Generated by snapshotter-cli configure\n\n")
-            for k, v in output_env_vars.items():
-                f.write(f"{k}={v}\n")
-        console.print(f"✅ Successfully generated/updated configuration: [bold green]{env_file_path}[/bold green]", style="green")
-    except IOError as e:
-        console.print(f"❌ Error writing configuration file: {e}", style="bold red")
+            f.write('\n'.join(env_contents))
+        console.print(f"✅ Created {env_filename} with following values:", style="bold green")
+        panel_content = []
+        for line in env_contents:
+            if "SIGNER_ACCOUNT_PRIVATE_KEY" in line:
+                panel_content.append("SIGNER_ACCOUNT_PRIVATE_KEY=(hidden)")
+            else:
+                panel_content.append(line)
+        panel = Panel("\n".join(panel_content), title="Environment File Contents", border_style="cyan")
+        console.print(panel)
+    except Exception as e:
+        console.print(f"❌ Error writing {env_filename}: {e}", style="bold red")
         raise typer.Exit(1)
