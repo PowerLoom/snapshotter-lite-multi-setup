@@ -185,6 +185,10 @@ def configure_command(
     if final_connection_refresh_interval:
         env_contents.append(f"CONNECTION_REFRESH_INTERVAL_SEC={final_connection_refresh_interval}")
 
+    # Add default values for LITE_NODE_BRANCH and LOCAL_COLLECTOR_IMAGE_TAG
+    env_contents.append("LITE_NODE_BRANCH=main")
+    env_contents.append("LOCAL_COLLECTOR_IMAGE_TAG=latest")
+
     if env_file_path.exists():
         overwrite = typer.confirm(f"⚠️ {env_filename} already exists. Overwrite?", default=False)
         if not overwrite:

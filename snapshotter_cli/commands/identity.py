@@ -17,41 +17,45 @@ identity_app = typer.Typer(
     no_args_is_help=True
 )
 
-def list_env_files() -> List[Path]:
-    """Find all namespaced .env files in the current directory."""
+def list_env_files(cli_context: CLIContext) -> List[Path]:
+    """Find all namespaced .env files in the current directory using known chains and markets."""
     env_files = []
+    available_chains = [x.lower() for x in cli_context.available_environments]
+    available_markets = [x.lower() for x in cli_context.available_markets]
+
     for file in glob(".env.*.*.*"):
-        if file.count('.') == 3:  # Should match .env.chain.market.source_chain pattern
-            env_files.append(Path(file))
+        parts = file.strip().split('.')
+        if len(parts) == 5:
+            chain, market, source_chain = parts[2].lower(), parts[3].lower(), parts[4]
+            if chain in available_chains and market in available_markets:
+                env_files.append(Path(file))
+
     return sorted(env_files)
 
 @identity_app.command("list")
 def list_identities(ctx: typer.Context):
     """List all configured identities (namespaced .env files) and their contents."""
-    env_files = list_env_files()
+    cli_context: CLIContext = ctx.obj
+    env_files = list_env_files(cli_context)
     
     if not env_files:
         console.print("No namespaced .env files found. Use 'snapshotter-cli configure' to create one.", style="yellow")
         return
 
-    table = Table(title="Configured Identities", show_header=True, header_style="bold blue")
-    table.add_column("Chain", style="magenta")
-    table.add_column("Market", style="cyan")
-    table.add_column("Source Chain", style="green")
-    table.add_column("Wallet Address", style="dim")
-    table.add_column("Signer Address", style="dim")
-    table.add_column("Has Private Key", style="dim")
-    table.add_column("Source RPC", style="dim")
+    table = Table(title="Configured Identities", show_header=True, header_style="bold blue", title_style="bold cyan")
+    table.add_column("Chain", style="magenta", min_width=10)
+    table.add_column("Market", style="cyan", min_width=12)
+    table.add_column("Source Chain", style="green", min_width=15)
+    table.add_column("Wallet Address", style="dim", min_width=42, no_wrap=True)
+    table.add_column("Signer Address", style="dim", min_width=42, no_wrap=True)
+    table.add_column("Has Private Key", style="dim", justify="center")
+    table.add_column("Source RPC", style="dim", justify="center")
 
     for env_file in env_files:
-        # Parse filename parts (.env.chain.market.source_chain)
         parts = env_file.name.split('.')
-        if len(parts) != 4:
-            continue
-        
-        chain = parts[1].upper()
-        market = parts[2].upper()
-        source_chain = parts[3].upper()
+        chain = parts[2].upper()
+        market = parts[3].upper()
+        source_chain = parts[4].upper()
         
         env_vars = parse_env_file_vars(str(env_file))
         
