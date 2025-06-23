@@ -34,7 +34,7 @@ def list_env_files(cli_context: CLIContext) -> List[Path]:
 
 @identity_app.command("list")
 def list_identities(ctx: typer.Context):
-    """List all configured identities (namespaced .env files) and their contents."""
+    """List all configured identities (namespaced .env files) with basic status."""
     cli_context: CLIContext = ctx.obj
     env_files = list_env_files(cli_context)
     
@@ -43,13 +43,10 @@ def list_identities(ctx: typer.Context):
         return
 
     table = Table(title="Configured Identities", show_header=True, header_style="bold blue", title_style="bold cyan")
-    table.add_column("Chain", style="magenta", min_width=10)
-    table.add_column("Market", style="cyan", min_width=12)
-    table.add_column("Source Chain", style="green", min_width=15)
-    table.add_column("Wallet Address", style="dim", min_width=42, no_wrap=True)
-    table.add_column("Signer Address", style="dim", min_width=42, no_wrap=True)
-    table.add_column("Has Private Key", style="dim", justify="center")
-    table.add_column("Source RPC", style="dim", justify="center")
+    table.add_column("Chain", style="magenta")
+    table.add_column("Market", style="cyan")
+    table.add_column("Source Chain", style="green")
+    table.add_column("Status", style="yellow")
 
     for env_file in env_files:
         parts = env_file.name.split('.')
@@ -59,18 +56,31 @@ def list_identities(ctx: typer.Context):
         
         env_vars = parse_env_file_vars(str(env_file))
         
+        # Determine configuration status
+        status_parts = []
+        if not env_vars.get("WALLET_HOLDER_ADDRESS"):
+            status_parts.append("❌ No Wallet")
+        if not env_vars.get("SIGNER_ACCOUNT_ADDRESS"):
+            status_parts.append("❌ No Signer")
+        if not env_vars.get("SIGNER_ACCOUNT_PRIVATE_KEY"):
+            status_parts.append("❌ No Key")
+        if not env_vars.get("SOURCE_RPC_URL"):
+            status_parts.append("❌ No RPC")
+        if not env_vars.get("POWERLOOM_RPC_URL"):
+            status_parts.append("❌ No Powerloom RPC")
+        
+        status = "✓ Ready" if not status_parts else " ".join(status_parts)
+        
         table.add_row(
             chain,
             market,
             source_chain,
-            env_vars.get("WALLET_HOLDER_ADDRESS", "[Not Set]"),
-            env_vars.get("SIGNER_ACCOUNT_ADDRESS", "[Not Set]"),
-            "✓" if env_vars.get("SIGNER_ACCOUNT_PRIVATE_KEY") else "✗",
-            "✓" if env_vars.get("SOURCE_RPC_URL") else "✗"
+            status
         )
 
     console.print(table)
-    console.print("\nℹ️ Use 'snapshotter-cli configure' to create or update these configurations.", style="blue")
+    console.print("\nℹ️ Use 'snapshotter-cli identity show --chain <CHAIN> --market <MARKET> --source-chain <SOURCE_CHAIN>' to view detailed configuration.", style="blue")
+    console.print("ℹ️ Use 'snapshotter-cli configure' to create or update these configurations.", style="blue")
 
 @identity_app.command("show")
 def show_identity(

@@ -43,6 +43,7 @@ def configure_command(
     signer_address: Optional[str] = typer.Option(None, "--signer", "-s", help="Signer account address (0x...)"),
     signer_key: Optional[str] = typer.Option(None, "--signer-key", "-k", help="Signer account private key", hide_input=True),
     source_rpc_url: Optional[str] = typer.Option(None, "--source-rpc", "-r", help="Source chain RPC URL"),
+    powerloom_rpc_url: Optional[str] = typer.Option(None, "--powerloom-rpc", "-p", help="Powerloom RPC URL"),
     telegram_chat_id: Optional[str] = typer.Option(None, "--telegram-chat", "-t", help="Telegram chat ID for notifications"),
     telegram_reporting_url: Optional[str] = typer.Option("", "--telegram-url", "-u", help="Telegram reporting URL"),
     max_stream_pool_size: Optional[int] = typer.Option(None, "--max-stream-pool-size", "-p", help="Max stream pool size for local collector"),
@@ -76,6 +77,10 @@ def configure_command(
                 selected_chain_name_upper = chain_input.upper()
                 break
             console.print("❌ Invalid selection. Please try again.", style="red")
+
+    # --- Select Powerloom RPC URL ---
+    if not powerloom_rpc_url:
+        final_powerloom_rpc_url = Prompt.ask("👉 Enter Powerloom RPC URL", default='https://rpc-v2.powerloom.network')
 
     # --- Select Data Market ---
     chain_data = cli_context.chain_markets_map[selected_chain_name_upper]
@@ -184,6 +189,8 @@ def configure_command(
         env_contents.append(f"MAX_STREAM_POOL_SIZE={final_max_stream_pool_size}")
     if final_connection_refresh_interval:
         env_contents.append(f"CONNECTION_REFRESH_INTERVAL_SEC={final_connection_refresh_interval}")
+    if final_powerloom_rpc_url:
+        env_contents.append(f"POWERLOOM_RPC_URL={final_powerloom_rpc_url}")
 
     # Add default values for LITE_NODE_BRANCH and LOCAL_COLLECTOR_IMAGE_TAG
     env_contents.append("LITE_NODE_BRANCH=main")
