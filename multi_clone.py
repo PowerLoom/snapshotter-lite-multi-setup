@@ -379,20 +379,20 @@ def main(data_market_choice: str, non_interactive: bool = False, latest_only: bo
     # Calculate appropriate connection refresh interval based on number of slots
     suggested_refresh_interval = calculate_connection_refresh_interval(len(deploy_slots))
     connection_refresh_interval = os.getenv('CONNECTION_REFRESH_INTERVAL_SEC')
-    
-    if use_env_refresh_interval and connection_refresh_interval:
-        connection_refresh_interval = int(connection_refresh_interval)
-        print(f'🔧 Using CONNECTION_REFRESH_INTERVAL_SEC from environment: {connection_refresh_interval} seconds')
-        if connection_refresh_interval < suggested_refresh_interval:
-            print(f'⚠️ Warning: This value is lower than the suggested {suggested_refresh_interval}s for {len(deploy_slots)} slots')
-    elif not connection_refresh_interval:
-        connection_refresh_interval = suggested_refresh_interval
-        print(f'🟢 Using calculated CONNECTION_REFRESH_INTERVAL_SEC based on {len(deploy_slots)} slots: {connection_refresh_interval} seconds')
+    connection_refresh_interval = int(connection_refresh_interval) if connection_refresh_interval else 0
+    if use_env_refresh_interval:
+        if not connection_refresh_interval:
+            print('🟡 CONNECTION_REFRESH_INTERVAL_SEC is not set in .env file, using calculated value...')
+            connection_refresh_interval = suggested_refresh_interval
+        else:
+            if connection_refresh_interval != suggested_refresh_interval:
+                print(f'⚠️ Current CONNECTION_REFRESH_INTERVAL_SEC ({connection_refresh_interval}s) is different from the suggested value ({suggested_refresh_interval}s) for {len(deploy_slots)} slots\n'
+                       'This may cause connection instability under high load! Switching to suggested value...')
+                connection_refresh_interval = suggested_refresh_interval
     else:
-        connection_refresh_interval = int(connection_refresh_interval)
-        if connection_refresh_interval < suggested_refresh_interval:
-            print(f'⚠️ Current CONNECTION_REFRESH_INTERVAL_SEC ({connection_refresh_interval}s) is lower than the suggested value ({suggested_refresh_interval}s) for {len(deploy_slots)} slots')
-            print('This may cause connection instability under high load!')
+        if connection_refresh_interval != suggested_refresh_interval:
+            print(f'⚠️ Current CONNECTION_REFRESH_INTERVAL_SEC ({connection_refresh_interval}s) is different from the suggested value ({suggested_refresh_interval}s) for {len(deploy_slots)} slots\n'
+                   'BE WARNED: This may cause connection instability under high load!')
     
     run_snapshotter_lite_v2(
         deploy_slots,
