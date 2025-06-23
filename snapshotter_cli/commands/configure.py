@@ -136,8 +136,8 @@ def configure_command(
     else:
         recommended_max_stream_pool_size = 20
     # --- Collect Credentials ---
-    final_wallet_address = wallet_address or Prompt.ask("👉 Enter wallet address (0x...)", default=existing_env_vars.get("WALLET_HOLDER_ADDRESS", ""))
-    final_signer_address = signer_address or Prompt.ask("👉 Enter signer address (0x...)", default=existing_env_vars.get("SIGNER_ACCOUNT_ADDRESS", ""))
+    final_wallet_address = wallet_address or Prompt.ask("👉 Enter slot NFT holder wallet address (0x...)", default=existing_env_vars.get("WALLET_HOLDER_ADDRESS", ""))
+    final_signer_address = signer_address or Prompt.ask("👉 Enter SNAPSHOTTER signer address (0x...)", default=existing_env_vars.get("SIGNER_ACCOUNT_ADDRESS", ""))
     final_signer_key = signer_key
     if not final_signer_key:
         existing_key = existing_env_vars.get("SIGNER_ACCOUNT_PRIVATE_KEY", "")
