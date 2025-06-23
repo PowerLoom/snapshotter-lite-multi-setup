@@ -387,12 +387,12 @@ def main(data_market_choice: str, non_interactive: bool = False, latest_only: bo
         else:
             if connection_refresh_interval != suggested_refresh_interval:
                 print(f'⚠️ Current CONNECTION_REFRESH_INTERVAL_SEC ({connection_refresh_interval}s) is different from the suggested value ({suggested_refresh_interval}s) for {len(deploy_slots)} slots\n'
-                       'This may cause connection instability under high load! Switching to suggested value...')
-                connection_refresh_interval = suggested_refresh_interval
+                       'BE WARNED: This may cause connection instability under high load!')      
     else:
         if connection_refresh_interval != suggested_refresh_interval:
             print(f'⚠️ Current CONNECTION_REFRESH_INTERVAL_SEC ({connection_refresh_interval}s) is different from the suggested value ({suggested_refresh_interval}s) for {len(deploy_slots)} slots\n'
-                   'BE WARNED: This may cause connection instability under high load!')
+                   'BE WARNED: This may cause connection instability under high load! Using suggested value...')
+            connection_refresh_interval = suggested_refresh_interval
     
     run_snapshotter_lite_v2(
         deploy_slots,
