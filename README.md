@@ -209,6 +209,18 @@ Available flags:
 - `--latest-only`: Deploy only the latest (highest) slot
 - `--use-env-connection-refresh-interval`: Use CONNECTION_REFRESH_INTERVAL_SEC from environment instead of calculating based on slots
 
+The script automatically calculates an optimal connection refresh interval based on the number of slots being deployed. This calculation ensures stability under load by adjusting the interval linearly.
+
+The `--use-env-connection-refresh-interval` flag modifies this behavior:
+
+- Without the flag (default):
+  - Always uses the calculated value
+  - If `CONNECTION_REFRESH_INTERVAL_SEC` exists in env but differs from calculated value, warns and uses calculated value
+
+- With the flag:
+  - If `CONNECTION_REFRESH_INTERVAL_SEC` exists in env: Uses that value (warns if different from calculated)
+  - If `CONNECTION_REFRESH_INTERVAL_SEC` not set: Falls back to calculated value
+
 Example usage:
 ```bash
 # Deploy all slots non-interactively for UNISWAPV2
@@ -217,8 +229,11 @@ python multi_clone.py --data-market 2 -y
 # Deploy only the latest slot
 python multi_clone.py --latest-only
 
-# Use environment variable for connection refresh interval
+# Use environment variable set at shell prompt for connection refresh interval
 CONNECTION_REFRESH_INTERVAL_SEC=300 python multi_clone.py --use-env-connection-refresh-interval
+
+# Set the above in .env file and run the script
+python multi_clone.py --use-env-connection-refresh-interval
 ```
 
 When you run the deploy script without any flags, it will ask you if you want to deploy all nodes? If you want to [Deploy a subset of slots](#221-deploy-a-subset-of-slots) then press `n` else you want to [Deploy all slots](#222-deploy-all-slots) press `y`.
