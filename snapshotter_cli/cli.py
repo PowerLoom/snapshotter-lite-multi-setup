@@ -177,11 +177,31 @@ def deploy(
     
         console.print(f"🚀 Deploying to environment: [bold magenta]{selected_powerloom_chain_name_upper}[/bold magenta]...", style="bold green")
 
+        # --- Load market-specific namespaced .env file ---
+        # We need to load this before getting credentials to ensure we use the right wallet address
+        namespaced_env_content: Optional[Dict[str,str]] = None
+        norm_pl_chain_name_for_file = selected_powerloom_chain_name_upper.lower()
+        
+        # Since we don't know which market yet, try all markets to find a matching wallet
+        for market_name, market_obj in env_config.markets.items():
+            norm_market_name_for_file = market_name.lower()
+            norm_source_chain_name_for_file = market_obj.sourceChain.lower().replace('-', '_')
+            potential_config_filename = CONFIG_ENV_FILENAME_TEMPLATE.format(
+                norm_pl_chain_name_for_file, 
+                norm_market_name_for_file, 
+                norm_source_chain_name_for_file
+            )
+            cwd_config_file_path = Path(os.getcwd()) / potential_config_filename
+            if cwd_config_file_path.exists():
+                console.print(f"✓ Found namespaced .env for market {market_name}: {cwd_config_file_path}", style="dim")
+                namespaced_env_content = parse_env_file_vars(str(cwd_config_file_path))
+                break
+
         final_wallet_address = get_credential(
             "WALLET_HOLDER_ADDRESS", 
             selected_powerloom_chain_name_upper, 
             wallet_address_opt,
-            None
+            namespaced_env_content
         )
         if not final_wallet_address: 
             error_message_lines = [
@@ -198,10 +218,16 @@ def deploy(
         deploy_slots: Optional[List[int]] = slots
         if not deploy_slots:
             console.print(f"ℹ️ No specific slots provided. Fetching all slots owned by {final_wallet_address} on {env_config.chain_config.name}...", style="dim")
+            
+            # Get protocol state contract address from the first market
+            first_market = next(iter(env_config.markets.values()))
+            protocol_state_contract_address = first_market.powerloomProtocolStateContractAddress
+            
             fetched_slots_result = fetch_owned_slots(
                 wallet_address=final_wallet_address,
                 powerloom_chain_name=env_config.chain_config.name,
-                rpc_url=str(env_config.chain_config.rpcURL)
+                rpc_url=str(env_config.chain_config.rpcURL),
+                protocol_state_contract_address=protocol_state_contract_address
             )
             if fetched_slots_result is None: 
                 console.print(f"❌ Could not fetch slots. Please check errors above.", style="bold red"); raise typer.Exit(1)
@@ -318,7 +344,7 @@ def deploy(
             console.print(f"📦 Processing market [bold cyan]{market_conf_obj.name}[/bold cyan] on [bold magenta]{selected_powerloom_chain_name_upper}[/bold magenta]...", style="green")
             
             # --- Load market-specific namespaced .env file ---
-            namespaced_env_content: Optional[Dict[str,str]] = None
+            market_namespaced_env_content: Optional[Dict[str,str]] = None
             norm_pl_chain_name_for_file = selected_powerloom_chain_name_upper.lower()
             norm_market_name_for_file = market_conf_obj.name.lower()
             norm_source_chain_name_for_file = market_conf_obj.sourceChain.lower().replace('-', '_')
@@ -330,15 +356,15 @@ def deploy(
             cwd_config_file_path = Path(os.getcwd()) / potential_config_filename
             if cwd_config_file_path.exists():
                 console.print(f"✓ Found namespaced .env for market {market_conf_obj.name}: {cwd_config_file_path}", style="dim")
-                namespaced_env_content = parse_env_file_vars(str(cwd_config_file_path))
+                market_namespaced_env_content = parse_env_file_vars(str(cwd_config_file_path))
 
             # --- Resolve Signer Credentials & Source RPC URL FOR THIS MARKET ---
-            # Uses the loaded namespaced_env_content for this specific market
+            # Uses the loaded market_namespaced_env_content for this specific market
             market_signer_address = get_credential(
                 "SIGNER_ACCOUNT_ADDRESS", 
                 selected_powerloom_chain_name_upper, 
                 signer_address_opt,
-                namespaced_env_content
+                market_namespaced_env_content
             )
             if not market_signer_address:
                 error_message_lines_signer_addr = [
@@ -352,7 +378,7 @@ def deploy(
                 "SIGNER_ACCOUNT_PRIVATE_KEY", 
                 selected_powerloom_chain_name_upper, 
                 signer_key_opt,
-                namespaced_env_content
+                market_namespaced_env_content
             )
             if not market_signer_key:
                 error_message_lines_signer_key = [
@@ -366,7 +392,7 @@ def deploy(
 
             source_rpc_url = get_source_chain_rpc_url(
                 market_conf_obj.sourceChain,
-                namespaced_env_content
+                market_namespaced_env_content
             )
             if not source_rpc_url:
                 error_message_lines_source_rpc = [

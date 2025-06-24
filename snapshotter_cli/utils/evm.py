@@ -7,12 +7,6 @@ from rich.console import Console
 
 console = Console()
 
-# TODO: Make these configurable, perhaps via a config file or fetched with sources.json
-# These are the main Powerloom Chain Protocol State Contracts, not the market-specific ones
-CHAIN_PROTOCOL_STATE_CONTRACTS = {
-    "DEVNET": "0x59213C839742B310D99A6517C069792C38A4145C", # Example for Devnet
-    "MAINNET": "0x000AA7d3a6a2556496f363B59e56D9aA1881548F", # From multi_clone.py
-}
 
 ABI_DIR = Path(__file__).parent.parent / "utils/abi" # Assumes abi folder is at snapshotter_cli/utils/abi
 
@@ -20,6 +14,7 @@ def fetch_owned_slots(
     wallet_address: str,
     powerloom_chain_name: str,
     rpc_url: str,
+    protocol_state_contract_address: Optional[str] = None,
 ) -> Optional[List[int]]:
     """
     Fetches the slot IDs owned by a given wallet address on a Powerloom chain.
@@ -32,12 +27,9 @@ def fetch_owned_slots(
         console.print("[bold red]Error: Powerloom RPC URL not provided.[/bold red]")
         return None
 
-    chain_name_upper = powerloom_chain_name.upper()
-    if chain_name_upper not in CHAIN_PROTOCOL_STATE_CONTRACTS:
-        console.print(f"[bold red]Error: Protocol State Contract for chain '{powerloom_chain_name}' not configured.[/bold red]")
+    if not protocol_state_contract_address:
+        console.print("[bold red]Error: Protocol State Contract address not provided.[/bold red]")
         return None
-    
-    protocol_state_contract_address = CHAIN_PROTOCOL_STATE_CONTRACTS[chain_name_upper]
 
     try:
         w3 = Web3(Web3.HTTPProvider(rpc_url))
@@ -101,15 +93,27 @@ if __name__ == '__main__':
     test_wallet = os.getenv("WALLET_HOLDER_ADDRESS")
     test_rpc_url_mainnet = "https://rpc-v2.powerloom.network" # or from env
     test_rpc_url_devnet = "https://rpc-devnet.powerloom.dev" # or from env
+    test_protocol_state_mainnet = os.getenv("PROTOCOL_STATE_CONTRACT_MAINNET")
+    test_protocol_state_devnet = os.getenv("PROTOCOL_STATE_CONTRACT_DEVNET")
     
     if test_wallet:
         console.print(f"--- Testing MAINNET with wallet: {test_wallet} ---")
-        slots_mainnet = fetch_owned_slots(test_wallet, "MAINNET", test_rpc_url_mainnet)
+        slots_mainnet = fetch_owned_slots(
+            test_wallet,
+            "MAINNET",
+            test_rpc_url_mainnet,
+            test_protocol_state_mainnet
+        )
         if slots_mainnet is not None:
             console.print(f"Mainnet Slots: {slots_mainnet}")
 
         console.print(f"\n--- Testing DEVNET with wallet: {test_wallet} ---")
-        slots_devnet = fetch_owned_slots(test_wallet, "DEVNET", test_rpc_url_devnet)
+        slots_devnet = fetch_owned_slots(
+            test_wallet,
+            "DEVNET",
+            test_rpc_url_devnet,
+            test_protocol_state_devnet
+        )
         if slots_devnet is not None:
             console.print(f"Devnet Slots: {slots_devnet}")
     else:
