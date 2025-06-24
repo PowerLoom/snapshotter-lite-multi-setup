@@ -16,7 +16,7 @@ identity_app = typer.Typer(
     help="Manage chain and market-specific identity configurations via namespaced .env files.",
     no_args_is_help=True
 )
-
+# TODO: locate env files in user's home directory instead of current directory. For eg: ~/.snapshotter-cli/envs/.env.devnet.uniswapv2.eth-mainnet
 def list_env_files(cli_context: CLIContext) -> List[Path]:
     """Find all namespaced .env files in the current directory using known chains and markets."""
     env_files = []
