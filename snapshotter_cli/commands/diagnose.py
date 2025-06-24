@@ -1,10 +1,8 @@
 import os
 import subprocess
-from typing import List, Tuple
-import psutil
+from typing import List, Tuple, Dict
 import typer
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
 
 console = Console()
@@ -60,31 +58,8 @@ def check_docker_compose() -> Tuple[bool, str]:
     except subprocess.CalledProcessError:
         return False, "Neither docker-compose nor Docker Compose plugin found"
 
-def check_port_in_use(port: int) -> bool:
-    """Check if a port is in use."""
-    try:
-        for conn in psutil.net_connections(kind='inet'):
-            if conn.laddr.port == port:
-                return True
-        return False
-    except psutil.AccessDenied:
-        # Fall back to using sudo netstat if psutil needs elevated privileges
-        try:
-            result = run_with_sudo(['netstat', '-tuln'], capture_output=True, text=True)
-            return f":{port}" in result.stdout
-        except subprocess.CalledProcessError:
-            console.print(f"⚠️  Unable to check port {port}", style="yellow")
-            return False
-
-def find_next_available_port(start_port: int) -> int:
-    """Find the next available port starting from start_port."""
-    port = start_port
-    while check_port_in_use(port):
-        port += 1
-    return port
-
-def get_powerloom_containers() -> List[str]:
-    """Get list of PowerLoom containers."""
+def get_powerloom_containers() -> List[Dict[str, str]]:
+    """Get list of PowerLoom containers with their IDs and names."""
     try:
         # Create a list of filters for different container name patterns
         filters = [
@@ -94,12 +69,20 @@ def get_powerloom_containers() -> List[str]:
             'name=powerloom-mainnet-',
             'name=local-collector'
         ]
-        # Run docker ps with multiple filters
+        # Run docker ps with multiple filters and format to get just ID and name
         result = run_with_sudo(
-            ['docker', 'ps', '-a'] + sum([['--filter', f] for f in filters], []),
+            ['docker', 'ps', '-a', '--format', '{{.ID}}\t{{.Names}}'] + sum([['--filter', f] for f in filters], []),
             capture_output=True, text=True
         )
-        return [line for line in result.stdout.split('\n') if line]
+        containers = []
+        for line in result.stdout.strip().split('\n'):
+            if line:
+                container_id, container_name = line.strip().split('\t')
+                containers.append({
+                    "id": container_id.strip(),
+                    "name": container_name.strip()
+                })
+        return containers
     except subprocess.CalledProcessError:
         return []
 
@@ -114,20 +97,57 @@ def get_powerloom_networks() -> List[str]:
     except subprocess.CalledProcessError:
         return []
 
+def get_powerloom_screen_sessions() -> List[Dict[str, str]]:
+    """Get list of PowerLoom screen sessions."""
+    try:
+        # Use screen -ls to list sessions and grep for powerloom patterns
+        result = subprocess.run(['screen', '-ls'], capture_output=True, text=True)
+        if result.returncode > 1:  # screen -ls returns 1 if no sessions exist
+            return []
+        
+        # Parse screen output and look for powerloom sessions
+        sessions = []
+        for line in result.stdout.split('\n'):
+            if any(pattern in line for pattern in ['powerloom-premainnet', 'powerloom-testnet', 'powerloom-mainnet', 'snapshotter', 'pl_']):
+                # Extract session ID from the line (first number in the line)
+                session_id = line.split('.')[0].strip()
+                if session_id.isdigit():
+                    sessions.append({
+                        "id": session_id,
+                        "name": line.strip()
+                    })
+        return sessions
+    except subprocess.CalledProcessError:
+        return []
+
 def cleanup_resources(force: bool = False) -> None:
     """Clean up Docker resources."""
     containers = get_powerloom_containers()
     networks = get_powerloom_networks()
+    screen_sessions = get_powerloom_screen_sessions()
     
+    if screen_sessions and (force or typer.confirm("Would you like to terminate existing PowerLoom screen sessions?")):
+        console.print("Terminating screen sessions...", style="yellow")
+        for session in screen_sessions:
+            try:
+                subprocess.run(['kill', session["id"]], check=True)
+                console.print(f"✅ Terminated screen session: {session['name']}", style="green")
+            except subprocess.CalledProcessError as e:
+                console.print(f"⚠️  Failed to terminate screen session {session['name']}: {e}", style="red")
+                continue
+        console.print("Screen session cleanup completed", style="green")
+
     if containers and (force or typer.confirm("Would you like to stop and remove existing PowerLoom containers?")):
         console.print("Stopping and removing containers...", style="yellow")
         for container in containers:
             try:
-                run_with_sudo(['docker', 'stop', container], capture_output=True)
-                run_with_sudo(['docker', 'rm', container], capture_output=True)
-                console.print(f"✅ Removed container: {container}", style="green")
+                container_id = container["id"]
+                container_name = container["name"]
+                run_with_sudo(['docker', 'stop', container_id], capture_output=True)
+                run_with_sudo(['docker', 'rm', container_id], capture_output=True)
+                console.print(f"✅ Removed container: {container_name} ({container_id})", style="green")
             except subprocess.CalledProcessError as e:
-                console.print(f"⚠️  Failed to remove container {container}: {e}", style="red")
+                console.print(f"⚠️  Failed to remove container {container_name} ({container_id}): {e}", style="red")
                 continue
         console.print("Container cleanup completed", style="green")
 
@@ -156,38 +176,36 @@ def run_diagnostics(clean: bool = False, force: bool = False) -> None:
     if not compose_ok:
         return
 
-    # Check ports
-    ports_table = Table(title="Port Status")
-    ports_table.add_column("Service")
-    ports_table.add_column("Default Port")
-    ports_table.add_column("Status")
-    ports_table.add_column("Next Available")
-
-    for service, port in [("Core API", 8002), ("Local Collector", 50051)]:
-        in_use = check_port_in_use(port)
-        next_port = find_next_available_port(port) if in_use else port
-        ports_table.add_row(
-            service,
-            str(port),
-            "In Use" if in_use else "Available",
-            str(next_port) if in_use else "-"
-        )
-    
-    console.print(ports_table)
-
     # Show existing resources
     if containers := get_powerloom_containers():
         console.print("\nExisting PowerLoom containers:", style="yellow")
-        for container in containers:
-            console.print(f"  • {container}")
+        # Get full container details for display
+        try:
+            result = run_with_sudo(
+                ['docker', 'ps', '-a', '--format', 'table {{.ID}}\t{{.Image}}\t{{.Command}}\t{{.CreatedAt}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}'] + 
+                sum([['--filter', f] for f in ['name=snapshotter-lite-v2', 'name=powerloom-premainnet-', 'name=powerloom-testnet-', 'name=powerloom-mainnet-', 'name=local-collector']], []),
+                capture_output=True, text=True
+            )
+            for line in result.stdout.split('\n'):
+                if line.strip():
+                    console.print(f"  • {line}")
+        except subprocess.CalledProcessError:
+            # Fallback to simple display if detailed view fails
+            for container in containers:
+                console.print(f"  • {container['name']} ({container['id']})")
 
     if networks := get_powerloom_networks():
         console.print("\nExisting PowerLoom networks:", style="yellow")
         for network in networks:
             console.print(f"  • {network}")
 
+    if screen_sessions := get_powerloom_screen_sessions():
+        console.print("\nExisting PowerLoom screen sessions:", style="yellow")
+        for session in screen_sessions:
+            console.print(f"  • {session['name']}")
+
     # Clean up if requested
-    if clean or (containers or networks):
+    if clean or (containers or networks or screen_sessions):
         cleanup_resources(force)
 
 def diagnose_command(clean: bool = False, force: bool = False):

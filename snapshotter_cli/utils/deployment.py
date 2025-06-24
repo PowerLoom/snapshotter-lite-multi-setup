@@ -197,7 +197,7 @@ def deploy_snapshotter_instance(
         with open(env_file_path, 'w') as f:
             f.write(f"# Auto-generated .env for {market_config.name} on {powerloom_chain_config.name}, Slot {slot_id}\n")
             f.write(f"# Deployment Path: {instance_dir}\n\n")
-            for key, value in sorted(final_env_vars.items()):
+            for key, value in final_env_vars.items():
                 f.write(f'{key}={value}\n')
         console.print(f"  📄 Generated .env file: {env_file_path}", style="dim green")
     except IOError as e:
@@ -205,14 +205,6 @@ def deploy_snapshotter_instance(
         return False
 
     # --- Spawning instance using screen and build.sh (from multi_clone.py) ---
-    console.print(f"\n📄 Contents of {env_file_path}:", style="bold blue")
-    try:
-        with open(env_file_path, 'r') as f:
-            console.print(f.read(), style="dim")
-    except IOError as e:
-        console.print(f"  ⚠️ Could not read .env file for display: {e}", style="yellow")
-    console.print("\n")
-
     console.print(f"  🚀 Spawning instance for slot {slot_id} market {market_config.name} via screen and build.sh...", style="dim blue")
     
     # Let's use a screen name based on the instance_dir structure to ensure uniqueness and clarity.

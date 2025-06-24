@@ -463,19 +463,16 @@ def status(
     filtered_sessions = []
 
     if not all_screen_sessions:
-        console.print("🤷 No running snapshotter screen sessions found with the 'pl_...' naming convention.", style="yellow")
+        console.print("🤷 No running screen sessions found", style="yellow")
         return
 
     for session in all_screen_sessions:
         session_name = session["name"]
-        # Expected format: pl_{chain}_{market}_{slot_id}
-        # Example: pl_mainnet_uniswapv2_123
-        # Example with market underscores: pl_arbitrum-goerli_aave_v3_liquidity_789
-        
         parsed_chain_name = None
         parsed_market_name = None
         parsed_slot_id = None
 
+        # Try new format first (pl_{chain}_{market}_{slot_id})
         if session_name.startswith("pl_") and session_name.count('_') >= 3:
             try:
                 name_parts_str = session_name[3:] # Remove "pl_"
@@ -487,30 +484,48 @@ def status(
                 
                 # Validate slot_id is a number
                 if not parsed_slot_id.isdigit():
-                    parsed_chain_name, parsed_market_name, parsed_slot_id = None, None, None # Invalidate parse
+                    parsed_chain_name, parsed_market_name, parsed_slot_id = None, None, None
                     console.print(f"  [dim yellow]⚠️ Skipping session '{session_name}': Slot ID part '{parsed_slot_id}' is not a number.[/dim]")
-
-
-            except IndexError: # Not enough parts after split
-                console.print(f"  [dim yellow]⚠️ Skipping session '{session_name}': Could not parse chain, market, slot ID due to unexpected format.[/dim]")
+            except IndexError:
+                console.print(f"  [dim yellow]⚠️ Could not parse new format for session '{session_name}'.[/dim]")
                 parsed_chain_name, parsed_market_name, parsed_slot_id = None, None, None
 
+        # Try legacy format if new format didn't match
+        if not parsed_chain_name:
+            # Legacy format: powerloom-{chain}-{market}-{slot_id}
+            # or snapshotter-lite-v2-{slot_id}-{chain}-{market}
+            try:
+                if session_name.startswith("powerloom-"):
+                    parts = session_name.split('-')
+                    if len(parts) >= 4:
+                        if parts[1] in ["premainnet", "testnet", "mainnet"]:
+                            parsed_chain_name = parts[1]
+                            parsed_market_name = parts[2]
+                            parsed_slot_id = parts[3] if parts[3].isdigit() else None
+                elif session_name.startswith("snapshotter-lite-v2-"):
+                    parts = session_name.split('-')
+                    if len(parts) >= 5 and parts[3] in ["MAINNET", "DEVNET", "mainnet", "devnet"]:
+                        parsed_slot_id = parts[2] if parts[2].isdigit() else None
+                        parsed_chain_name = parts[3].lower()
+                        parsed_market_name = parts[4]
+            except Exception:
+                console.print(f"  [dim yellow]⚠️ Could not parse legacy format for session '{session_name}'.[/dim]")
 
         passes_env_filter = True
         if environment and parsed_chain_name:
             passes_env_filter = (parsed_chain_name.lower() == environment.lower())
-        elif environment and not parsed_chain_name: # Env filter active, but couldn't parse chain
+        elif environment and not parsed_chain_name:
             passes_env_filter = False
             
         passes_market_filter = True
         if data_market and parsed_market_name:
             passes_market_filter = (parsed_market_name.lower() == data_market.lower())
-        elif data_market and not parsed_market_name: # Market filter active, but couldn't parse market
+        elif data_market and not parsed_market_name:
             passes_market_filter = False
 
         if passes_env_filter and passes_market_filter:
             session_details = {
-                **session, # pid, name, status_str
+                **session,
                 "chain_name": parsed_chain_name or "N/A",
                 "market_name": parsed_market_name or "N/A",
                 "slot_id": parsed_slot_id or "N/A"
