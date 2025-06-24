@@ -6,9 +6,8 @@ from typing import Dict, Optional
 import os
 from dotenv import dotenv_values
 from snapshotter_cli.utils.models import CLIContext, MarketConfig, PowerloomChainConfig
-from snapshotter_cli.utils.deployment import CONFIG_ENV_FILENAME_TEMPLATE
+from snapshotter_cli.utils.deployment import CONFIG_ENV_FILENAME_TEMPLATE, calculate_connection_refresh_interval
 import psutil
-from multi_clone import calculate_connection_refresh_interval
 from rich.panel import Panel
 
 console = Console()

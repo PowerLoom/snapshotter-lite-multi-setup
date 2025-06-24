@@ -257,3 +257,26 @@ def deploy_snapshotter_instance(
 
     console.print(f"✅ Deployment attempt for Market [bold cyan]{market_config.name}[/bold cyan], Slot [bold blue]{slot_id}[/bold blue] initiated via screen.", style="bold green")
     return True 
+
+def calculate_connection_refresh_interval(num_slots: int) -> int:
+    """Calculate the connection refresh interval based on number of slots.
+    
+    Args:
+        num_slots: Number of slots being deployed
+        
+    Returns:
+        Recommended refresh interval in seconds
+    """
+    # Base minimum interval
+    MIN_INTERVAL = 60  # seconds
+    
+    if num_slots <= 10:
+        return MIN_INTERVAL
+    
+    # Linear scaling with some adjustments
+    # Formula: 4 seconds per slot + baseline of 60
+    interval = (4 * num_slots) + MIN_INTERVAL
+    
+    # Cap at reasonable maximum
+    MAX_INTERVAL = 900  # 15 minutes
+    return min(interval, MAX_INTERVAL) 
