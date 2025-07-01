@@ -16,7 +16,7 @@ from .commands.configure import configure_command
 from .commands.identity import identity_app
 from .utils.models import CLIContext, ChainConfig, ChainMarketData, MarketConfig, ComputeConfig, PowerloomChainConfig
 from .utils.evm import fetch_owned_slots
-from .utils.deployment import deploy_snapshotter_instance, parse_env_file_vars, CONFIG_ENV_FILENAME_TEMPLATE, run_git_command
+from .utils.deployment import deploy_snapshotter_instance, parse_env_file_vars, CONFIG_ENV_FILENAME_TEMPLATE, run_git_command, CONFIG_DIR
 from .utils.config_helpers import get_credential, get_source_chain_rpc_url
 from .utils.system_checks import is_docker_running, list_snapshotter_screen_sessions
 from .utils.docker_utils import get_docker_container_status_for_instance
@@ -191,9 +191,18 @@ def deploy(
                 norm_market_name_for_file, 
                 norm_source_chain_name_for_file
             )
+            
+            # First check in config directory
+            config_file_path = CONFIG_DIR / potential_config_filename
+            if config_file_path.exists():
+                console.print(f"✓ Found namespaced .env for market {market_name}: {config_file_path}", style="dim")
+                namespaced_env_content = parse_env_file_vars(str(config_file_path))
+                break
+            
+            # If not found in config directory, check current directory for backward compatibility
             cwd_config_file_path = Path(os.getcwd()) / potential_config_filename
             if cwd_config_file_path.exists():
-                console.print(f"✓ Found namespaced .env for market {market_name}: {cwd_config_file_path}", style="dim")
+                console.print(f"⚠️ Found legacy env file in current directory: {cwd_config_file_path}. Consider moving it to {CONFIG_DIR}", style="yellow")
                 namespaced_env_content = parse_env_file_vars(str(cwd_config_file_path))
                 break
 
@@ -353,10 +362,18 @@ def deploy(
                 norm_market_name_for_file, 
                 norm_source_chain_name_for_file
             )
-            cwd_config_file_path = Path(os.getcwd()) / potential_config_filename
-            if cwd_config_file_path.exists():
-                console.print(f"✓ Found namespaced .env for market {market_conf_obj.name}: {cwd_config_file_path}", style="dim")
-                market_namespaced_env_content = parse_env_file_vars(str(cwd_config_file_path))
+            
+            # First check in config directory
+            config_file_path = CONFIG_DIR / potential_config_filename
+            if config_file_path.exists():
+                console.print(f"✓ Found namespaced .env for market {market_conf_obj.name}: {config_file_path}", style="dim")
+                market_namespaced_env_content = parse_env_file_vars(str(config_file_path))
+            else:
+                # Check current directory for backward compatibility
+                cwd_config_file_path = Path(os.getcwd()) / potential_config_filename
+                if cwd_config_file_path.exists():
+                    console.print(f"⚠️ Found legacy env file in current directory: {cwd_config_file_path}. Consider moving it to {CONFIG_DIR}", style="yellow")
+                    market_namespaced_env_content = parse_env_file_vars(str(cwd_config_file_path))
 
             # --- Resolve Signer Credentials & Source RPC URL FOR THIS MARKET ---
             # Uses the loaded market_namespaced_env_content for this specific market

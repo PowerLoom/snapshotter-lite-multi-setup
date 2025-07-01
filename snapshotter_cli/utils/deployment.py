@@ -17,6 +17,9 @@ ENV_EXAMPLE_BASENAME = "env.example"
 
 CONFIG_ENV_FILENAME_TEMPLATE = ".env.{}.{}.{}"
 
+# Directory for storing env files in user's home directory
+CONFIG_DIR = Path.home() / ".snapshotter-cli" / "envs"
+
 def parse_env_file_vars(file_path: str) -> Dict[str, str]:
     """Parses a .env file and returns a dictionary of key-value pairs."""
     env_vars = {}
@@ -146,13 +149,20 @@ def deploy_snapshotter_instance(
         norm_market_name_for_file, 
         norm_source_chain_name_for_file
     )
-    cwd_config_file_path = Path(os.getcwd()) / potential_config_filename
     
-    if cwd_config_file_path.exists():
-        console.print(f"  ℹ️ Found pre-configured .env template: {cwd_config_file_path}. Loading it.", style="dim")
-        final_env_vars.update(parse_env_file_vars(str(cwd_config_file_path)))
+    # First check in config directory
+    config_file_path = CONFIG_DIR / potential_config_filename
+    if config_file_path.exists():
+        console.print(f"  ℹ️ Found pre-configured .env template in config directory: {config_file_path}. Loading it.", style="dim")
+        final_env_vars.update(parse_env_file_vars(str(config_file_path)))
     else:
-        console.print(f"  ℹ️ No pre-configured .env template found at {cwd_config_file_path}. Using minimal core settings.", style="dim")
+        # Check current directory for backward compatibility
+        cwd_config_file_path = Path(os.getcwd()) / potential_config_filename
+        if cwd_config_file_path.exists():
+            console.print(f"  ⚠️ Found legacy env file in current directory: {cwd_config_file_path}. Consider moving it to {CONFIG_DIR}", style="yellow")
+            final_env_vars.update(parse_env_file_vars(str(cwd_config_file_path)))
+        else:
+            console.print(f"  ℹ️ No pre-configured .env template found. Using minimal core settings.", style="dim")
 
     # 2. Set essential/resolved values (these take highest precedence and will overwrite template if keys conflict)
     final_env_vars["OVERRIDE_DEFAULTS"] = "true"

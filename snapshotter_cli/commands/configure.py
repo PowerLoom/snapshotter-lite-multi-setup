@@ -6,7 +6,7 @@ from typing import Dict, Optional
 import os
 from dotenv import dotenv_values
 from snapshotter_cli.utils.models import CLIContext, MarketConfig, PowerloomChainConfig
-from snapshotter_cli.utils.deployment import CONFIG_ENV_FILENAME_TEMPLATE, calculate_connection_refresh_interval
+from snapshotter_cli.utils.deployment import CONFIG_ENV_FILENAME_TEMPLATE, calculate_connection_refresh_interval, CONFIG_DIR
 import psutil
 from rich.panel import Panel
 
@@ -32,7 +32,6 @@ def get_default_env_vars() -> Dict[str, str]:
     project_root = Path(__file__).resolve().parent.parent.parent 
     env_example_path = project_root / "env.example"
     return parse_env_file_vars(str(env_example_path))
-
 
 def configure_command(
     ctx: typer.Context,
@@ -117,8 +116,23 @@ def configure_command(
     norm_market_name = selected_market_name_upper.lower()
     norm_source_chain = selected_market_obj.sourceChain.lower().replace('-', '_')
     
+    # Create config directory if it doesn't exist
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    
     env_filename = CONFIG_ENV_FILENAME_TEMPLATE.format(norm_chain_name, norm_market_name, norm_source_chain)
-    env_file_path = Path(os.getcwd()) / env_filename
+    env_file_path = CONFIG_DIR / env_filename
+
+    # Check current directory for backward compatibility
+    cwd_env_path = Path(os.getcwd()) / env_filename
+    if cwd_env_path.exists():
+        console.print(f"⚠️ Found legacy env file in current directory. Moving it to {CONFIG_DIR}", style="yellow")
+        try:
+            # Create backup in current directory
+            backup_path = cwd_env_path.with_suffix(cwd_env_path.suffix + '.backup')
+            cwd_env_path.rename(backup_path)
+            console.print(f"✓ Created backup of legacy file: {backup_path}", style="dim")
+        except OSError as e:
+            console.print(f"⚠️ Could not create backup of legacy file: {e}", style="yellow")
 
     # Load existing env file values if it exists
     existing_env_vars = {}
@@ -204,7 +218,7 @@ def configure_command(
     try:
         with open(env_file_path, 'w') as f:
             f.write('\n'.join(env_contents))
-        console.print(f"✅ Created {env_filename} with following values:", style="bold green")
+        console.print(f"✅ Created {env_file_path} with following values:", style="bold green")
         panel_content = []
         for line in env_contents:
             if "SIGNER_ACCOUNT_PRIVATE_KEY" in line:
@@ -214,5 +228,5 @@ def configure_command(
         panel = Panel("\n".join(panel_content), title="Environment File Contents", border_style="cyan")
         console.print(panel)
     except Exception as e:
-        console.print(f"❌ Error writing {env_filename}: {e}", style="bold red")
+        console.print(f"❌ Error writing {env_file_path}: {e}", style="bold red")
         raise typer.Exit(1)

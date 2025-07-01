@@ -7,7 +7,7 @@ import os
 from glob import glob
 
 from ..utils.models import CLIContext
-from ..utils.deployment import CONFIG_ENV_FILENAME_TEMPLATE, parse_env_file_vars
+from ..utils.deployment import CONFIG_ENV_FILENAME_TEMPLATE, parse_env_file_vars, CONFIG_DIR
 
 console = Console()
 
@@ -16,19 +16,34 @@ identity_app = typer.Typer(
     help="Manage chain and market-specific identity configurations via namespaced .env files.",
     no_args_is_help=True
 )
-# TODO: locate env files in user's home directory instead of current directory. For eg: ~/.snapshotter-cli/envs/.env.devnet.uniswapv2.eth-mainnet
+
 def list_env_files(cli_context: CLIContext) -> List[Path]:
-    """Find all namespaced .env files in the current directory using known chains and markets."""
+    """Find all namespaced .env files in the user's home directory using known chains and markets."""
     env_files = []
     available_chains = [x.lower() for x in cli_context.available_environments]
     available_markets = [x.lower() for x in cli_context.available_markets]
 
-    for file in glob(".env.*.*.*"):
-        parts = file.strip().split('.')
+    # Create config directory if it doesn't exist
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Search for env files in the config directory
+    for file in CONFIG_DIR.glob(".env.*.*.*"):
+        parts = file.name.strip().split('.')
         if len(parts) == 5:
             chain, market, source_chain = parts[2].lower(), parts[3].lower(), parts[4]
             if chain in available_chains and market in available_markets:
-                env_files.append(Path(file))
+                env_files.append(file)
+
+    # Also check current directory for backward compatibility
+    for file in Path().glob(".env.*.*.*"):
+        parts = file.name.strip().split('.')
+        if len(parts) == 5:
+            chain, market, source_chain = parts[2].lower(), parts[3].lower(), parts[4]
+            if chain in available_chains and market in available_markets:
+                # If file exists in both places, prefer the one in config directory
+                if not any(ef.name == file.name for ef in env_files):
+                    console.print(f"⚠️ Found legacy env file in current directory: {file}. Consider moving it to {CONFIG_DIR}", style="yellow")
+                    env_files.append(file)
 
     return sorted(env_files)
 
@@ -96,7 +111,16 @@ def show_identity(
     norm_source = source_chain.lower().replace('-', '_')
     
     env_filename = CONFIG_ENV_FILENAME_TEMPLATE.format(norm_chain, norm_market, norm_source)
-    env_path = Path(os.getcwd()) / env_filename
+    
+    # First check in config directory
+    env_path = CONFIG_DIR / env_filename
+    
+    # If not found in config directory, check current directory for backward compatibility
+    if not env_path.exists():
+        cwd_env_path = Path(os.getcwd()) / env_filename
+        if cwd_env_path.exists():
+            console.print(f"⚠️ Found legacy env file in current directory. Consider moving it to {CONFIG_DIR}", style="yellow")
+            env_path = cwd_env_path
     
     if not env_path.exists():
         console.print(f"No configuration found for {chain}/{market}/{source_chain}.", style="yellow")
@@ -106,7 +130,7 @@ def show_identity(
     env_vars = parse_env_file_vars(str(env_path))
     
     console.print(f"\n[bold]Configuration for {chain}/{market}/{source_chain}[/bold]")
-    console.print(f"File: {env_filename}\n")
+    console.print(f"File: {env_path}\n")
     
     # Display in sections
     console.print("[bold]Identity[/bold]")
@@ -140,7 +164,16 @@ def delete_identity(
     norm_source = source_chain.lower().replace('-', '_')
     
     env_filename = CONFIG_ENV_FILENAME_TEMPLATE.format(norm_chain, norm_market, norm_source)
-    env_path = Path(os.getcwd()) / env_filename
+    
+    # First check in config directory
+    env_path = CONFIG_DIR / env_filename
+    
+    # If not found in config directory, check current directory for backward compatibility
+    if not env_path.exists():
+        cwd_env_path = Path(os.getcwd()) / env_filename
+        if cwd_env_path.exists():
+            console.print(f"⚠️ Found legacy env file in current directory. Consider moving it to {CONFIG_DIR}", style="yellow")
+            env_path = cwd_env_path
     
     if not env_path.exists():
         console.print(f"No configuration found for {chain}/{market}/{source_chain}.", style="yellow")
@@ -149,7 +182,7 @@ def delete_identity(
     if typer.confirm(f"Are you sure you want to delete the configuration for {chain}/{market}/{source_chain}?"):
         try:
             env_path.unlink()
-            console.print(f"✅ Deleted configuration: {env_filename}", style="green")
+            console.print(f"✅ Deleted configuration: {env_path}", style="green")
         except OSError as e:
             console.print(f"Error deleting configuration: {e}", style="bold red")
             raise typer.Exit(1)
