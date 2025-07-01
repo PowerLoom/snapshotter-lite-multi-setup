@@ -236,6 +236,24 @@ CONNECTION_REFRESH_INTERVAL_SEC=300 python multi_clone.py --use-env-connection-r
 python multi_clone.py --use-env-connection-refresh-interval
 ```
 
+> [!IMPORTANT]
+> **Local Collector Configuration Behavior**
+> 
+> When deploying multiple slots using this setup script, be aware of the following behavior:
+> 
+> 1. The first deployment determines the local collector's configuration:
+>    - The `MAX_STREAM_POOL_SIZE` is calculated based on the total number of slots selected for the first deployment
+>    - The `CONNECTION_REFRESH_INTERVAL_SEC` is set based on the number of slots in the first deployment
+> 
+> 2. Subsequent deployments using this script:
+>    - Will NOT reconfigure or respawn the existing local collector
+>    - Will NOT adjust the `MAX_STREAM_POOL_SIZE` or `CONNECTION_REFRESH_INTERVAL_SEC` values
+>    - Will use the configuration set during the first deployment
+> 
+> Therefore, it's recommended to:
+> - Plan your initial deployment carefully to include all slots you intend to run
+> - If you need to deploy additional slots later with different configurations, consider cleaning up the existing deployment first using the diagnostic script
+
 When you run the deploy script without any flags, it will ask you if you want to deploy all nodes? If you want to [Deploy a subset of slots](#221-deploy-a-subset-of-slots) then press `n` else you want to [Deploy all slots](#222-deploy-all-slots) press `y`.
 
 #### 2.2.1 Deploy a subset of slots
