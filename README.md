@@ -11,7 +11,8 @@
       - [1.2.2 Manual Node dependency installation](#122-manual-node-dependency-installation)
   - [2. Setup](#2-setup)
     - [2.1 Initialize Environment](#21-initialize-environment)
-      - [2.2 Run the deploy script](#22-run-the-deploy-script)
+    - [2.2 Run the deploy script](#22-run-the-deploy-script)
+      - [2.2.0 Deploy script command line flags](#220-deploy-script-command-line-flags)
       - [2.2.1 Deploy a subset of slots](#221-deploy-a-subset-of-slots)
       - [2.2.2 Deploy all slots](#222-deploy-all-slots)
   - [3. Monitoring, diagnostics and cleanup](#3-monitoring-diagnostics-and-cleanup)
@@ -127,7 +128,7 @@ pyenv local ss_lite_multi_311
 pip install -r requirements.txt
 ```
 
-## 2\. Setup
+## 2. Setup
 
 ### 2.1 Initialize Environment
 
@@ -186,13 +187,74 @@ This will:
 * Create a new .env file with your settings
 * This step will require you to inform the RPC URL, snapshotter owner wallet address, Signer(Burner) wallet address and signer(burner) wallet private key. When you paste or type the private key, it will look like nothing is typed or pasted, but that´s due to the sensitive information, simply paste and press enter!
 
-#### 2.2 Run the deploy script
+### 2.2 Run the deploy script
 
-``` bash
+The deploy script can be run interactively, as is, with
+
+```bash
 python multi_clone.py
 ```
 
-When you run the deploy script it will ask you if you want to deploy all nodes? If you want to [Deploy a subset of slots](#221-deploy-a-subset-of-slots) then press `n` else you want to [Deploy all slots](#222-deploy-all-slots) press `y`.
+#### 2.2.0 Deploy script command line flags
+
+The deploy script supports several command line flags to customize its behavior:
+
+```bash
+python multi_clone.py [flags]
+```
+
+Available flags:
+- `--data-market {1,2}`: Choose the data market (1: AAVEV3, 2: UNISWAPV2)
+- `-y, --yes`: Deploy all nodes without prompting for confirmation
+- `--latest-only`: Deploy only the latest (highest) slot
+- `--use-env-connection-refresh-interval`: Use CONNECTION_REFRESH_INTERVAL_SEC from environment instead of calculating based on slots
+
+The script automatically calculates an optimal connection refresh interval based on the number of slots being deployed. This calculation ensures stability under load by adjusting the interval linearly.
+
+The `--use-env-connection-refresh-interval` flag modifies this behavior:
+
+- Without the flag (default):
+  - Always uses the calculated value
+  - If `CONNECTION_REFRESH_INTERVAL_SEC` exists in env but differs from calculated value, warns and uses calculated value
+
+- With the flag:
+  - If `CONNECTION_REFRESH_INTERVAL_SEC` exists in env: Uses that value (warns if different from calculated)
+  - If `CONNECTION_REFRESH_INTERVAL_SEC` not set: Falls back to calculated value
+
+Example usage:
+```bash
+# Deploy all slots non-interactively for UNISWAPV2
+python multi_clone.py --data-market 2 -y
+
+# Deploy only the latest slot
+python multi_clone.py --latest-only
+
+# Use environment variable set at shell prompt for connection refresh interval
+CONNECTION_REFRESH_INTERVAL_SEC=300 python multi_clone.py --use-env-connection-refresh-interval
+
+# Set the above in .env file and run the script
+python multi_clone.py --use-env-connection-refresh-interval
+```
+
+> [!IMPORTANT]
+> **Local Collector Configuration Behavior**
+> 
+> When deploying multiple slots using this setup script, be aware of the following behavior:
+> 
+> 1. The first deployment determines the local collector's configuration:
+>    - The `MAX_STREAM_POOL_SIZE` is calculated based on the total number of slots selected for the first deployment
+>    - The `CONNECTION_REFRESH_INTERVAL_SEC` is set based on the number of slots in the first deployment
+> 
+> 2. Subsequent deployments using this script:
+>    - Will NOT reconfigure or respawn the existing local collector
+>    - Will NOT adjust the `MAX_STREAM_POOL_SIZE` or `CONNECTION_REFRESH_INTERVAL_SEC` values
+>    - Will use the configuration set during the first deployment
+> 
+> Therefore, it's recommended to:
+> - Plan your initial deployment carefully to include all slots you intend to run
+> - If you need to deploy additional slots later with different configurations, consider cleaning up the existing deployment first using the diagnostic script
+
+When you run the deploy script without any flags, it will ask you if you want to deploy all nodes? If you want to [Deploy a subset of slots](#221-deploy-a-subset-of-slots) then press `n` else you want to [Deploy all slots](#222-deploy-all-slots) press `y`.
 
 #### 2.2.1 Deploy a subset of slots
 
@@ -407,12 +469,12 @@ If you encounter any issues, please contact us on [discord](https://discord.com/
 
 ### 4.1 Deploy subsets of slots with different configs
 
-Meet Bob, The Architect of Chaos. Bob has five Powerloom slots, but he’s got an itch to make things complicated—deploying three nodes each with a different RPC and two nodes sharing a single RPC. Here’s how he pulls it off:
+Meet Bob, The Architect of Chaos. Bob has five Powerloom slots, but he's got an itch to make things complicated—deploying three nodes each with a different RPC and two nodes sharing a single RPC. Here's how he pulls it off:
 
 1. Bob logs into his VPS and follows [Preparation](#1-preparation).
 2. When initializing the environment (by `./bootstrap.sh`), he inputs all the necessary slot info and sets **RPC1**.
-3. Bob then runs the deploy script: (by `python multi_clone.py`). Since he’s deploying a subset of slots, he follows [Deploy a subset of slots](#221-deploy-a-subset-of-slots) and sets the **start slot** and **end slot** to **slot1**. BOOM! **Slot1 is live.**
-4. Bob repeats the process for **slot2** using **RPC2** and deploys **slot2** using the same method.
+3. Bob then runs the deploy script: (by `python multi_clone.py`). Since he's deploying a subset of slots, he follows [Deploy a subset of slots](#221-deploy-a-subset-of-slots) and sets the **start slot** and **end slot** to **slot1**. BOOM! **Slot1 is live.**
+4. Bob repeats the process for **slot2** using **RPC2** and deploys **slot2** using the same method.
 5. He does the same for **RPC3** to deploy **slot3**.
 6. Now for the final trick, Bob wants **slot4 and slot5** to share **RPC4**. He reinitializes the env variables by (by `./bootstrap.sh`), and when deploying(by python multi\_clone.py), he sets **start slot to slot4 and end slot to slot5**.
 
@@ -420,12 +482,12 @@ BOOM! Bob did it. **Three slots running on three different RPCs and two slots sh
 
 ### 4.2 Running Slots from Different Wallets on a Single VPS
 
-Meet Alice, the queen of efficiency. Unlike Bob, who enjoys juggling multiple RPCs, Alice faces a different challenge. Her four Powerloom slots are spread across three wallets, but she wants them all running smoothly on a single VPS. Here’s how she pulls it off:
+Meet Alice, the queen of efficiency. Unlike Bob, who enjoys juggling multiple RPCs, Alice faces a different challenge. Her four Powerloom slots are spread across three wallets, but she wants them all running smoothly on a single VPS. Here's how she pulls it off:
 She clones `X(#of wallets)` multiscript directories, each with different destination directory name.
 
 1. Alice logs into her VPS and follows [Preparation](#1-preparation), She then clones the repository three times, assigning a unique destination directory name to each clone.
 2. Now, she [Setup](#2-setup) two nodes from **Wallet 1** on a single RPC. When initializing the environment (by `./bootstrap.sh`), she inputs all the necessary for wallet1 info and sets **RPC1**.
-3. Alice then runs the deploy script: (by `python multi_clone.py`). Since she’s deploying a subset of slots, she follows [Deploy a subset of slots](#221-deploy-a-subset-of-slots) and sets the **start slot** to **slot1** and **end slot** to **slot2**. BOOM! **Slot1 and slot2 is live.**
+3. Alice then runs the deploy script: (by `python multi_clone.py`). Since she's deploying a subset of slots, she follows [Deploy a subset of slots](#221-deploy-a-subset-of-slots) and sets the **start slot** to **slot1** and **end slot** to **slot2**. BOOM! **Slot1 and slot2 is live.**
 4. Alice then navigates to the second repository (by `cd <directory-name>`), initializes the environment (by `./bootstrap.sh`) and inputs all the necessary info for wallet2 and sets **RPC1**. She then deploys node from wallet 2 by running deploy script: (by `python multi_clone.py`) and follows [Deploy a subset of slots](#221-deploy-a-subset-of-slots)Finally, she repeats the same process for **Slot 3** from **Wallet 3**, just as she did for Slot 2.
 
 BOOM! Alice did it. **Four slots from three different wallet running on single VPS.** Mission accomplished. 🎉
