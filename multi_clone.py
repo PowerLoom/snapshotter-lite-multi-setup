@@ -303,7 +303,7 @@ def main(data_market_choice: str, non_interactive: bool = False, latest_only: bo
         deploy_slots = slot_ids
         print('🟢 Non-interactive mode: Deploying all slots')
     else:
-        deploy_all_slots = input('☑️ Do you want to deploy all slots? (y/n)')
+        deploy_all_slots = input('☑️ Do you want to deploy all slots? (y/n) ')
         if deploy_all_slots.lower() == 'n':
             start_slot = input('🫸 ▶︎ Enter the start slot ID: ')
             end_slot = input('🫸 ▶︎ Enter the end slot ID: ')
@@ -391,9 +391,11 @@ def main(data_market_choice: str, non_interactive: bool = False, latest_only: bo
                        '⚡ Moving ahead with overridden value from environment...')      
     else:
         if connection_refresh_interval != suggested_refresh_interval:
-            print(f'⚠️ Current CONNECTION_REFRESH_INTERVAL_SEC ({connection_refresh_interval}s) is different from the suggested value ({suggested_refresh_interval}s) for {len(deploy_slots)} slots\n'
-                   'BE WARNED: This may cause connection instability under high load! Using suggested value...\n'
-                                       '🔧 Use --use-env-connection-refresh-interval to override this warning and use the value from environment.')
+            if (connection_refresh_interval == 0):
+                print(f'✔️ Using suggested connection refresh interval value of {suggested_refresh_interval}s for {len(deploy_slots)} slots')
+            else:
+                print(f'⚠️ Current CONNECTION_REFRESH_INTERVAL_SEC ({connection_refresh_interval}s) in .env file is different from the suggested value ({suggested_refresh_interval}s) for {len(deploy_slots)} slots\n'
+                       '⛑️ Using suggested value for safety... If you know what you are doing, you can override this by passing --use-env-connection-refresh-interval to the script')
             connection_refresh_interval = suggested_refresh_interval
     
     run_snapshotter_lite_v2(
