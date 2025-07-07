@@ -24,6 +24,9 @@
     - [4.1 Deploy subsets of slots with different configs](#41-deploy-subsets-of-slots-with-different-configs)
     - [4.2 Running Slots from Different Wallets on a Single VPS](#42-running-slots-from-different-wallets-on-a-single-vps)
   - [\[OPTIONAL\] Dev mode setup](#optional-dev-mode-setup)
+  - [Development and Build Instructions](#development-and-build-instructions)
+    - [Building from Source](#building-from-source)
+    - [Testing the Build](#testing-the-build)
 
 > [!NOTE]
 > This setup is for Lite nodes participating in the latest V2 of Powerloom Protocol with multiple data markets. [Protocol V1 setup](https://github.com/PowerLoom/snapshotter-lite-multi-setup/tree/main) is deprecated and its data markets are archived. Your submission data, rewards on it are finalized and recorded as [announced on Discord](https://discord.com/channels/777248105636560948/1146931631039463484/1242876184509812847).
@@ -473,4 +476,61 @@ Ref: [Step 2](https://github.com/PowerLoom/snapshotter-lite-v2/blob/main/README.
 DEV_MODE=False  # you can set this to True
 # subseqeuently you can specify the branch of [https://github.com/PowerLoom/snapshotter-lite-v2](https://github.com/PowerLoom/snapshotter-lite-v2) that you wish to run
 LITE_NODE_BRANCH=main
+```
+
+## Development and Build Instructions
+
+### Building from Source
+
+There are two ways to install and use the snapshotter-cli:
+
+1. **Using the Package (Recommended for Users)**
+
+```bash
+# Install using uv (recommended)
+uv tool install snapshotter-cli
+
+# Or install using pipx
+pipx install snapshotter-cli
+```
+
+2. **Building from Source (For Development)**
+
+Prerequisites:
+- Python 3.12 or higher
+- pip package manager
+
+```bash
+# Clone the repository
+git clone https://github.com/PowerLoom/snapshotter-lite-multi-setup.git
+cd snapshotter-lite-multi-setup
+
+# Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install uv
+pip install uv
+
+# Install dependencies and build the package
+uv pip install -e .
+uv build --python $(which python)
+```
+
+This will create:
+- A wheel file in `dist/snapshotter_cli-0.1.0-py3-none-any.whl`
+- A source distribution in `dist/snapshotter_cli-0.1.0.tar.gz`
+
+### Testing the Build
+
+```bash
+# Create a test environment
+python -m venv test_env
+source test_env/bin/activate  # On Windows: test_env\Scripts\activate
+
+# Install the built wheel
+uv pip install dist/snapshotter_cli-0.1.0-py3-none-any.whl
+
+# Test the CLI
+snapshotter-cli --help
 ```

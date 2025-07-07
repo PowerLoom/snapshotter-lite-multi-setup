@@ -6,3 +6,4 @@ powerloom-premainnet-*/
 powerloom-mainnet-*/
 dist*/
 *__pycache__*/
+build*/
