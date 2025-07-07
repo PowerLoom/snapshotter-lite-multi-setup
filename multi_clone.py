@@ -4,6 +4,7 @@ import sys
 import time
 import json
 import argparse
+import re
 from dotenv import load_dotenv
 from web3 import Web3
 import psutil
@@ -412,13 +413,63 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
                     active_nodes = sorted(list(deployment_tracker['active']))
                     print(f"   Still deploying: {', '.join(map(str, active_nodes[:10]))}{' ...' if len(active_nodes) > 10 else ''}")
         
-        # Show active screen sessions
-        print("\n📺 Active screen sessions:")
+        # Verify deployment status using docker ps
+        print("\n🔍 Verifying deployment status...")
         try:
-            result = subprocess.run("screen -ls | grep powerloom || echo 'No active sessions found'", 
-                                  shell=True, capture_output=True, text=True)
-            print(result.stdout.strip())
-        except:
+            # Get all deployed slot IDs from the tracker
+            all_deployed = deployment_tracker['completed'].union(deployment_tracker['failed'])
+            
+            # Check running containers
+            result = subprocess.run(
+                f"docker ps --format '{{{{.Names}}}}' | grep -E 'snapshotter-lite-v2-[0-9]+-{full_namespace}'",
+                shell=True, capture_output=True, text=True
+            )
+            running_containers = set()
+            if result.stdout:
+                for line in result.stdout.strip().split('\n'):
+                    # Extract slot ID from container name
+                    match = re.search(r'snapshotter-lite-v2-(\d+)-', line)
+                    if match:
+                        running_containers.add(int(match.group(1)))
+            
+            # Check screen sessions
+            result = subprocess.run(
+                f"screen -ls | grep powerloom",
+                shell=True, capture_output=True, text=True
+            )
+            screen_sessions = set()
+            if result.stdout:
+                for line in result.stdout.strip().split('\n'):
+                    # Extract slot ID from screen name like: 98180.powerloom-mainnet-v2-6568-UNISWAPV2
+                    match = re.search(r'powerloom-[^-]+-[^-]+-(\d+)-', line)
+                    if match:
+                        screen_sessions.add(int(match.group(1)))
+            
+            # Compare
+            containers_without_screens = running_containers - screen_sessions
+            screens_without_containers = screen_sessions - running_containers
+            successful_deployments = running_containers.intersection(screen_sessions)
+            
+            print(f"\n📊 Deployment Summary:")
+            print(f"   ✅ Successfully running: {len(successful_deployments)} containers")
+            if screens_without_containers:
+                print(f"   ⚠️  Screen sessions without containers: {len(screens_without_containers)}")
+                print(f"      Slots: {sorted(list(screens_without_containers))[:10]}{' ...' if len(screens_without_containers) > 10 else ''}")
+            if containers_without_screens:
+                print(f"   ⚠️  Containers without screen sessions: {len(containers_without_screens)}")
+                print(f"      Slots: {sorted(list(containers_without_screens))[:10]}{' ...' if len(containers_without_screens) > 10 else ''}")
+            
+            # Show all running containers
+            if successful_deployments:
+                print(f"\n📺 All running containers:")
+                sorted_slots = sorted(list(successful_deployments))
+                # Display in columns for better readability
+                for i in range(0, len(sorted_slots), 10):
+                    batch = sorted_slots[i:i+10]
+                    print(f"   {', '.join(str(slot) for slot in batch)}")
+                    
+        except Exception as e:
+            print(f"Error checking deployment status: {e}")
             pass
         
         print("\n✅ Deployment process completed!")
