@@ -286,8 +286,26 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             print(f"❌ Failed to deploy first node: {result[2]}")
             return
         
-        print(f"✅ First node deployed successfully. Waiting 30 seconds for collector initialization...")
-        time.sleep(30)
+        print(f"✅ First node deployed successfully.")
+        
+        # Check if Docker pull lock is released before waiting for collector
+        docker_pull_lock = "/tmp/powerloom_docker_pull.lock"
+        if os.path.exists(docker_pull_lock):
+            print("\n⏳ Docker pull lock detected. Waiting for it to be released...")
+            wait_time = 0
+            max_wait = 60  # 1 minute max wait
+            while os.path.exists(docker_pull_lock) and wait_time < max_wait:
+                time.sleep(5)
+                wait_time += 5
+                print(f"   Still waiting... ({wait_time}s elapsed)")
+            
+            if os.path.exists(docker_pull_lock):
+                print("⚠️  Docker pull lock still exists after 60s. Proceeding anyway...")
+            else:
+                print("✅ Docker pull lock released.")
+        
+        print("\n⏳ Waiting 10 seconds for collector initialization...")
+        time.sleep(10)
     
     # Phase 2: Parallel deployment of remaining nodes
     if len(deploy_slots) > 1:
@@ -636,13 +654,13 @@ def main(data_market_choice: str, non_interactive: bool = False, latest_only: bo
     if not sequential and len(deploy_slots) > 1:
         workers = parallel_workers if parallel_workers is not None else default_workers
         # More realistic estimate:
-        # - 30s for first node
+        # - 10s for first node
         # - Batches of 3x workers processed with some parallelism
         # - Account for delays and Docker operations
         batch_size = workers * 3
         num_batches = ((len(deploy_slots) - 1) + batch_size - 1) // batch_size
         # Assume ~20-30s per batch due to semaphore limiting and Docker operations
-        estimated_time = 30 + (num_batches * 25) + (num_batches * 10)  # 10s pause between batches
+        estimated_time = 10 + (num_batches * 25) + (num_batches * 10)  # 10s pause between batches
         print(f"   • Estimated Time: ~{estimated_time // 60}m {estimated_time % 60}s ({estimated_time} seconds)")
     print()
     
@@ -676,7 +694,7 @@ def main(data_market_choice: str, non_interactive: bool = False, latest_only: bo
         print('🟡 Previously cloned snapshotter-lite-v2 repo already exists, deleting...')
         os.system('rm -rf snapshotter-lite-v2')
     print('⚙️ Cloning snapshotter-lite-v2 repo from main branch...')
-    os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch {lite_node_branch}')
+    os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --depth 1 --single-branch --branch {lite_node_branch}')
     # recommended max stream pool size
     cpus = psutil.cpu_count(logical=True)
     if cpus >= 2 and cpus < 4:

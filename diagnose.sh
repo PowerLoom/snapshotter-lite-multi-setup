@@ -112,7 +112,7 @@ if [ -n "$USED_SUBNETS" ]; then
     done
 fi
 
-# Check for cloned directories
+# Check for cloned directories (but don't remove them yet)
 echo -e "\n📁 Checking for PowerLoom deployment directories..."
 # Matches patterns like:
 # - powerloom-premainnet-v2-*
@@ -129,16 +129,6 @@ fi
 if [ -n "$EXISTING_DIRS" ]; then
     echo -e "${YELLOW}Found existing PowerLoom deployment directories:${NC}"
     echo "$EXISTING_DIRS"
-    if [ "$AUTO_CLEANUP" = true ]; then
-        remove_dirs="y"
-    else
-        read -p "Would you like to remove these directories? (y/n): " remove_dirs
-    fi
-    if [ "$remove_dirs" = "y" ]; then
-        echo -e "\n${YELLOW}Removing deployment directories...${NC}"
-        echo "$EXISTING_DIRS" | xargs -I {} rm -rf "{}"
-        echo -e "${GREEN}✅ Deployment directories removed${NC}"
-    fi
 fi
 
 # Phase 2: Cleanup Options
@@ -151,19 +141,44 @@ if [ -n "$EXISTING_CONTAINERS" ]; then
         read -p "Would you like to stop and remove existing PowerLoom containers? (y/n): " remove_containers
     fi
     if [ "$remove_containers" = "y" ]; then
-        echo -e "\n${YELLOW}Stopping running containers... (timeout: 30s per container)${NC}"
+        echo -e "\n${YELLOW}Stopping running containers... (timeout: 10s per container)${NC}"
         # Stop containers with timeout and track failures in parallel
         STOP_FAILED=false
+        STUBBORN_CONTAINERS=""
         echo "$EXISTING_CONTAINERS" | xargs -P64 -I {} bash -c '
             container="$1"
             if docker ps -q --filter "name=$container" | grep -q .; then
                 echo -e "Attempting to stop container ${container}..."
-                if ! timeout 35 docker stop --timeout 30 "$container" 2>/dev/null; then
+                if ! timeout 15 docker stop --timeout 10 "$container" 2>/dev/null; then
                     echo -e "\033[1;33m⚠️ Container ${container} could not be stopped gracefully after 30 seconds\033[0m"
+                    # Return the container name for force kill
+                    echo "$container"
                     exit 1
                 fi
             fi
-        ' -- {} || STOP_FAILED=true
+        ' -- {} 2>&1 | while read line; do
+            if [[ ! "$line" =~ ^Attempting && ! "$line" =~ ^⚠️ ]]; then
+                STUBBORN_CONTAINERS="$STUBBORN_CONTAINERS $line"
+            else
+                echo "$line"
+            fi
+        done || STOP_FAILED=true
+
+        # Force kill stubborn containers
+        if [ "$STOP_FAILED" = true ]; then
+            echo -e "\n${YELLOW}Force killing stubborn containers...${NC}"
+            # First try docker kill
+            echo "$EXISTING_CONTAINERS" | xargs -P64 -I {} bash -c '
+                container="$1"
+                if docker ps -q --filter "name=$container" | grep -q .; then
+                    echo -e "Force killing container ${container}..."
+                    docker kill "$container" 2>/dev/null || true
+                fi
+            ' -- {}
+            
+            # Give a moment for containers to die
+            sleep 2
+        fi
 
         echo -e "\n${YELLOW}Removing containers...${NC}"
         # Remove containers in parallel and track failures
@@ -172,7 +187,16 @@ if [ -n "$EXISTING_CONTAINERS" ]; then
             container="$1"
             echo -e "Removing container ${container}..."
             if ! docker rm -f "$container" 2>/dev/null; then
-                echo -e "\033[1;33m⚠️ Failed to remove container ${container}\033[0m"
+                # If removal still fails, try to get more info
+                if docker ps -a --filter "name=$container" --format "{{.Names}}" | grep -q .; then
+                    echo -e "\033[0;31m❌ Container ${container} still exists and could not be removed\033[0m"
+                    # Try one more aggressive approach
+                    container_id=$(docker ps -aq --filter "name=$container" | head -1)
+                    if [ -n "$container_id" ]; then
+                        echo -e "Attempting final force removal of container ID ${container_id}..."
+                        docker rm -f "$container_id" 2>&1 || echo -e "\033[0;31m❌ Final removal attempt failed\033[0m"
+                    fi
+                fi
                 exit 1
             fi
         ' -- {} || REMOVE_FAILED=true
@@ -230,6 +254,20 @@ if [ -n "$EXISTING_NETWORKS" ]; then
         else
             echo -e "${GREEN}✅ Networks removed${NC}"
         fi
+    fi
+fi
+
+# Remove directories after containers and networks are cleaned up
+if [ -n "$EXISTING_DIRS" ]; then
+    if [ "$AUTO_CLEANUP" = true ]; then
+        remove_dirs="y"
+    else
+        read -p "Would you like to remove the PowerLoom deployment directories? (y/n): " remove_dirs
+    fi
+    if [ "$remove_dirs" = "y" ]; then
+        echo -e "\n${YELLOW}Removing deployment directories...${NC}"
+        echo "$EXISTING_DIRS" | xargs -I {} rm -rf "{}"
+        echo -e "${GREEN}✅ Deployment directories removed${NC}"
     fi
 fi
 
