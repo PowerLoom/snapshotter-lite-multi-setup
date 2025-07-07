@@ -274,43 +274,124 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
         else:
             print(f"📊 Using {max_workers} parallel workers (user-specified, detected {cpu_cores} CPU cores)")
         
-        # Deploy remaining nodes in parallel with controlled concurrency
+        # Deploy remaining nodes in batches with controlled concurrency
         print(f"📋 Starting parallel deployment of {len(deploy_slots) - 1} nodes with {max_workers} workers...")
         
         # Create a semaphore to limit concurrent deployments
         deployment_semaphore = Semaphore(max_workers)
         
-        with ThreadPoolExecutor(max_workers=max_workers * 2) as executor:
-            # Create a mapping of future to slot_id for tracking
-            future_to_slot = {}
-            for idx, slot_id in enumerate(deploy_slots[1:], 1):
-                future = executor.submit(
-                    deploy_single_node, slot_id, idx, data_market_namespace, 
-                    data_market_contract_number, protocol_state, full_namespace, base_dir, 
-                    semaphore=deployment_semaphore, **kwargs
-                )
-                future_to_slot[future] = slot_id
-            
-            # Monitor progress as futures complete
-            completed = 0
-            total = len(deploy_slots) - 1
-            for future in as_completed(future_to_slot, timeout=300):
-                slot_id = future_to_slot[future]
-                try:
-                    result = future.result()
-                    completed += 1
-                    if result[1] == "success":
-                        print(f"✅ [{completed}/{total}] {result[2]}")
-                    else:
-                        print(f"❌ [{completed}/{total}] {result[2]}")
-                except Exception as e:
-                    completed += 1
-                    print(f"❌ [{completed}/{total}] Node {slot_id} deployment failed with exception: {e}")
+        # Process nodes in batches
+        remaining_slots = deploy_slots[1:]
+        batch_size = max_workers * 2  # Process 2x workers at a time
+        completed = 0
+        total = len(remaining_slots)
         
-        # Brief pause to ensure all containers are starting
-        print("\n⏳ Waiting 10 seconds for all containers to initialize...")
-        time.sleep(10)
-        print("\n✅ All deployments completed!")
+        for batch_start in range(0, len(remaining_slots), batch_size):
+            batch_end = min(batch_start + batch_size, len(remaining_slots))
+            batch = remaining_slots[batch_start:batch_end]
+            batch_num = (batch_start // batch_size) + 1
+            total_batches = (len(remaining_slots) + batch_size - 1) // batch_size
+            
+            print(f"\n📦 Processing batch {batch_num}/{total_batches} ({len(batch)} nodes)...")
+            
+            with ThreadPoolExecutor(max_workers=max_workers * 2) as executor:
+                # Create a mapping of future to slot_id for tracking
+                future_to_slot = {}
+                for idx_in_batch, (idx, slot_id) in enumerate(enumerate(batch, 1)):
+                    actual_idx = batch_start + idx
+                    future = executor.submit(
+                        deploy_single_node, slot_id, actual_idx + 1, data_market_namespace, 
+                        data_market_contract_number, protocol_state, full_namespace, base_dir, 
+                        semaphore=deployment_semaphore, **kwargs
+                    )
+                    future_to_slot[future] = slot_id
+                
+                # Monitor progress for this batch
+                for future in as_completed(future_to_slot, timeout=300):
+                    slot_id = future_to_slot[future]
+                    try:
+                        result = future.result()
+                        completed += 1
+                        if result[1] == "success":
+                            print(f"✅ [{completed}/{total}] {result[2]}")
+                        else:
+                            print(f"❌ [{completed}/{total}] {result[2]}")
+                    except Exception as e:
+                        completed += 1
+                        print(f"❌ [{completed}/{total}] Node {slot_id} deployment failed with exception: {e}")
+            
+            # Check system state between batches
+            if batch_end < len(remaining_slots):
+                print(f"\n🔍 Checking system state before next batch...")
+                
+                # Wait for Docker pulls to stabilize
+                wait_time = 0
+                max_wait = 30
+                while wait_time < max_wait:
+                    docker_pull_lock = "/tmp/powerloom_docker_pull.lock"
+                    if os.path.exists(docker_pull_lock):
+                        print(f"⏳ Docker pulls in progress, waiting... ({wait_time}s)")
+                        time.sleep(5)
+                        wait_time += 5
+                    else:
+                        break
+                
+                # Brief pause between batches
+                print("⏸️  Pausing 5 seconds before next batch...")
+                time.sleep(5)
+        
+        # Check if deployments are actually complete
+        print("\n⏳ Waiting for all background deployments to complete...")
+        print("📊 Checking Docker activity...")
+        
+        # Wait for Docker pulls to complete
+        max_wait_time = 300  # 5 minutes max
+        check_interval = 5
+        elapsed = 0
+        
+        while elapsed < max_wait_time:
+            # Check if docker pull lock exists (indicates ongoing pulls)
+            docker_pull_lock = "/tmp/powerloom_docker_pull.lock"
+            if os.path.exists(docker_pull_lock):
+                print(f"🔄 Docker pulls still in progress... ({elapsed}s elapsed)")
+                time.sleep(check_interval)
+                elapsed += check_interval
+                continue
+            
+            # Check for active docker-compose processes in screen sessions
+            try:
+                # Count active build.sh processes
+                result = subprocess.run(
+                    "ps aux | grep -E 'build\\.sh|docker-compose.*up' | grep -v grep | wc -l",
+                    shell=True, capture_output=True, text=True
+                )
+                active_builds = int(result.stdout.strip())
+                
+                if active_builds > 0:
+                    print(f"🔄 {active_builds} deployments still active... ({elapsed}s elapsed)")
+                    time.sleep(check_interval)
+                    elapsed += check_interval
+                else:
+                    print("✅ All background deployments appear to be complete!")
+                    break
+            except:
+                # If we can't check, wait a bit more
+                time.sleep(check_interval)
+                elapsed += check_interval
+        
+        if elapsed >= max_wait_time:
+            print("⚠️ Timeout waiting for deployments to complete. Some may still be running in background.")
+        
+        # Show active screen sessions
+        print("\n📺 Active screen sessions:")
+        try:
+            result = subprocess.run("screen -ls | grep powerloom || echo 'No active sessions found'", 
+                                  shell=True, capture_output=True, text=True)
+            print(result.stdout.strip())
+        except:
+            pass
+        
+        print("\n✅ Deployment process completed!")
 
 def docker_running():
     try:
