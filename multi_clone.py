@@ -129,19 +129,40 @@ def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
     )
 
 def deploy_single_node(slot_id: int, idx: int, data_market_namespace: str, data_market_contract_number: int, 
-                      protocol_state: dict, full_namespace: str, base_dir: str, semaphore=None, **kwargs):
+                      protocol_state: dict, full_namespace: str, base_dir: str, semaphore=None, deployment_tracker=None, **kwargs):
     """Deploy a single node in a thread-safe manner"""
     try:
+        # Track deployment start
+        if deployment_tracker:
+            with deployment_tracker['lock']:
+                deployment_tracker['active'].add(slot_id)
+        
         # Use semaphore to control concurrent deployments if provided
         if semaphore:
             # print(f"⏳ [Worker {threading.current_thread().name}] Waiting for slot to deploy {slot_id}...")
             with semaphore:
-                return _deploy_single_node_impl(slot_id, idx, data_market_namespace, data_market_contract_number,
+                result = _deploy_single_node_impl(slot_id, idx, data_market_namespace, data_market_contract_number,
                                                protocol_state, full_namespace, base_dir, **kwargs)
         else:
-            return _deploy_single_node_impl(slot_id, idx, data_market_namespace, data_market_contract_number,
+            result = _deploy_single_node_impl(slot_id, idx, data_market_namespace, data_market_contract_number,
                                            protocol_state, full_namespace, base_dir, **kwargs)
+        
+        # Track deployment completion
+        if deployment_tracker:
+            with deployment_tracker['lock']:
+                deployment_tracker['active'].discard(slot_id)
+                if result[1] == "success":
+                    deployment_tracker['completed'].add(slot_id)
+                else:
+                    deployment_tracker['failed'].add(slot_id)
+        
+        return result
     except Exception as e:
+        # Track deployment failure
+        if deployment_tracker:
+            with deployment_tracker['lock']:
+                deployment_tracker['active'].discard(slot_id)
+                deployment_tracker['failed'].add(slot_id)
         return (slot_id, "error", f"Failed to deploy node {slot_id}: {str(e)}")
 
 
@@ -244,12 +265,20 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
         return
     
     # Parallel deployment mode
+    # Create deployment tracker for accurate monitoring
+    deployment_tracker = {
+        'active': set(),
+        'completed': set(),
+        'failed': set(),
+        'lock': threading.Lock()
+    }
+    
     # Phase 1: Deploy first node with collector
     if deploy_slots:
         print("🚀 Phase 1: Deploying first node with collector service...")
         result = deploy_single_node(
             deploy_slots[0], 0, data_market_namespace, data_market_contract_number,
-            protocol_state, full_namespace, base_dir, **kwargs
+            protocol_state, full_namespace, base_dir, deployment_tracker=deployment_tracker, **kwargs
         )
         
         if result[1] == "error":
@@ -304,7 +333,7 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
                     future = executor.submit(
                         deploy_single_node, slot_id, actual_idx + 1, data_market_namespace, 
                         data_market_contract_number, protocol_state, full_namespace, base_dir, 
-                        semaphore=deployment_semaphore, **kwargs
+                        semaphore=deployment_semaphore, deployment_tracker=deployment_tracker, **kwargs
                     )
                     future_to_slot[future] = slot_id
                 
@@ -342,47 +371,46 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
                 print("⏸️  Pausing 10 seconds before next batch...")
                 time.sleep(10)
         
-        # Check if deployments are actually complete
+        # Wait for all deployments to complete using our tracker
         print("\n⏳ Waiting for all background deployments to complete...")
-        print("📊 Checking Docker activity...")
         
-        # Wait for Docker pulls to complete
-        max_wait_time = 300  # 5 minutes max
         check_interval = 5
         elapsed = 0
+        max_wait_time = 600  # 10 minutes max
         
         while elapsed < max_wait_time:
-            # Check if docker pull lock exists (indicates ongoing pulls)
-            docker_pull_lock = "/tmp/powerloom_docker_pull.lock"
-            if os.path.exists(docker_pull_lock):
-                print(f"🔄 Docker pulls still in progress... ({elapsed}s elapsed)")
-                time.sleep(check_interval)
-                elapsed += check_interval
-                continue
+            with deployment_tracker['lock']:
+                active_count = len(deployment_tracker['active'])
+                completed_count = len(deployment_tracker['completed'])
+                failed_count = len(deployment_tracker['failed'])
+                total_tracked = completed_count + failed_count
             
-            # Check for active deployment processes specific to our snapshotter
-            try:
-                # Count screen sessions running our build scripts
-                result = subprocess.run(
-                    "screen -ls | grep -E 'powerloom-mainnet-v2-[0-9]+-' | wc -l",
-                    shell=True, capture_output=True, text=True
-                )
-                active_screens = int(result.stdout.strip())
-                
-                if active_screens > 0:
-                    print(f"🔄 {active_screens} deployment screens still active... ({elapsed}s elapsed)")
-                    time.sleep(check_interval)
-                    elapsed += check_interval
-                else:
-                    print("✅ All background deployments appear to be complete!")
-                    break
-            except:
-                # If we can't check, wait a bit more
-                time.sleep(check_interval)
-                elapsed += check_interval
+            if active_count == 0 and total_tracked >= len(deploy_slots):
+                # All deployments have finished
+                print(f"✅ All deployments complete! ({completed_count} successful, {failed_count} failed)")
+                print("⏳ Waiting 10s for containers to stabilize...")
+                time.sleep(10)
+                break
+            
+            # Show progress
+            print(f"🔄 {active_count} deployments still active... ({elapsed}s elapsed)")
+            print(f"   ✅ Completed: {completed_count}, ❌ Failed: {failed_count}")
+            
+            # Show which nodes are still deploying
+            if elapsed % 20 == 0 and elapsed > 0 and active_count > 0:
+                with deployment_tracker['lock']:
+                    active_nodes = sorted(list(deployment_tracker['active']))
+                print(f"   ℹ️  Active nodes: {', '.join(map(str, active_nodes[:10]))}{' ...' if len(active_nodes) > 10 else ''}")
+            
+            time.sleep(check_interval)
+            elapsed += check_interval
         
         if elapsed >= max_wait_time:
-            print("⚠️ Timeout waiting for deployments to complete. Some may still be running in background.")
+            print("⚠️ Timeout waiting for deployments to complete.")
+            with deployment_tracker['lock']:
+                if deployment_tracker['active']:
+                    active_nodes = sorted(list(deployment_tracker['active']))
+                    print(f"   Still deploying: {', '.join(map(str, active_nodes[:10]))}{' ...' if len(active_nodes) > 10 else ''}")
         
         # Show active screen sessions
         print("\n📺 Active screen sessions:")
