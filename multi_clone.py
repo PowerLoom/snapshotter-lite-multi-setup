@@ -7,6 +7,8 @@ import argparse
 from dotenv import load_dotenv
 from web3 import Web3
 import psutil
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 OUTPUT_WORTHY_ENV_VARS = [
     'SOURCE_RPC_URL', 
@@ -125,23 +127,30 @@ def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
         connection_refresh_interval_sec=kwargs['connection_refresh_interval_sec'],
     )
 
-def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int, data_market_namespace: str, **kwargs):
-    protocol_state = DATA_MARKET_CHOICES_PROTOCOL_STATE[data_market_namespace]
-    full_namespace = f'{POWERLOOM_CHAIN}-{data_market_namespace}-{SOURCE_CHAIN}'
-
-    for idx, slot_id in enumerate(deploy_slots):
+def deploy_single_node(slot_id: int, idx: int, data_market_namespace: str, data_market_contract_number: int, 
+                      protocol_state: dict, full_namespace: str, base_dir: str, **kwargs):
+    """Deploy a single node in a thread-safe manner"""
+    try:
         print(f'🟠 Deploying node for slot {slot_id} in data market {data_market_namespace}')
+        
+        # Determine collector profile
         if idx > 0:
-            os.chdir('..')
             collector_profile_string = '--no-collector --no-autoheal-launch'
         else:
             collector_profile_string = ''
+        
         repo_name = f'powerloom-mainnet-v2-{slot_id}-{data_market_namespace}'
-        if os.path.exists(repo_name):
+        repo_path = os.path.join(base_dir, repo_name)
+        
+        # Clean up existing directory
+        if os.path.exists(repo_path):
             print(f'Deleting existing dir {repo_name}')
-            os.system(f'rm -rf {repo_name}')
-        os.system(f'cp -R snapshotter-lite-v2 {repo_name}')
-        os.chdir(repo_name)
+            subprocess.run(['rm', '-rf', repo_path], check=True)
+        
+        # Copy template directory
+        subprocess.run(['cp', '-R', os.path.join(base_dir, 'snapshotter-lite-v2'), repo_path], check=True)
+        
+        # Generate environment file
         env_file_contents = generate_env_file_contents(
             data_market_namespace=data_market_namespace,
             source_rpc_url=kwargs['source_rpc_url'],
@@ -162,17 +171,104 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             slot_id=slot_id,
             connection_refresh_interval_sec=kwargs['connection_refresh_interval_sec'],
         )
-        with open(f'.env-{full_namespace}', 'w+') as f:
+        
+        env_file_path = os.path.join(repo_path, f'.env-{full_namespace}')
+        with open(env_file_path, 'w+') as f:
             f.write(env_file_contents)
-        # docker build and run
-        print('--'*20 + f'Spinning up docker containers for slot {slot_id}' + '--'*20) 
-        os.system(f"""
-screen -dmS {repo_name}
-screen -r {repo_name} -p 0 -X stuff "./build.sh {collector_profile_string} --skip-credential-update --data-market-contract-number {data_market_contract_number}\n"
-        """)
-        sleep_duration = 30 if idx == 0 else 10
-        print(f'Sleeping for {sleep_duration} seconds to allow docker containers to spin up...')
-        time.sleep(sleep_duration)
+        
+        # Launch in screen session
+        print('--'*20 + f'Spinning up docker containers for slot {slot_id}' + '--'*20)
+        
+        # Create and launch screen session
+        screen_cmd = f"""cd {repo_path} && screen -dmS {repo_name} bash -c './build.sh {collector_profile_string} --skip-credential-update --data-market-contract-number {data_market_contract_number}'"""
+        subprocess.run(screen_cmd, shell=True, check=True)
+        
+        return (slot_id, "success", f"Node {slot_id} deployed successfully")
+    
+    except Exception as e:
+        return (slot_id, "error", f"Failed to deploy node {slot_id}: {str(e)}")
+
+
+def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int, data_market_namespace: str, **kwargs):
+    protocol_state = DATA_MARKET_CHOICES_PROTOCOL_STATE[data_market_namespace]
+    full_namespace = f'{POWERLOOM_CHAIN}-{data_market_namespace}-{SOURCE_CHAIN}'
+    base_dir = os.getcwd()
+    
+    # Check if sequential mode is requested
+    sequential_mode = kwargs.get('sequential', False)
+    
+    if sequential_mode:
+        print("📌 Running in sequential mode (parallel deployment disabled)")
+        # Original sequential logic
+        for idx, slot_id in enumerate(deploy_slots):
+            result = deploy_single_node(
+                slot_id, idx, data_market_namespace, data_market_contract_number,
+                protocol_state, full_namespace, base_dir, **kwargs
+            )
+            
+            if result[1] == "error":
+                print(f"❌ Failed to deploy node {slot_id}: {result[2]}")
+                continue
+            
+            sleep_duration = 30 if idx == 0 else 10
+            print(f'Sleeping for {sleep_duration} seconds to allow docker containers to spin up...')
+            time.sleep(sleep_duration)
+        return
+    
+    # Parallel deployment mode
+    # Phase 1: Deploy first node with collector
+    if deploy_slots:
+        print("🚀 Phase 1: Deploying first node with collector service...")
+        result = deploy_single_node(
+            deploy_slots[0], 0, data_market_namespace, data_market_contract_number,
+            protocol_state, full_namespace, base_dir, **kwargs
+        )
+        
+        if result[1] == "error":
+            print(f"❌ Failed to deploy first node: {result[2]}")
+            return
+        
+        print(f"✅ First node deployed successfully. Waiting 30 seconds for collector initialization...")
+        time.sleep(30)
+    
+    # Phase 2: Parallel deployment of remaining nodes
+    if len(deploy_slots) > 1:
+        print(f"\n🚀 Phase 2: Deploying {len(deploy_slots) - 1} remaining nodes in parallel...")
+        
+        # Determine number of workers
+        cpu_cores = psutil.cpu_count(logical=True)
+        max_workers = kwargs.get('parallel_workers', min(max(4, cpu_cores // 2), 8))
+        print(f"📊 Using {max_workers} parallel workers (detected {cpu_cores} CPU cores)")
+        
+        # Deploy remaining nodes in parallel
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = []
+            for idx, slot_id in enumerate(deploy_slots[1:], 1):
+                future = executor.submit(
+                    deploy_single_node, slot_id, idx, data_market_namespace, 
+                    data_market_contract_number, protocol_state, full_namespace, base_dir, **kwargs
+                )
+                futures.append((slot_id, future))
+            
+            # Monitor progress
+            completed = 0
+            total = len(deploy_slots) - 1
+            for slot_id, future in futures:
+                try:
+                    result = future.result(timeout=60)
+                    completed += 1
+                    if result[1] == "success":
+                        print(f"✅ [{completed}/{total}] {result[2]}")
+                    else:
+                        print(f"❌ [{completed}/{total}] {result[2]}")
+                except Exception as e:
+                    completed += 1
+                    print(f"❌ [{completed}/{total}] Node {slot_id} deployment failed with exception: {e}")
+        
+        # Brief pause to ensure all containers are starting
+        print("\n⏳ Waiting 10 seconds for all containers to initialize...")
+        time.sleep(10)
+        print("\n✅ All deployments completed!")
 
 def docker_running():
     try:
@@ -197,7 +293,7 @@ def calculate_connection_refresh_interval(num_slots):
     MAX_INTERVAL = 900  # 15 minutes
     return min(interval, MAX_INTERVAL)
 
-def main(data_market_choice: str, non_interactive: bool = False, latest_only: bool = False, use_env_refresh_interval: bool = False):
+def main(data_market_choice: str, non_interactive: bool = False, latest_only: bool = False, use_env_refresh_interval: bool = False, parallel_workers: int = None, sequential: bool = False):
     # check if Docker is running
     if not docker_running():
         print('🟡 Docker is not running, please start Docker and try again!')
@@ -412,6 +508,8 @@ def main(data_market_choice: str, non_interactive: bool = False, latest_only: bo
         stream_pool_health_check_interval=os.getenv('STREAM_POOL_HEALTH_CHECK_INTERVAL', 120),
         local_collector_image_tag=local_collector_image_tag,
         connection_refresh_interval_sec=connection_refresh_interval,
+        parallel_workers=parallel_workers,
+        sequential=sequential,
     )
 
 
@@ -425,11 +523,23 @@ if __name__ == '__main__':
                     help='Deploy only the latest (highest) slot')
     parser.add_argument('--use-env-connection-refresh-interval', action='store_true',
                     help='Use CONNECTION_REFRESH_INTERVAL_SEC from environment instead of calculating based on slots')
+    parser.add_argument('--parallel-workers', type=int, metavar='N',
+                    help='Number of parallel workers for deployment (1-8, default: auto-detect based on CPU cores)')
+    parser.add_argument('--sequential', action='store_true',
+                    help='Disable parallel deployment and use sequential mode (backward compatibility)')
     
     args = parser.parse_args()
     
     data_market = args.data_market if args.data_market else '0'
+    
+    # Validate parallel workers if provided
+    if args.parallel_workers is not None:
+        if args.parallel_workers < 1 or args.parallel_workers > 8:
+            parser.error("--parallel-workers must be between 1 and 8")
+    
     main(data_market_choice=data_market, 
          non_interactive=args.yes, 
          latest_only=args.latest_only,
-         use_env_refresh_interval=args.use_env_connection_refresh_interval)
+         use_env_refresh_interval=args.use_env_connection_refresh_interval,
+         parallel_workers=args.parallel_workers,
+         sequential=args.sequential)
