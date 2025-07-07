@@ -339,8 +339,8 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
                         break
                 
                 # Brief pause between batches
-                print("⏸️  Pausing 5 seconds before next batch...")
-                time.sleep(5)
+                print("⏸️  Pausing 10 seconds before next batch...")
+                time.sleep(10)
         
         # Check if deployments are actually complete
         print("\n⏳ Waiting for all background deployments to complete...")
@@ -362,24 +362,15 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             
             # Check for active deployment processes specific to our snapshotter
             try:
-                # Count active build.sh processes in our deployment directories
+                # Count screen sessions running our build scripts
                 result = subprocess.run(
-                    "ps aux | grep -E 'powerloom-mainnet.*build\\.sh' | grep -v grep | wc -l",
+                    "screen -ls | grep -E 'powerloom-mainnet-v2-[0-9]+-' | wc -l",
                     shell=True, capture_output=True, text=True
                 )
-                active_builds = int(result.stdout.strip())
+                active_screens = int(result.stdout.strip())
                 
-                # Also check for docker-compose processes specific to our project
-                result2 = subprocess.run(
-                    "ps aux | grep -E 'docker-compose.*snapshotter-lite-v2.*up' | grep -v grep | wc -l",
-                    shell=True, capture_output=True, text=True
-                )
-                active_compose = int(result2.stdout.strip())
-                
-                total_active = active_builds + active_compose
-                
-                if total_active > 0:
-                    print(f"🔄 {total_active} deployments still active... ({elapsed}s elapsed)")
+                if active_screens > 0:
+                    print(f"🔄 {active_screens} deployment screens still active... ({elapsed}s elapsed)")
                     time.sleep(check_interval)
                     elapsed += check_interval
                 else:
@@ -565,8 +556,15 @@ def main(data_market_choice: str, non_interactive: bool = False, latest_only: bo
     print(f"   • Total Slots: {len(deploy_slots)}")
     if not sequential and len(deploy_slots) > 1:
         workers = parallel_workers if parallel_workers is not None else default_workers
-        estimated_time = 30 + ((len(deploy_slots) - 1) // workers + 1) * 10
-        print(f"   • Estimated Time: ~{estimated_time} seconds")
+        # More realistic estimate:
+        # - 30s for first node
+        # - Batches of 3x workers processed with some parallelism
+        # - Account for delays and Docker operations
+        batch_size = workers * 3
+        num_batches = ((len(deploy_slots) - 1) + batch_size - 1) // batch_size
+        # Assume ~20-30s per batch due to semaphore limiting and Docker operations
+        estimated_time = 30 + (num_batches * 25) + (num_batches * 10)  # 10s pause between batches
+        print(f"   • Estimated Time: ~{estimated_time // 60}m {estimated_time % 60}s ({estimated_time} seconds)")
     print()
     
     if not data_market_contract_number:
