@@ -281,8 +281,10 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
         deployment_semaphore = Semaphore(max_workers)
         
         # Process nodes in batches
+        # Batch size is larger than max_workers to keep the pipeline full
+        # as some deployments finish faster than others
         remaining_slots = deploy_slots[1:]
-        batch_size = max_workers * 2  # Process 2x workers at a time
+        batch_size = max_workers * 3  # Process 3x workers per batch to keep pipeline full
         completed = 0
         total = len(remaining_slots)
         
@@ -294,7 +296,7 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             
             print(f"\n📦 Processing batch {batch_num}/{total_batches} ({len(batch)} nodes)...")
             
-            with ThreadPoolExecutor(max_workers=max_workers * 2) as executor:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 # Create a mapping of future to slot_id for tracking
                 future_to_slot = {}
                 for idx_in_batch, (idx, slot_id) in enumerate(enumerate(batch, 1)):
@@ -358,17 +360,26 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
                 elapsed += check_interval
                 continue
             
-            # Check for active docker-compose processes in screen sessions
+            # Check for active deployment processes specific to our snapshotter
             try:
-                # Count active build.sh processes
+                # Count active build.sh processes in our deployment directories
                 result = subprocess.run(
-                    "ps aux | grep -E 'build\\.sh|docker-compose.*up' | grep -v grep | wc -l",
+                    "ps aux | grep -E 'powerloom-mainnet.*build\\.sh' | grep -v grep | wc -l",
                     shell=True, capture_output=True, text=True
                 )
                 active_builds = int(result.stdout.strip())
                 
-                if active_builds > 0:
-                    print(f"🔄 {active_builds} deployments still active... ({elapsed}s elapsed)")
+                # Also check for docker-compose processes specific to our project
+                result2 = subprocess.run(
+                    "ps aux | grep -E 'docker-compose.*snapshotter-lite-v2.*up' | grep -v grep | wc -l",
+                    shell=True, capture_output=True, text=True
+                )
+                active_compose = int(result2.stdout.strip())
+                
+                total_active = active_builds + active_compose
+                
+                if total_active > 0:
+                    print(f"🔄 {total_active} deployments still active... ({elapsed}s elapsed)")
                     time.sleep(check_interval)
                     elapsed += check_interval
                 else:
