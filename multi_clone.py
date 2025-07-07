@@ -9,6 +9,7 @@ from web3 import Web3
 import psutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+from threading import Semaphore
 
 OUTPUT_WORTHY_ENV_VARS = [
     'SOURCE_RPC_URL', 
@@ -128,10 +129,27 @@ def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
     )
 
 def deploy_single_node(slot_id: int, idx: int, data_market_namespace: str, data_market_contract_number: int, 
-                      protocol_state: dict, full_namespace: str, base_dir: str, **kwargs):
+                      protocol_state: dict, full_namespace: str, base_dir: str, semaphore=None, **kwargs):
     """Deploy a single node in a thread-safe manner"""
     try:
-        print(f'🟠 Deploying node for slot {slot_id} in data market {data_market_namespace}')
+        # Use semaphore to control concurrent deployments if provided
+        if semaphore:
+            # print(f"⏳ [Worker {threading.current_thread().name}] Waiting for slot to deploy {slot_id}...")
+            with semaphore:
+                return _deploy_single_node_impl(slot_id, idx, data_market_namespace, data_market_contract_number,
+                                               protocol_state, full_namespace, base_dir, **kwargs)
+        else:
+            return _deploy_single_node_impl(slot_id, idx, data_market_namespace, data_market_contract_number,
+                                           protocol_state, full_namespace, base_dir, **kwargs)
+    except Exception as e:
+        return (slot_id, "error", f"Failed to deploy node {slot_id}: {str(e)}")
+
+
+def _deploy_single_node_impl(slot_id: int, idx: int, data_market_namespace: str, data_market_contract_number: int, 
+                            protocol_state: dict, full_namespace: str, base_dir: str, **kwargs):
+    """Implementation of single node deployment"""
+    try:
+        print(f'🟠 [Worker {threading.current_thread().name}] Starting deployment for slot {slot_id}')
         
         # Determine collector profile
         if idx > 0:
@@ -182,6 +200,16 @@ def deploy_single_node(slot_id: int, idx: int, data_market_namespace: str, data_
         # Create and launch screen session
         screen_cmd = f"""cd {repo_path} && screen -dmS {repo_name} bash -c './build.sh {collector_profile_string} --skip-credential-update --data-market-contract-number {data_market_contract_number}'"""
         subprocess.run(screen_cmd, shell=True, check=True)
+        
+        # Wait for the deployment to reach a stable state
+        # This ensures we don't release the semaphore too early
+        if idx == 0:
+            # First node needs more time for collector initialization
+            time.sleep(5)
+        else:
+            # Subsequent nodes need less time but still need to wait
+            # for Docker containers to actually start
+            time.sleep(3)
         
         return (slot_id, "success", f"Node {slot_id} deployed successfully")
     
@@ -237,25 +265,39 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
         
         # Determine number of workers
         cpu_cores = psutil.cpu_count(logical=True)
-        max_workers = kwargs.get('parallel_workers', min(max(4, cpu_cores // 2), 8))
-        print(f"📊 Using {max_workers} parallel workers (detected {cpu_cores} CPU cores)")
+        default_workers = min(max(4, cpu_cores // 2), 8)
+        max_workers = kwargs.get('parallel_workers')
         
-        # Deploy remaining nodes in parallel
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = []
+        if max_workers is None:
+            max_workers = default_workers
+            print(f"📊 Using {max_workers} parallel workers (auto-detected based on {cpu_cores} CPU cores)")
+        else:
+            print(f"📊 Using {max_workers} parallel workers (user-specified, detected {cpu_cores} CPU cores)")
+        
+        # Deploy remaining nodes in parallel with controlled concurrency
+        print(f"📋 Starting parallel deployment of {len(deploy_slots) - 1} nodes with {max_workers} workers...")
+        
+        # Create a semaphore to limit concurrent deployments
+        deployment_semaphore = Semaphore(max_workers)
+        
+        with ThreadPoolExecutor(max_workers=max_workers * 2) as executor:
+            # Create a mapping of future to slot_id for tracking
+            future_to_slot = {}
             for idx, slot_id in enumerate(deploy_slots[1:], 1):
                 future = executor.submit(
                     deploy_single_node, slot_id, idx, data_market_namespace, 
-                    data_market_contract_number, protocol_state, full_namespace, base_dir, **kwargs
+                    data_market_contract_number, protocol_state, full_namespace, base_dir, 
+                    semaphore=deployment_semaphore, **kwargs
                 )
-                futures.append((slot_id, future))
+                future_to_slot[future] = slot_id
             
-            # Monitor progress
+            # Monitor progress as futures complete
             completed = 0
             total = len(deploy_slots) - 1
-            for slot_id, future in futures:
+            for future in as_completed(future_to_slot, timeout=300):
+                slot_id = future_to_slot[future]
                 try:
-                    result = future.result(timeout=60)
+                    result = future.result()
                     completed += 1
                     if result[1] == "success":
                         print(f"✅ [{completed}/{total}] {result[2]}")
@@ -413,6 +455,27 @@ def main(data_market_choice: str, non_interactive: bool = False, latest_only: bo
             deploy_slots = slot_ids
 
     print(f'🎰 Final list of slots to deploy: {deploy_slots}')
+    
+    # Display deployment configuration
+    print("\n📋 Deployment Configuration:")
+    cpu_cores = psutil.cpu_count(logical=True)
+    if parallel_workers is not None:
+        print(f"   • Parallel Workers: {parallel_workers} (user-specified)")
+    else:
+        default_workers = min(max(4, cpu_cores // 2), 8)
+        print(f"   • Parallel Workers: {default_workers} (auto-detected from {cpu_cores} CPU cores)")
+    
+    if sequential:
+        print("   • Mode: Sequential (parallel deployment disabled)")
+    else:
+        print("   • Mode: Parallel")
+    
+    print(f"   • Total Slots: {len(deploy_slots)}")
+    if not sequential and len(deploy_slots) > 1:
+        workers = parallel_workers if parallel_workers is not None else default_workers
+        estimated_time = 30 + ((len(deploy_slots) - 1) // workers + 1) * 10
+        print(f"   • Estimated Time: ~{estimated_time} seconds")
+    print()
     
     if not data_market_contract_number:
         if non_interactive:

@@ -158,7 +158,7 @@ if [ -n "$EXISTING_CONTAINERS" ]; then
             container="$1"
             if docker ps -q --filter "name=$container" | grep -q .; then
                 echo -e "Attempting to stop container ${container}..."
-                if ! timeout 35 docker stop --time 30 "$container" 2>/dev/null; then
+                if ! timeout 35 docker stop --timeout 30 "$container" 2>/dev/null; then
                     echo -e "\033[1;33m⚠️ Container ${container} could not be stopped gracefully after 30 seconds\033[0m"
                     exit 1
                 fi
