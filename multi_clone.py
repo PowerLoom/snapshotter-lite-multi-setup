@@ -307,6 +307,11 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
         print("\n⏳ Waiting 10 seconds for collector initialization...")
         time.sleep(10)
     
+    # For single slot deployment, we're done
+    if len(deploy_slots) == 1:
+        print("\n✅ Single node deployment completed!")
+        return
+    
     # Phase 2: Parallel deployment of remaining nodes
     if len(deploy_slots) > 1:
         print(f"\n🚀 Phase 2: Deploying {len(deploy_slots) - 1} remaining nodes in parallel...")
