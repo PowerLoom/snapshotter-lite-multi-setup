@@ -150,7 +150,7 @@ if [ -n "$EXISTING_CONTAINERS" ]; then
             if docker ps -q --filter "name=$container" | grep -q .; then
                 echo -e "Attempting to stop container ${container}..."
                 if ! timeout 15 docker stop --timeout 10 "$container" 2>/dev/null; then
-                    echo -e "\033[1;33m⚠️ Container ${container} could not be stopped gracefully after 30 seconds\033[0m"
+                    echo -e "\033[1;33m⚠️ Container ${container} could not be stopped gracefully after 10 seconds\033[0m"
                     # Return the container name for force kill
                     echo "$container"
                     exit 1
