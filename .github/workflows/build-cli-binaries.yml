@@ -64,6 +64,11 @@ jobs:
           --hidden-import snapshotter_cli \
           --hidden-import snapshotter_cli.cli \
           --hidden-import snapshotter_cli.commands \
+          --hidden-import snapshotter_cli.commands.configure \
+          --hidden-import snapshotter_cli.commands.deploy \
+          --hidden-import snapshotter_cli.commands.diagnose \
+          --hidden-import snapshotter_cli.commands.manage \
+          --hidden-import snapshotter_cli.utils \
           --hidden-import typer \
           --hidden-import rich \
           --hidden-import web3 \
@@ -80,7 +85,7 @@ jobs:
           --workpath build \
           --specpath build \
           -y \
-          snapshotter_cli/cli.py
+          snapshotter_cli/__main__.py
         
     - name: Test binary
       run: |
@@ -147,6 +152,11 @@ jobs:
             --hidden-import snapshotter_cli \
             --hidden-import snapshotter_cli.cli \
             --hidden-import snapshotter_cli.commands \
+            --hidden-import snapshotter_cli.commands.configure \
+            --hidden-import snapshotter_cli.commands.deploy \
+            --hidden-import snapshotter_cli.commands.diagnose \
+            --hidden-import snapshotter_cli.commands.manage \
+            --hidden-import snapshotter_cli.utils \
             --hidden-import typer \
             --hidden-import rich \
             --hidden-import web3 \
@@ -163,7 +173,7 @@ jobs:
             --workpath /app/build \
             --specpath /app/build \
             -y \
-            snapshotter_cli/cli.py
+            snapshotter_cli/__main__.py
         
         # Create checksum
         RUN cd /app/dist && sha256sum powerloom-snapshotter-cli-linux-arm64 > powerloom-snapshotter-cli-linux-arm64.sha256
