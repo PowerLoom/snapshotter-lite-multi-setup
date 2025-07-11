@@ -140,14 +140,16 @@ jobs:
         
         WORKDIR /app
         
-        # Copy project files
+        # Copy dependency files first for better caching
         COPY pyproject.toml poetry.lock ./
-        COPY snapshotter_cli/ ./snapshotter_cli/
         
-        # Install dependencies and PyInstaller
+        # Install dependencies (this layer will be cached)
         RUN poetry config virtualenvs.create false && \
-            poetry install --no-interaction --no-ansi && \
+            poetry install --no-interaction --no-ansi --no-root && \
             pip install pyinstaller
+        
+        # Copy source code (changes here won't invalidate dependency cache)
+        COPY snapshotter_cli/ ./snapshotter_cli/
         
         # Build binary
         RUN pyinstaller --onefile --name powerloom-snapshotter-cli-linux-arm64 \
@@ -184,7 +186,14 @@ jobs:
     
     - name: Build ARM64 binary in Docker
       run: |
-        docker buildx build --platform linux/arm64 -f Dockerfile.arm64 -t powerloom-snapshotter-cli-arm64-builder .
+        docker buildx build \
+          --platform linux/arm64 \
+          --cache-from type=gha \
+          --cache-to type=gha,mode=max \
+          -f Dockerfile.arm64 \
+          -t powerloom-snapshotter-cli-arm64-builder \
+          --load \
+          .
         docker create --name extract-arm64 powerloom-snapshotter-cli-arm64-builder
         docker cp extract-arm64:/app/dist ./dist-arm64
         docker rm extract-arm64
