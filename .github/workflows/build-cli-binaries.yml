@@ -75,12 +75,19 @@ jobs:
           --hidden-import psutil \
           --hidden-import pydantic \
           --hidden-import dotenv \
-          --collect-all web3 \
-          --collect-all eth_account \
-          --collect-all eth_utils \
-          --collect-all hexbytes \
-          --collect-all cytoolz \
+          --hidden-import eth_account \
+          --hidden-import eth_utils \
+          --hidden-import hexbytes \
+          --hidden-import cytoolz \
+          --hidden-import eth_typing \
+          --hidden-import eth_abi \
+          --exclude-module test \
+          --exclude-module tests \
+          --exclude-module pytest \
           --exclude-module flaky \
+          --exclude-module _pytest \
+          --bootloader-ignore-signals \
+          --noupx \
           --distpath dist \
           --workpath build \
           --specpath build \
@@ -168,12 +175,19 @@ jobs:
             --hidden-import psutil \
             --hidden-import pydantic \
             --hidden-import dotenv \
-            --collect-all web3 \
-            --collect-all eth_account \
-            --collect-all eth_utils \
-            --collect-all hexbytes \
-            --collect-all cytoolz \
+            --hidden-import eth_account \
+            --hidden-import eth_utils \
+            --hidden-import hexbytes \
+            --hidden-import cytoolz \
+            --hidden-import eth_typing \
+            --hidden-import eth_abi \
+            --exclude-module test \
+            --exclude-module tests \
+            --exclude-module pytest \
             --exclude-module flaky \
+            --exclude-module _pytest \
+            --bootloader-ignore-signals \
+            --noupx \
             --distpath /app/dist \
             --workpath /app/build \
             --specpath /app/build \
