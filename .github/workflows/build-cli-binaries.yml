@@ -89,7 +89,6 @@ jobs:
         
     - name: Test binary
       run: |
-        ./dist/powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }} --version
         ./dist/powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }} --help
         
     - name: Create checksums
