@@ -7,7 +7,6 @@ import os
 from dotenv import dotenv_values
 from snapshotter_cli.utils.models import CLIContext, MarketConfig, PowerloomChainConfig
 from snapshotter_cli.utils.deployment import CONFIG_ENV_FILENAME_TEMPLATE, calculate_connection_refresh_interval, CONFIG_DIR
-import psutil
 from rich.panel import Panel
 
 console = Console()
@@ -141,6 +140,8 @@ def configure_command(
         console.print(f"ℹ️ Existing configuration found for {env_filename}. Using existing values as defaults.", style="yellow")
 
     # Calculate recommended max stream pool size based on CPU count
+    import psutil
+    
     cpus = psutil.cpu_count(logical=True)
     if cpus >= 2 and cpus < 4:
         recommended_max_stream_pool_size = 40

@@ -1,11 +1,8 @@
 import os
 import typer
-import rich
 from rich.console import Console
 import requests
 from typing import Dict, List, Optional
-import json
-from enum import Enum
 from pathlib import Path
 import shutil
 from .commands.diagnose import diagnose_command
@@ -15,7 +12,6 @@ from rich.tree import Tree
 from .commands.configure import configure_command
 from .commands.identity import identity_app
 from .utils.models import CLIContext, ChainConfig, ChainMarketData, MarketConfig, ComputeConfig, PowerloomChainConfig
-from .utils.evm import fetch_owned_slots
 from .utils.deployment import deploy_snapshotter_instance, parse_env_file_vars, CONFIG_ENV_FILENAME_TEMPLATE, run_git_command, CONFIG_DIR
 from .utils.config_helpers import get_credential, get_source_chain_rpc_url
 from .utils.system_checks import is_docker_running, list_snapshotter_screen_sessions
@@ -231,6 +227,8 @@ def deploy(
             # Get protocol state contract address from the first market
             first_market = next(iter(env_config.markets.values()))
             protocol_state_contract_address = first_market.powerloomProtocolStateContractAddress
+            
+            from .utils.evm import fetch_owned_slots
             
             fetched_slots_result = fetch_owned_slots(
                 wallet_address=final_wallet_address,

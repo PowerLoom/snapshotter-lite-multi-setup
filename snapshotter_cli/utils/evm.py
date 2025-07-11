@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 from typing import List, Optional
 
-from web3 import Web3
 from rich.console import Console
 
 console = Console()
@@ -32,6 +31,8 @@ def fetch_owned_slots(
         return None
 
     try:
+        from web3 import Web3
+        
         w3 = Web3(Web3.HTTPProvider(rpc_url))
         if not w3.is_connected():
             console.print(f"[bold red]Error: Failed to connect to Powerloom RPC URL: {rpc_url}[/bold red]")
