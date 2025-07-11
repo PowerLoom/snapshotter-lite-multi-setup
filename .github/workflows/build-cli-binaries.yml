@@ -94,7 +94,11 @@ jobs:
     - name: Create checksums
       run: |
         cd dist
-        sha256sum powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }} > powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }}.sha256
+        if [[ "${{ matrix.platform }}" == "macos" ]]; then
+          shasum -a 256 powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }} > powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }}.sha256
+        else
+          sha256sum powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }} > powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }}.sha256
+        fi
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
