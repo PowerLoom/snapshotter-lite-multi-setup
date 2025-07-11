@@ -60,8 +60,10 @@ jobs:
     - name: Build binary with PyInstaller
       run: |
         poetry run pyinstaller --onefile --name powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }} \
-          --add-data "snapshotter_cli:snapshotter_cli" \
+          --paths . \
           --hidden-import snapshotter_cli \
+          --hidden-import snapshotter_cli.cli \
+          --hidden-import snapshotter_cli.commands \
           --hidden-import typer \
           --hidden-import rich \
           --hidden-import web3 \
@@ -71,9 +73,13 @@ jobs:
           --collect-all web3 \
           --collect-all eth_account \
           --collect-all eth_utils \
+          --collect-all hexbytes \
+          --collect-all cytoolz \
+          --exclude-module flaky \
           --distpath dist \
           --workpath build \
           --specpath build \
+          -y \
           snapshotter_cli/cli.py
         
     - name: Test binary
@@ -137,8 +143,10 @@ jobs:
         
         # Build binary
         RUN pyinstaller --onefile --name powerloom-snapshotter-cli-linux-arm64 \
-            --add-data "snapshotter_cli:snapshotter_cli" \
+            --paths . \
             --hidden-import snapshotter_cli \
+            --hidden-import snapshotter_cli.cli \
+            --hidden-import snapshotter_cli.commands \
             --hidden-import typer \
             --hidden-import rich \
             --hidden-import web3 \
@@ -148,9 +156,13 @@ jobs:
             --collect-all web3 \
             --collect-all eth_account \
             --collect-all eth_utils \
+            --collect-all hexbytes \
+            --collect-all cytoolz \
+            --exclude-module flaky \
             --distpath /app/dist \
             --workpath /app/build \
             --specpath /app/build \
+            -y \
             snapshotter_cli/cli.py
         
         # Create checksum
