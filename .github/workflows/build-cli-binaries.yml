@@ -61,7 +61,8 @@ jobs:
       run: |
         poetry run pyinstaller --onefile --name powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }} \
           --paths . \
-          --add-data "snapshotter_cli/utils/abi/*.json:snapshotter_cli/utils/abi" \
+          --add-data "snapshotter_cli/utils/abi/PowerloomNodes.json:snapshotter_cli/utils/abi" \
+          --add-data "snapshotter_cli/utils/abi/ProtocolState.json:snapshotter_cli/utils/abi" \
           --hidden-import snapshotter_cli \
           --hidden-import snapshotter_cli.cli \
           --hidden-import snapshotter_cli.commands \
@@ -162,7 +163,8 @@ jobs:
         # Build binary
         RUN pyinstaller --onefile --name powerloom-snapshotter-cli-linux-arm64 \
             --paths . \
-            --add-data "snapshotter_cli/utils/abi/*.json:snapshotter_cli/utils/abi" \
+            --add-data "snapshotter_cli/utils/abi/PowerloomNodes.json:snapshotter_cli/utils/abi" \
+            --add-data "snapshotter_cli/utils/abi/ProtocolState.json:snapshotter_cli/utils/abi" \
             --hidden-import snapshotter_cli \
             --hidden-import snapshotter_cli.cli \
             --hidden-import snapshotter_cli.commands \
