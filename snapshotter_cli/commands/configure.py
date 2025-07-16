@@ -75,12 +75,18 @@ def configure_command(
                 break
             console.print("❌ Invalid selection. Please try again.", style="red")
 
-    # --- Select Powerloom RPC URL ---
-    if not powerloom_rpc_url:
-        final_powerloom_rpc_url = Prompt.ask("👉 Enter Powerloom RPC URL", default='https://rpc-v2.powerloom.network')
-
     # --- Select Data Market ---
     chain_data = cli_context.chain_markets_map[selected_chain_name_upper]
+    
+    # --- Get Powerloom RPC URL from chain config ---
+    chain_config = chain_data.chain_config
+    default_rpc_url = str(chain_config.rpcURL)
+    
+    # --- Select Powerloom RPC URL ---
+    if not powerloom_rpc_url:
+        final_powerloom_rpc_url = Prompt.ask("👉 Enter Powerloom RPC URL", default=default_rpc_url)
+    else:
+        final_powerloom_rpc_url = powerloom_rpc_url
     available_markets = sorted(chain_data.markets.keys())
     if not available_markets:
         console.print(f"❌ No data markets available for {selected_chain_name_upper}.", style="bold red")
