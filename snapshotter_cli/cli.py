@@ -11,6 +11,7 @@ from rich.panel import Panel
 from rich.tree import Tree
 from .commands.configure import configure_command
 from .commands.identity import identity_app
+from .commands.shell import shell_command
 from .utils.models import CLIContext, ChainConfig, ChainMarketData, MarketConfig, ComputeConfig, PowerloomChainConfig
 from .utils.deployment import deploy_snapshotter_instance, parse_env_file_vars, CONFIG_ENV_FILENAME_TEMPLATE, run_git_command, CONFIG_DIR
 from .utils.config_helpers import get_credential, get_source_chain_rpc_url
@@ -84,6 +85,11 @@ app = typer.Typer(
 )
 
 app.add_typer(identity_app, name="identity")
+
+@app.command()
+def shell(ctx: typer.Context):
+    """Start an interactive shell session for faster command execution."""
+    shell_command(ctx)
 
 # class Environment(str, Enum):
 #     pass
