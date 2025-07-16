@@ -1,4 +1,5 @@
 import json
+import sys
 from pathlib import Path
 from typing import List, Optional
 
@@ -7,7 +8,13 @@ from rich.console import Console
 console = Console()
 
 
-ABI_DIR = Path(__file__).parent / "abi"  # ABI folder is at snapshotter_cli/utils/abi
+# Handle PyInstaller bundled files
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    # Running in a PyInstaller bundle
+    ABI_DIR = Path(sys._MEIPASS) / "snapshotter_cli" / "utils" / "abi"
+else:
+    # Running normally
+    ABI_DIR = Path(__file__).parent / "abi"
 
 def fetch_owned_slots(
     wallet_address: str,
