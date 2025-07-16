@@ -7,7 +7,7 @@ from rich.console import Console
 console = Console()
 
 
-ABI_DIR = Path(__file__).parent.parent / "utils/abi" # Assumes abi folder is at snapshotter_cli/utils/abi
+ABI_DIR = Path(__file__).parent / "abi"  # ABI folder is at snapshotter_cli/utils/abi
 
 def fetch_owned_slots(
     wallet_address: str,
