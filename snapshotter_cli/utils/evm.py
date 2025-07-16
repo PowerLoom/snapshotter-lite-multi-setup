@@ -9,9 +9,14 @@ console = Console()
 
 
 # Handle PyInstaller bundled files
-if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+if getattr(sys, 'frozen', False):
     # Running in a PyInstaller bundle
-    ABI_DIR = Path(sys._MEIPASS) / "snapshotter_cli" / "utils" / "abi"
+    import sys
+    base_path = Path(sys._MEIPASS)
+    ABI_DIR = base_path / "snapshotter_cli" / "utils" / "abi"
+    # Also check if files are in the root of _MEIPASS
+    if not ABI_DIR.exists():
+        ABI_DIR = base_path / "abi"
 else:
     # Running normally
     ABI_DIR = Path(__file__).parent / "abi"
@@ -51,6 +56,13 @@ def fetch_owned_slots(
 
         if not protocol_state_abi_path.exists() or not powerloom_nodes_abi_path.exists():
             console.print(f"[bold red]Error: ABI files not found in {ABI_DIR}. Make sure ProtocolState.json and PowerloomNodes.json are present.[/bold red]")
+            # Debug info
+            console.print(f"[dim]Debug: Looking for ABI files in: {ABI_DIR}[/dim]")
+            console.print(f"[dim]Debug: ABI_DIR exists: {ABI_DIR.exists()}[/dim]")
+            if ABI_DIR.exists():
+                console.print(f"[dim]Debug: Contents of ABI_DIR: {list(ABI_DIR.iterdir())}[/dim]")
+            console.print(f"[dim]Debug: sys.frozen = {getattr(sys, 'frozen', False)}[/dim]")
+            console.print(f"[dim]Debug: sys._MEIPASS = {getattr(sys, '_MEIPASS', 'Not set')}[/dim]")
             return None
 
         with open(protocol_state_abi_path, 'r') as f:

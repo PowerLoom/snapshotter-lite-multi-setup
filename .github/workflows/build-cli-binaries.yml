@@ -59,41 +59,15 @@ jobs:
       
     - name: Build binary with PyInstaller
       run: |
-        poetry run pyinstaller --onefile --name powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }} \
-          --paths . \
-          --collect-data snapshotter_cli \
-          --hidden-import snapshotter_cli \
-          --hidden-import snapshotter_cli.cli \
-          --hidden-import snapshotter_cli.commands \
-          --hidden-import snapshotter_cli.commands.configure \
-          --hidden-import snapshotter_cli.commands.deploy \
-          --hidden-import snapshotter_cli.commands.diagnose \
-          --hidden-import snapshotter_cli.commands.manage \
-          --hidden-import snapshotter_cli.utils \
-          --hidden-import typer \
-          --hidden-import rich \
-          --hidden-import web3 \
-          --hidden-import psutil \
-          --hidden-import pydantic \
-          --hidden-import dotenv \
-          --hidden-import eth_account \
-          --hidden-import eth_utils \
-          --hidden-import hexbytes \
-          --hidden-import cytoolz \
-          --hidden-import eth_typing \
-          --hidden-import eth_abi \
-          --exclude-module test \
-          --exclude-module tests \
-          --exclude-module pytest \
-          --exclude-module flaky \
-          --exclude-module _pytest \
-          --bootloader-ignore-signals \
-          --noupx \
+        # Set environment variables for the spec file
+        export PLATFORM=${{ matrix.platform }}
+        export ARCH=${{ matrix.arch }}
+        
+        # Build using the spec file
+        poetry run pyinstaller pyinstaller.spec \
           --distpath dist \
           --workpath build \
-          --specpath build \
-          -y \
-          snapshotter_cli/__main__.py
+          --clean
         
     - name: Test binary
       run: |
@@ -156,45 +130,17 @@ jobs:
             poetry install --no-interaction --no-ansi --no-root && \
             pip install pyinstaller
         
-        # Copy source code (changes here won't invalidate dependency cache)
+        # Copy source code and spec file
         COPY snapshotter_cli/ ./snapshotter_cli/
+        COPY pyinstaller.spec ./
         
         # Build binary
-        RUN pyinstaller --onefile --name powerloom-snapshotter-cli-linux-arm64 \
-            --paths . \
-            --collect-data snapshotter_cli \
-            --hidden-import snapshotter_cli \
-            --hidden-import snapshotter_cli.cli \
-            --hidden-import snapshotter_cli.commands \
-            --hidden-import snapshotter_cli.commands.configure \
-            --hidden-import snapshotter_cli.commands.deploy \
-            --hidden-import snapshotter_cli.commands.diagnose \
-            --hidden-import snapshotter_cli.commands.manage \
-            --hidden-import snapshotter_cli.utils \
-            --hidden-import typer \
-            --hidden-import rich \
-            --hidden-import web3 \
-            --hidden-import psutil \
-            --hidden-import pydantic \
-            --hidden-import dotenv \
-            --hidden-import eth_account \
-            --hidden-import eth_utils \
-            --hidden-import hexbytes \
-            --hidden-import cytoolz \
-            --hidden-import eth_typing \
-            --hidden-import eth_abi \
-            --exclude-module test \
-            --exclude-module tests \
-            --exclude-module pytest \
-            --exclude-module flaky \
-            --exclude-module _pytest \
-            --bootloader-ignore-signals \
-            --noupx \
+        ENV PLATFORM=linux
+        ENV ARCH=arm64
+        RUN pyinstaller pyinstaller.spec \
             --distpath /app/dist \
             --workpath /app/build \
-            --specpath /app/build \
-            -y \
-            snapshotter_cli/__main__.py
+            --clean
         
         # Create checksum
         RUN cd /app/dist && sha256sum powerloom-snapshotter-cli-linux-arm64 > powerloom-snapshotter-cli-linux-arm64.sha256
