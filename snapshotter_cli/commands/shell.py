@@ -5,6 +5,11 @@ from rich.panel import Panel
 from typing import List, Optional
 import shlex
 import sys
+try:
+    import readline
+    HAS_READLINE = True
+except ImportError:
+    HAS_READLINE = False
 
 console = Console()
 
@@ -21,9 +26,21 @@ def parse_command(command_line: str) -> tuple[str, List[str]]:
 
 def run_shell(app: typer.Typer, parent_ctx: typer.Context):
     """Run an interactive shell for the CLI."""
+    # Setup readline history if available
+    if HAS_READLINE:
+        import tempfile
+        import os
+        history_file = os.path.join(tempfile.gettempdir(), '.powerloom_shell_history')
+        try:
+            readline.read_history_file(history_file)
+        except FileNotFoundError:
+            pass  # History file doesn't exist yet
+        readline.set_history_length(1000)
+    
     console.print(Panel.fit(
         "[bold green]PowerLoom Snapshotter CLI - Interactive Mode[/bold green]\n"
-        "Type 'help' for available commands, 'exit' or 'quit' to leave.",
+        "Type 'help' for available commands, 'exit' or 'quit' to leave.\n"
+        "Use Ctrl+C to cancel current command.",
         border_style="green"
     ))
     
@@ -51,8 +68,15 @@ def run_shell(app: typer.Typer, parent_ctx: typer.Context):
     
     while True:
         try:
-            # Get user input
-            command_line = Prompt.ask("\n[bold cyan]powerloom-snapshotter[/bold cyan]", default="").strip()
+            # Get user input with readline support
+            if HAS_READLINE:
+                try:
+                    command_line = input("\npowerloom-snapshotter> ").strip()
+                except EOFError:
+                    console.print("\n[yellow]Goodbye![/yellow]")
+                    break
+            else:
+                command_line = Prompt.ask("\n[bold cyan]powerloom-snapshotter[/bold cyan]", default="").strip()
             
             if not command_line:
                 continue
@@ -104,6 +128,13 @@ def run_shell(app: typer.Typer, parent_ctx: typer.Context):
             # Handle Ctrl+D
             console.print("\n[yellow]Goodbye![/yellow]")
             break
+    
+    # Save history on exit
+    if HAS_READLINE:
+        try:
+            readline.write_history_file(history_file)
+        except:
+            pass  # Ignore errors saving history
 
 def show_help(commands: dict):
     """Show available commands."""
