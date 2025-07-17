@@ -412,11 +412,6 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             if active_count == 0 and total_tracked >= len(deploy_slots):
                 # All deployments have finished
                 print(f"✅ All deployments complete! ({completed_count} successful, {failed_count} failed)")
-                # Dynamic wait time based on number of slots
-                # Base 10s + 0.1s per slot, capped at 40s
-                wait_time = min(10 + (len(deploy_slots) * 0.1), 40)
-                print(f"⏳ Waiting {int(wait_time)}s for containers to fully start...")
-                time.sleep(wait_time)
                 break
             
             # Show progress
