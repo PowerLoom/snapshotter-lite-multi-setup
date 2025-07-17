@@ -12,4 +12,5 @@ sleep 5
 echo "🟢 Starting automatic redeployment of all slots..."
 python3 multi_clone.py -y
 
-echo "✅ Deployment process completed!"
+#There is no need for this message as multi_clone.py will print the final message
+#echo "✅ Deployment process completed!"
