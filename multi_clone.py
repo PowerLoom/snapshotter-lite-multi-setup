@@ -4,9 +4,13 @@ import sys
 import time
 import json
 import argparse
+import re
 from dotenv import load_dotenv
 from web3 import Web3
 import psutil
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+from threading import Semaphore
 
 OUTPUT_WORTHY_ENV_VARS = [
     'SOURCE_RPC_URL', 
@@ -125,23 +129,68 @@ def generate_env_file_contents(data_market_namespace: str, **kwargs) -> str:
         connection_refresh_interval_sec=kwargs['connection_refresh_interval_sec'],
     )
 
-def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int, data_market_namespace: str, **kwargs):
-    protocol_state = DATA_MARKET_CHOICES_PROTOCOL_STATE[data_market_namespace]
-    full_namespace = f'{POWERLOOM_CHAIN}-{data_market_namespace}-{SOURCE_CHAIN}'
+def deploy_single_node(slot_id: int, idx: int, data_market_namespace: str, data_market_contract_number: int, 
+                      protocol_state: dict, full_namespace: str, base_dir: str, semaphore=None, deployment_tracker=None, **kwargs):
+    """Deploy a single node in a thread-safe manner"""
+    try:
+        # Track deployment start
+        if deployment_tracker:
+            with deployment_tracker['lock']:
+                deployment_tracker['active'].add(slot_id)
+        
+        # Use semaphore to control concurrent deployments if provided
+        if semaphore:
+            # print(f"⏳ [Worker {threading.current_thread().name}] Waiting for slot to deploy {slot_id}...")
+            with semaphore:
+                result = _deploy_single_node_impl(slot_id, idx, data_market_namespace, data_market_contract_number,
+                                               protocol_state, full_namespace, base_dir, **kwargs)
+        else:
+            result = _deploy_single_node_impl(slot_id, idx, data_market_namespace, data_market_contract_number,
+                                           protocol_state, full_namespace, base_dir, **kwargs)
+        
+        # Track deployment completion
+        if deployment_tracker:
+            with deployment_tracker['lock']:
+                deployment_tracker['active'].discard(slot_id)
+                if result[1] == "success":
+                    deployment_tracker['completed'].add(slot_id)
+                else:
+                    deployment_tracker['failed'].add(slot_id)
+        
+        return result
+    except Exception as e:
+        # Track deployment failure
+        if deployment_tracker:
+            with deployment_tracker['lock']:
+                deployment_tracker['active'].discard(slot_id)
+                deployment_tracker['failed'].add(slot_id)
+        return (slot_id, "error", f"Failed to deploy node {slot_id}: {str(e)}")
 
-    for idx, slot_id in enumerate(deploy_slots):
-        print(f'🟠 Deploying node for slot {slot_id} in data market {data_market_namespace}')
+
+def _deploy_single_node_impl(slot_id: int, idx: int, data_market_namespace: str, data_market_contract_number: int, 
+                            protocol_state: dict, full_namespace: str, base_dir: str, **kwargs):
+    """Implementation of single node deployment"""
+    try:
+        print(f'🟠 [Worker {threading.current_thread().name}] Starting deployment for slot {slot_id}')
+        
+        # Determine collector profile
         if idx > 0:
-            os.chdir('..')
             collector_profile_string = '--no-collector --no-autoheal-launch'
         else:
             collector_profile_string = ''
+        
         repo_name = f'powerloom-mainnet-v2-{slot_id}-{data_market_namespace}'
-        if os.path.exists(repo_name):
+        repo_path = os.path.join(base_dir, repo_name)
+        
+        # Clean up existing directory
+        if os.path.exists(repo_path):
             print(f'Deleting existing dir {repo_name}')
-            os.system(f'rm -rf {repo_name}')
-        os.system(f'cp -R snapshotter-lite-v2 {repo_name}')
-        os.chdir(repo_name)
+            subprocess.run(['rm', '-rf', repo_path], check=True)
+        
+        # Copy template directory
+        subprocess.run(['cp', '-R', os.path.join(base_dir, 'snapshotter-lite-v2'), repo_path], check=True)
+        
+        # Generate environment file
         env_file_contents = generate_env_file_contents(
             data_market_namespace=data_market_namespace,
             source_rpc_url=kwargs['source_rpc_url'],
@@ -162,17 +211,311 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
             slot_id=slot_id,
             connection_refresh_interval_sec=kwargs['connection_refresh_interval_sec'],
         )
-        with open(f'.env-{full_namespace}', 'w+') as f:
+        
+        env_file_path = os.path.join(repo_path, f'.env-{full_namespace}')
+        with open(env_file_path, 'w+') as f:
             f.write(env_file_contents)
-        # docker build and run
-        print('--'*20 + f'Spinning up docker containers for slot {slot_id}' + '--'*20) 
-        os.system(f"""
-screen -dmS {repo_name}
-screen -r {repo_name} -p 0 -X stuff "./build.sh {collector_profile_string} --skip-credential-update --data-market-contract-number {data_market_contract_number}\n"
-        """)
-        sleep_duration = 30 if idx == 0 else 10
-        print(f'Sleeping for {sleep_duration} seconds to allow docker containers to spin up...')
-        time.sleep(sleep_duration)
+        
+        # Launch in screen session
+        print('--'*20 + f'Spinning up docker containers for slot {slot_id}' + '--'*20)
+        
+        # Create and launch screen session
+        screen_cmd = f"""cd {repo_path} && screen -dmS {repo_name} bash -c './build.sh {collector_profile_string} --skip-credential-update --data-market-contract-number {data_market_contract_number}'"""
+        subprocess.run(screen_cmd, shell=True, check=True)
+        
+        # Wait for the deployment to reach a stable state
+        # This ensures we don't release the semaphore too early
+        if idx == 0:
+            # First node needs more time for collector initialization
+            time.sleep(5)
+        else:
+            # Subsequent nodes need less time but still need to wait
+            # for Docker containers to actually start
+            time.sleep(3)
+        
+        return (slot_id, "success", f"Node {slot_id} deployed successfully")
+    
+    except Exception as e:
+        return (slot_id, "error", f"Failed to deploy node {slot_id}: {str(e)}")
+
+
+def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int, data_market_namespace: str, **kwargs):
+    protocol_state = DATA_MARKET_CHOICES_PROTOCOL_STATE[data_market_namespace]
+    full_namespace = f'{POWERLOOM_CHAIN}-{data_market_namespace}-{SOURCE_CHAIN}'
+    base_dir = os.getcwd()
+    
+    # Check if sequential mode is requested
+    sequential_mode = kwargs.get('sequential', False)
+    
+    if sequential_mode:
+        print("📌 Running in sequential mode (parallel deployment disabled)")
+        # Original sequential logic
+        for idx, slot_id in enumerate(deploy_slots):
+            result = deploy_single_node(
+                slot_id, idx, data_market_namespace, data_market_contract_number,
+                protocol_state, full_namespace, base_dir, **kwargs
+            )
+            
+            if result[1] == "error":
+                print(f"❌ Failed to deploy node {slot_id}: {result[2]}")
+                continue
+            
+            sleep_duration = 30 if idx == 0 else 10
+            print(f'Sleeping for {sleep_duration} seconds to allow docker containers to spin up...')
+            time.sleep(sleep_duration)
+        return
+    
+    # Parallel deployment mode
+    # Create deployment tracker for accurate monitoring
+    deployment_tracker = {
+        'active': set(),
+        'completed': set(),
+        'failed': set(),
+        'lock': threading.Lock()
+    }
+    
+    # Phase 1: Deploy first node with collector
+    if deploy_slots:
+        print("🚀 Phase 1: Deploying first node with collector service...")
+        result = deploy_single_node(
+            deploy_slots[0], 0, data_market_namespace, data_market_contract_number,
+            protocol_state, full_namespace, base_dir, deployment_tracker=deployment_tracker, **kwargs
+        )
+        
+        if result[1] == "error":
+            print(f"❌ Failed to deploy first node: {result[2]}")
+            return
+        
+        print(f"✅ First node deployed successfully.")
+        
+        # Check if Docker pull lock is released before waiting for collector
+        docker_pull_lock = "/tmp/powerloom_docker_pull.lock"
+        if os.path.exists(docker_pull_lock):
+            print("\n⏳ Docker pull lock detected. Waiting for it to be released...")
+            wait_time = 0
+            max_wait = 60  # 1 minute max wait
+            while os.path.exists(docker_pull_lock) and wait_time < max_wait:
+                time.sleep(5)
+                wait_time += 5
+                print(f"   Still waiting... ({wait_time}s elapsed)")
+            
+            if os.path.exists(docker_pull_lock):
+                print("⚠️  Docker pull lock still exists after 60s. Proceeding anyway...")
+            else:
+                print("✅ Docker pull lock released.")
+        
+        print("\n⏳ Waiting 10 seconds for collector initialization...")
+        time.sleep(10)
+    
+    # For single slot deployment, we're done
+    if len(deploy_slots) == 1:
+        print("\n✅ Single node deployment completed!")
+        return
+    
+    # Phase 2: Parallel deployment of remaining nodes
+    if len(deploy_slots) > 1:
+        print(f"\n🚀 Phase 2: Deploying {len(deploy_slots) - 1} remaining nodes in parallel...")
+        
+        # Determine number of workers
+        cpu_cores = psutil.cpu_count(logical=True)
+        default_workers = min(max(4, cpu_cores // 2), 8)
+        max_workers = kwargs.get('parallel_workers')
+        
+        if max_workers is None:
+            max_workers = default_workers
+            print(f"📊 Using {max_workers} parallel workers (auto-detected based on {cpu_cores} CPU cores)")
+        else:
+            print(f"📊 Using {max_workers} parallel workers (user-specified, detected {cpu_cores} CPU cores)")
+        
+        # Deploy remaining nodes in batches with controlled concurrency
+        print(f"📋 Starting parallel deployment of {len(deploy_slots) - 1} nodes with {max_workers} workers...")
+        
+        # Create a semaphore to limit concurrent deployments
+        deployment_semaphore = Semaphore(max_workers)
+        
+        # Process nodes in batches
+        # Batch size is larger than max_workers to keep the pipeline full
+        # as some deployments finish faster than others
+        remaining_slots = deploy_slots[1:]
+        batch_size = max_workers * 3  # Process 3x workers per batch to keep pipeline full
+        completed = 0
+        total = len(remaining_slots)
+        
+        for batch_start in range(0, len(remaining_slots), batch_size):
+            batch_end = min(batch_start + batch_size, len(remaining_slots))
+            batch = remaining_slots[batch_start:batch_end]
+            batch_num = (batch_start // batch_size) + 1
+            total_batches = (len(remaining_slots) + batch_size - 1) // batch_size
+            
+            print(f"\n📦 Processing batch {batch_num}/{total_batches} ({len(batch)} nodes)...")
+            
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Create a mapping of future to slot_id for tracking
+                future_to_slot = {}
+                for idx_in_batch, (idx, slot_id) in enumerate(enumerate(batch, 1)):
+                    actual_idx = batch_start + idx
+                    future = executor.submit(
+                        deploy_single_node, slot_id, actual_idx + 1, data_market_namespace, 
+                        data_market_contract_number, protocol_state, full_namespace, base_dir, 
+                        semaphore=deployment_semaphore, deployment_tracker=deployment_tracker, **kwargs
+                    )
+                    future_to_slot[future] = slot_id
+                
+                # Monitor progress for this batch
+                for future in as_completed(future_to_slot, timeout=300):
+                    slot_id = future_to_slot[future]
+                    try:
+                        result = future.result()
+                        completed += 1
+                        if result[1] == "success":
+                            print(f"✅ [{completed}/{total}] {result[2]}")
+                        else:
+                            print(f"❌ [{completed}/{total}] {result[2]}")
+                    except Exception as e:
+                        completed += 1
+                        print(f"❌ [{completed}/{total}] Node {slot_id} deployment failed with exception: {e}")
+            
+            # Check system state between batches
+            if batch_end < len(remaining_slots):
+                print(f"\n🔍 Checking system state before next batch...")
+                
+                # Wait for Docker pulls to stabilize
+                wait_time = 0
+                max_wait = 30
+                while wait_time < max_wait:
+                    docker_pull_lock = "/tmp/powerloom_docker_pull.lock"
+                    if os.path.exists(docker_pull_lock):
+                        print(f"⏳ Docker pulls in progress, waiting... ({wait_time}s)")
+                        time.sleep(5)
+                        wait_time += 5
+                    else:
+                        break
+                
+                # Brief pause between batches
+                print("⏸️  Pausing 10 seconds before next batch...")
+                time.sleep(10)
+        
+        # Wait for all deployments to complete using our tracker
+        print("\n⏳ Waiting for all background deployments to complete...")
+        
+        check_interval = 5
+        elapsed = 0
+        max_wait_time = 600  # 10 minutes max
+        
+        while elapsed < max_wait_time:
+            with deployment_tracker['lock']:
+                active_count = len(deployment_tracker['active'])
+                completed_count = len(deployment_tracker['completed'])
+                failed_count = len(deployment_tracker['failed'])
+                total_tracked = completed_count + failed_count
+            
+            if active_count == 0 and total_tracked >= len(deploy_slots):
+                # All deployments have finished
+                print(f"✅ All deployments complete! ({completed_count} successful, {failed_count} failed)")
+                break
+            
+            # Show progress
+            print(f"🔄 {active_count} deployments still active... ({elapsed}s elapsed)")
+            print(f"   ✅ Completed: {completed_count}, ❌ Failed: {failed_count}")
+            
+            # Show which nodes are still deploying
+            if elapsed % 20 == 0 and elapsed > 0 and active_count > 0:
+                with deployment_tracker['lock']:
+                    active_nodes = sorted(list(deployment_tracker['active']))
+                print(f"   ℹ️  Active nodes: {', '.join(map(str, active_nodes[:10]))}{' ...' if len(active_nodes) > 10 else ''}")
+            
+            time.sleep(check_interval)
+            elapsed += check_interval
+        
+        if elapsed >= max_wait_time:
+            print("⚠️ Timeout waiting for deployments to complete.")
+            with deployment_tracker['lock']:
+                if deployment_tracker['active']:
+                    active_nodes = sorted(list(deployment_tracker['active']))
+                    print(f"   Still deploying: {', '.join(map(str, active_nodes[:10]))}{' ...' if len(active_nodes) > 10 else ''}")
+        
+        # Verify deployment status using docker ps with stabilization wait
+        print("\n🔍 Verifying deployment status (waiting for containers to stabilize)...")
+        try:
+            # Get all deployed slot IDs from the tracker
+            all_deployed = deployment_tracker['completed'].union(deployment_tracker['failed'])
+            
+            # Wait for containers to stabilize
+            previous_count = 0
+            stable_seconds = 0
+            check_interval = 3
+            
+            while stable_seconds < 10:  # Wait until no new containers for 10 seconds
+                # Check running containers
+                result = subprocess.run(
+                    f"docker ps --format '{{{{.Names}}}}' | grep -E 'snapshotter-lite-v2-[0-9]+-{full_namespace}'",
+                    shell=True, capture_output=True, text=True
+                )
+                running_containers = set()
+                if result.stdout:
+                    for line in result.stdout.strip().split('\n'):
+                        # Extract slot ID from container name
+                        match = re.search(r'snapshotter-lite-v2-(\d+)-', line)
+                        if match:
+                            running_containers.add(int(match.group(1)))
+                
+                current_count = len(running_containers)
+                
+                if current_count > previous_count:
+                    print(f"   📈 Container count increased: {previous_count} → {current_count}")
+                    previous_count = current_count
+                    stable_seconds = 0  # Reset stability counter
+                else:
+                    stable_seconds += check_interval
+                    if stable_seconds < 10:
+                        print(f"   ⏳ Container count stable at {current_count} ({stable_seconds}s)...")
+                
+                if stable_seconds < 10:
+                    time.sleep(check_interval)
+            
+            print(f"   ✅ Container count stabilized at {current_count}")
+            
+            # Now check screen sessions
+            result = subprocess.run(
+                f"screen -ls | grep powerloom",
+                shell=True, capture_output=True, text=True
+            )
+            screen_sessions = set()
+            if result.stdout:
+                for line in result.stdout.strip().split('\n'):
+                    # Extract slot ID from screen name like: 98180.powerloom-mainnet-v2-6568-UNISWAPV2
+                    match = re.search(r'powerloom-[^-]+-[^-]+-(\d+)-', line)
+                    if match:
+                        screen_sessions.add(int(match.group(1)))
+            
+            # Compare
+            containers_without_screens = running_containers - screen_sessions
+            screens_without_containers = screen_sessions - running_containers
+            successful_deployments = running_containers.intersection(screen_sessions)
+            
+            print(f"\n📊 Deployment Summary:")
+            print(f"   ✅ Successfully running: {len(successful_deployments)} containers")
+            if screens_without_containers:
+                print(f"   ⚠️  Screen sessions without containers: {len(screens_without_containers)}")
+                print(f"      Slots: {sorted(list(screens_without_containers))[:10]}{' ...' if len(screens_without_containers) > 10 else ''}")
+            if containers_without_screens:
+                print(f"   ⚠️  Containers without screen sessions: {len(containers_without_screens)}")
+                print(f"      Slots: {sorted(list(containers_without_screens))[:10]}{' ...' if len(containers_without_screens) > 10 else ''}")
+            
+            # Show all running containers
+            if successful_deployments:
+                print(f"\n📺 All running containers:")
+                sorted_slots = sorted(list(successful_deployments))
+                # Display in columns for better readability
+                for i in range(0, len(sorted_slots), 10):
+                    batch = sorted_slots[i:i+10]
+                    print(f"   {', '.join(str(slot) for slot in batch)}")
+                    
+        except Exception as e:
+            print(f"Error checking deployment status: {e}")
+            pass
+        
+        print("\n✅ Deployment process completed!")
 
 def docker_running():
     try:
@@ -197,7 +540,7 @@ def calculate_connection_refresh_interval(num_slots):
     MAX_INTERVAL = 900  # 15 minutes
     return min(interval, MAX_INTERVAL)
 
-def main(data_market_choice: str, non_interactive: bool = False, latest_only: bool = False, use_env_refresh_interval: bool = False):
+def main(data_market_choice: str, non_interactive: bool = False, latest_only: bool = False, use_env_refresh_interval: bool = False, parallel_workers: int = None, sequential: bool = False):
     # check if Docker is running
     if not docker_running():
         print('🟡 Docker is not running, please start Docker and try again!')
@@ -303,7 +646,7 @@ def main(data_market_choice: str, non_interactive: bool = False, latest_only: bo
         deploy_slots = slot_ids
         print('🟢 Non-interactive mode: Deploying all slots')
     else:
-        deploy_all_slots = input('☑️ Do you want to deploy all slots? (y/n)')
+        deploy_all_slots = input('☑️ Do you want to deploy all slots? (y/n) ')
         if deploy_all_slots.lower() == 'n':
             start_slot = input('🫸 ▶︎ Enter the start slot ID: ')
             end_slot = input('🫸 ▶︎ Enter the end slot ID: ')
@@ -317,6 +660,34 @@ def main(data_market_choice: str, non_interactive: bool = False, latest_only: bo
             deploy_slots = slot_ids
 
     print(f'🎰 Final list of slots to deploy: {deploy_slots}')
+    
+    # Display deployment configuration
+    print("\n📋 Deployment Configuration:")
+    cpu_cores = psutil.cpu_count(logical=True)
+    if parallel_workers is not None:
+        print(f"   • Parallel Workers: {parallel_workers} (user-specified)")
+    else:
+        default_workers = min(max(4, cpu_cores // 2), 8)
+        print(f"   • Parallel Workers: {default_workers} (auto-detected from {cpu_cores} CPU cores)")
+    
+    if sequential:
+        print("   • Mode: Sequential (parallel deployment disabled)")
+    else:
+        print("   • Mode: Parallel")
+    
+    print(f"   • Total Slots: {len(deploy_slots)}")
+    if not sequential and len(deploy_slots) > 1:
+        workers = parallel_workers if parallel_workers is not None else default_workers
+        # More realistic estimate:
+        # - 10s for first node
+        # - Batches of 3x workers processed with some parallelism
+        # - Account for delays and Docker operations
+        batch_size = workers * 3
+        num_batches = ((len(deploy_slots) - 1) + batch_size - 1) // batch_size
+        # Assume ~20-30s per batch due to semaphore limiting and Docker operations
+        estimated_time = 10 + (num_batches * 25) + (num_batches * 10)  # 10s pause between batches
+        print(f"   • Estimated Time: ~{estimated_time // 60}m {estimated_time % 60}s ({estimated_time} seconds)")
+    print()
     
     if not data_market_contract_number:
         if non_interactive:
@@ -348,7 +719,7 @@ def main(data_market_choice: str, non_interactive: bool = False, latest_only: bo
         print('🟡 Previously cloned snapshotter-lite-v2 repo already exists, deleting...')
         os.system('rm -rf snapshotter-lite-v2')
     print('⚙️ Cloning snapshotter-lite-v2 repo from main branch...')
-    os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --single-branch --branch {lite_node_branch}')
+    os.system(f'git clone https://github.com/PowerLoom/snapshotter-lite-v2 --depth 1 --single-branch --branch {lite_node_branch}')
     # recommended max stream pool size
     cpus = psutil.cpu_count(logical=True)
     if cpus >= 2 and cpus < 4:
@@ -379,20 +750,24 @@ def main(data_market_choice: str, non_interactive: bool = False, latest_only: bo
     # Calculate appropriate connection refresh interval based on number of slots
     suggested_refresh_interval = calculate_connection_refresh_interval(len(deploy_slots))
     connection_refresh_interval = os.getenv('CONNECTION_REFRESH_INTERVAL_SEC')
-    
-    if use_env_refresh_interval and connection_refresh_interval:
-        connection_refresh_interval = int(connection_refresh_interval)
-        print(f'🔧 Using CONNECTION_REFRESH_INTERVAL_SEC from environment: {connection_refresh_interval} seconds')
-        if connection_refresh_interval < suggested_refresh_interval:
-            print(f'⚠️ Warning: This value is lower than the suggested {suggested_refresh_interval}s for {len(deploy_slots)} slots')
-    elif not connection_refresh_interval:
-        connection_refresh_interval = suggested_refresh_interval
-        print(f'🟢 Using calculated CONNECTION_REFRESH_INTERVAL_SEC based on {len(deploy_slots)} slots: {connection_refresh_interval} seconds')
+    connection_refresh_interval = int(connection_refresh_interval) if connection_refresh_interval else 0
+    if use_env_refresh_interval:
+        if not connection_refresh_interval:
+            print('🟡 CONNECTION_REFRESH_INTERVAL_SEC is not set in .env file, using calculated value...')
+            connection_refresh_interval = suggested_refresh_interval
+        else:
+            if connection_refresh_interval != suggested_refresh_interval:
+                print(f'⚠️ Current CONNECTION_REFRESH_INTERVAL_SEC ({connection_refresh_interval}s) is different from the suggested value ({suggested_refresh_interval}s) for {len(deploy_slots)} slots\n'
+                       'BE WARNED: This may cause connection instability under high load!\n'
+                       '⚡ Moving ahead with overridden value from environment...')      
     else:
-        connection_refresh_interval = int(connection_refresh_interval)
-        if connection_refresh_interval < suggested_refresh_interval:
-            print(f'⚠️ Current CONNECTION_REFRESH_INTERVAL_SEC ({connection_refresh_interval}s) is lower than the suggested value ({suggested_refresh_interval}s) for {len(deploy_slots)} slots')
-            print('This may cause connection instability under high load!')
+        if connection_refresh_interval != suggested_refresh_interval:
+            if (connection_refresh_interval == 0):
+                print(f'✔️ Using suggested connection refresh interval value of {suggested_refresh_interval}s for {len(deploy_slots)} slots')
+            else:
+                print(f'⚠️ Current CONNECTION_REFRESH_INTERVAL_SEC ({connection_refresh_interval}s) in .env file is different from the suggested value ({suggested_refresh_interval}s) for {len(deploy_slots)} slots\n'
+                       '⛑️ Using suggested value for safety... If you know what you are doing, you can override this by passing --use-env-connection-refresh-interval to the script')
+            connection_refresh_interval = suggested_refresh_interval
     
     run_snapshotter_lite_v2(
         deploy_slots,
@@ -408,6 +783,8 @@ def main(data_market_choice: str, non_interactive: bool = False, latest_only: bo
         stream_pool_health_check_interval=os.getenv('STREAM_POOL_HEALTH_CHECK_INTERVAL', 120),
         local_collector_image_tag=local_collector_image_tag,
         connection_refresh_interval_sec=connection_refresh_interval,
+        parallel_workers=parallel_workers,
+        sequential=sequential,
     )
 
 
@@ -421,11 +798,23 @@ if __name__ == '__main__':
                     help='Deploy only the latest (highest) slot')
     parser.add_argument('--use-env-connection-refresh-interval', action='store_true',
                     help='Use CONNECTION_REFRESH_INTERVAL_SEC from environment instead of calculating based on slots')
+    parser.add_argument('--parallel-workers', type=int, metavar='N',
+                    help='Number of parallel workers for deployment (1-8, default: auto-detect based on CPU cores)')
+    parser.add_argument('--sequential', action='store_true',
+                    help='Disable parallel deployment and use sequential mode (backward compatibility)')
     
     args = parser.parse_args()
     
     data_market = args.data_market if args.data_market else '0'
+    
+    # Validate parallel workers if provided
+    if args.parallel_workers is not None:
+        if args.parallel_workers < 1 or args.parallel_workers > 8:
+            parser.error("--parallel-workers must be between 1 and 8")
+    
     main(data_market_choice=data_market, 
          non_interactive=args.yes, 
          latest_only=args.latest_only,
-         use_env_refresh_interval=args.use_env_connection_refresh_interval)
+         use_env_refresh_interval=args.use_env_connection_refresh_interval,
+         parallel_workers=args.parallel_workers,
+         sequential=args.sequential)

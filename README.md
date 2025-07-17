@@ -210,18 +210,72 @@ Available flags:
 - `-y, --yes`: Deploy all nodes without prompting for confirmation
 - `--latest-only`: Deploy only the latest (highest) slot
 - `--use-env-connection-refresh-interval`: Use CONNECTION_REFRESH_INTERVAL_SEC from environment instead of calculating based on slots
+- `--parallel-workers N`: Number of parallel workers for deployment (1-8, default: auto-detect based on CPU cores)
+- `--sequential`: Disable parallel deployment and use sequential mode (backward compatibility)
+
+#### Parallel Deployment
+
+By default, the script uses parallel deployment to significantly speed up the process:
+- Automatically detects CPU cores and uses an optimal number of workers (4-8)
+- Deploys the first node with collector service sequentially
+- Deploys remaining nodes in parallel batches
+- Provides real-time progress tracking
+
+Performance improvements:
+- 20 nodes: ~52 seconds (vs 220 seconds sequential)
+- 50 nodes: ~90 seconds (vs 520 seconds sequential) 
+- 100 nodes: ~152 seconds (vs 1020 seconds sequential)
+
+The script automatically calculates an optimal connection refresh interval based on the number of slots being deployed. This calculation ensures stability under load by adjusting the interval linearly.
+
+The `--use-env-connection-refresh-interval` flag modifies this behavior:
+
+- Without the flag (default):
+  - Always uses the calculated value
+  - If `CONNECTION_REFRESH_INTERVAL_SEC` exists in env but differs from calculated value, warns and uses calculated value
+
+- With the flag:
+  - If `CONNECTION_REFRESH_INTERVAL_SEC` exists in env: Uses that value (warns if different from calculated)
+  - If `CONNECTION_REFRESH_INTERVAL_SEC` not set: Falls back to calculated value
 
 Example usage:
 ```bash
-# Deploy all slots non-interactively for UNISWAPV2
+# Deploy all slots non-interactively for UNISWAPV2 (uses parallel by default)
 python multi_clone.py --data-market 2 -y
+
+# Deploy with specific number of parallel workers
+python multi_clone.py --parallel-workers 6 -y
+
+# Deploy using sequential mode (old behavior)
+python multi_clone.py --sequential -y
 
 # Deploy only the latest slot
 python multi_clone.py --latest-only
 
-# Use environment variable for connection refresh interval
+# Use environment variable set at shell prompt for connection refresh interval
 CONNECTION_REFRESH_INTERVAL_SEC=300 python multi_clone.py --use-env-connection-refresh-interval
+
+# Set the above in .env file and run the script
+python multi_clone.py --use-env-connection-refresh-interval
 ```
+
+> [!IMPORTANT]
+> **Local Collector Configuration Behavior**
+> 
+> When deploying multiple slots using this setup script, be aware of the following behavior:
+> 
+> 1. The first deployment determines the local collector's configuration:
+>    - The `MAX_STREAM_POOL_SIZE` is calculated based on the total number of slots selected for the first deployment
+>    - The `CONNECTION_REFRESH_INTERVAL_SEC` is set based on the number of slots in the first deployment
+> 
+> 2. Subsequent deployments using this script:
+>    - Will NOT reconfigure or respawn the existing local collector
+>    - Will NOT adjust the `MAX_STREAM_POOL_SIZE` or `CONNECTION_REFRESH_INTERVAL_SEC` values
+>    - Will use the configuration set during the first deployment
+> 
+> Therefore, it's recommended to:
+> - Plan your initial deployment carefully to include all slots you intend to run
+> - If you need to deploy additional slots later with different configurations, consider cleaning up the existing deployment first using the diagnostic script
 
 When you run the deploy script without any flags, it will ask you if you want to deploy all nodes? If you want to [Deploy a subset of slots](#221-deploy-a-subset-of-slots) then press `n` else you want to [Deploy all slots](#222-deploy-all-slots) press `y`.
 
@@ -365,14 +419,18 @@ If you want to cleanup the existing containers, follow along to the next section
 
 #### 3.1.1 Stop and remove all powerloom containers
 
-If the diagnostic script finds any running containers tagged with `snapshotter-lite`, it will ask you if you want to stop and remove them.
+If the diagnostic script finds any running containers tagged with `snapshotter-lite`, it will ask you if you want to stop and remove them. The script uses a multi-tiered approach to handle stubborn containers:
+
+1. Graceful stop with 10-second timeout
+2. Force kill if graceful stop fails
+3. Force remove with fallback strategies
 
 Select `y` at the following prompt and you see some logs like the following:
 
 ```
 Would you like to stop and remove existing PowerLoom containers? (y/n): y 
 
-Stopping running containers... (timeout: 30s per container)
+Stopping running containers... (timeout: 10s per container)
 Attempting to stop container snapshotter-lite-v2-xxx1-mainnet-UNISWAPV2-ETH...
 snapshotter-lite-v2-xxx1-mainnet-UNISWAPV2-ETH
 Attempting to stop container snapshotter-lite-local-collector-xxx1-mainnet-UNISWAPV2-ETH...
@@ -384,6 +442,9 @@ Removing container snapshotter-lite-local-collector-xxx1-mainnet-UNISWAPV2-ETH..
 
 Removing container snapshotter-lite-v2-xxx2-mainnet-UNISWAPV2-ETH...
 ```
+
+> [!NOTE]
+> The diagnostic script performs cleanup in the proper order: containers first, then screen sessions, networks, and finally deployment directories to avoid conflicts.
 
 #### 3.1.2 Remove all Docker subnets assigned to the snapshotter-lite containers
 
