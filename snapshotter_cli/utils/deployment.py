@@ -18,7 +18,7 @@ ENV_EXAMPLE_BASENAME = "env.example"
 CONFIG_ENV_FILENAME_TEMPLATE = ".env.{}.{}.{}"
 
 # Directory for storing env files in user's home directory
-CONFIG_DIR = Path.home() / ".snapshotter-cli" / "envs"
+CONFIG_DIR = Path.home() / ".powerloom-snapshotter-cli" / "envs"
 
 def parse_env_file_vars(file_path: str) -> Dict[str, str]:
     """Parses a .env file and returns a dictionary of key-value pairs."""

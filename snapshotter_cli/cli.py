@@ -221,7 +221,9 @@ def deploy(
                 f"     1. The --wallet CLI option",
                 f"     2. The `WALLET_HOLDER_ADDRESS` shell environment variable",
                 f"     3. A `WALLET_HOLDER_ADDRESS` entry in a `.env` file in your current directory",
-                f"     4. A namespaced .env file for this chain/market combination"
+                f"     4. A namespaced .env file for this chain/market combination",
+                f"",
+                f"💡 Run [bold cyan]configure[/bold cyan] to set up credentials."
             ]
             console.print("\n".join(error_message_lines), style="bold red")
             raise typer.Exit(1)
