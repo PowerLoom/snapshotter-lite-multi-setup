@@ -78,7 +78,7 @@ def load_default_config(ctx: typer.Context):
 
 app = typer.Typer(
     name="powerloom",
-    help="PowerLoom Snapshotter Node Management CLI",
+    help="Powerloom Snapshotter Node Management CLI",
     add_completion=False,
     callback=load_default_config,
     no_args_is_help=True
@@ -623,12 +623,12 @@ def status(
 @app.command(name="list")
 def list_chains_and_markets(ctx: typer.Context):
     """
-    Display available PowerLoom chains and their data markets
+    Display available Powerloom chains and their data markets
     """
     cli_context: CLIContext = ctx.obj
     chain_markets_map = cli_context.chain_markets_map
     
-    tree = Tree("🌐 [bold cyan]Available PowerLoom Chains[/]")
+    tree = Tree("🌐 [bold cyan]Available Powerloom Chains[/]")
     
     for chain_name, chain_data_val in sorted(chain_markets_map.items()): # sorted for consistent order
         chain_config_val = chain_data_val.chain_config

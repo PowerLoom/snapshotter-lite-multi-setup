@@ -7,7 +7,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}🚀 Setting up PowerLoom Snapshotter CLI development environment...${NC}\n"
+echo -e "${GREEN}🚀 Setting up Powerloom Snapshotter CLI development environment...${NC}\n"
 
 # Check if pyenv is installed
 if ! command -v pyenv &> /dev/null; then

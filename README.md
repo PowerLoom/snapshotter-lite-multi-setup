@@ -1,6 +1,6 @@
 # Multi node setup for multiple Powerloom Snapshotter Lite: Protocol V2 slot holders on Linux VPS
 
-## 🚀 New: PowerLoom Snapshotter CLI
+## 🚀 New: Powerloom Snapshotter CLI
 
 We now offer a powerful command-line interface (CLI) tool that simplifies node management:
 
@@ -41,7 +41,7 @@ powerloom-snapshotter> logs --follow
 ## Table of Contents
 
 - [Multi node setup for multiple Powerloom Snapshotter Lite: Protocol V2 slot holders on Linux VPS](#multi-node-setup-for-multiple-powerloom-snapshotter-lite-protocol-v2-slot-holders-on-linux-vps)
-  - [🚀 New: PowerLoom Snapshotter CLI](#-new-powerloom-snapshotter-cli)
+  - [🚀 New: Powerloom Snapshotter CLI](#-new-powerloom-snapshotter-cli)
   - [Table of Contents](#table-of-contents)
   - [1. Preparation](#1-preparation)
     - [1.1 Run Diagnostics to cleanup old instances](#11-run-diagnostics-to-cleanup-old-instances)
@@ -94,9 +94,9 @@ This will help you:
 * Ensure Docker and Docker Compose Availability
 * Check if default ports (e.g., `8002`, `50051`) are in use and suggests available alternatives.
 * Scan Docker network configurations, listing used subnets and suggesting available ones.
-* Check for PowerLoom deployment directories and removes them if necessary.
+* Check for Powerloom deployment directories and removes them if necessary.
 * Detect and terminate active screen sessions related to PowerLoom.
-* Stop and remove all PowerLoom containers to prevent conflicts.
+* Stop and remove all Powerloom containers to prevent conflicts.
 * Identify and remove unused or legacy Docker networks.
 
 ### 1.2 Choose Installation Method: Manual or Automated
@@ -428,7 +428,7 @@ The following output may vary depending on whether you have run snapshotter node
 
 ```
 ./diagnose.sh
-🔍 Starting PowerLoom Node Diagnostics...
+🔍 Starting Powerloom Node Diagnostics...
 
 📦 Checking Docker installation...
 ✅ Docker is installed and running
@@ -442,8 +442,8 @@ The following output may vary depending on whether you have run snapshotter node
 ⚠️ Port 50051 is in use
 ✅ Next available Collector port: 50052
 
-🔍 Checking existing PowerLoom containers...
-Found existing PowerLoom containers:
+🔍 Checking existing Powerloom containers...
+Found existing Powerloom containers:
 snapshotter-lite-v2-xxx1-mainnet-UNISWAPV2-ETH
 snapshotter-lite-local-collector-xxx1-mainnet-UNISWAPV2-ETH
 snapshotter-lite-v2-xxx2-mainnet-UNISWAPV2-ETH
@@ -467,7 +467,7 @@ If the diagnostic script finds any running containers tagged with `snapshotter-l
 Select `y` at the following prompt and you see some logs like the following:
 
 ```
-Would you like to stop and remove existing PowerLoom containers? (y/n): y 
+Would you like to stop and remove existing Powerloom containers? (y/n): y 
 
 Stopping running containers... (timeout: 10s per container)
 Attempting to stop container snapshotter-lite-v2-xxx1-mainnet-UNISWAPV2-ETH...
@@ -490,7 +490,7 @@ Removing container snapshotter-lite-v2-xxx2-mainnet-UNISWAPV2-ETH...
 Enter `y` at the following prompt and you see some logs like the following:
 
 ```
-Would you like to remove existing PowerLoom networks? (y/n): y
+Would you like to remove existing Powerloom networks? (y/n): y
 
 Removing networks...
 snapshotter-lite-v2-xxx1-mainnet-UNISWAPV2-ETH

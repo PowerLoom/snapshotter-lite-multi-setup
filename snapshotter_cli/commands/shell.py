@@ -38,7 +38,7 @@ def run_shell(app: typer.Typer, parent_ctx: typer.Context):
         readline.set_history_length(1000)
     
     console.print(Panel.fit(
-        "[bold green]PowerLoom Snapshotter CLI - Interactive Mode[/bold green]\n"
+        "[bold green]Powerloom Snapshotter CLI - Interactive Mode[/bold green]\n"
         "Type 'help' for available commands, 'exit' or 'quit' to leave.\n"
         "Use Ctrl+C to cancel current command.",
         border_style="green"

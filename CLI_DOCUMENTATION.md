@@ -1,4 +1,4 @@
-# PowerLoom Snapshotter CLI Documentation
+# Powerloom Snapshotter CLI Documentation
 
 ## Table of Contents
 - [Overview](#overview)
@@ -23,7 +23,7 @@
 
 ## Overview
 
-The PowerLoom Snapshotter CLI (`powerloom-snapshotter-cli`) is a command-line tool for managing PowerLoom snapshotter nodes. It simplifies the process of configuring, deploying, and managing multiple snapshotter instances across different chains and data markets.
+The Powerloom Snapshotter CLI (`powerloom-snapshotter-cli`) is a command-line tool for managing Powerloom snapshotter nodes. It simplifies the process of configuring, deploying, and managing multiple snapshotter instances across different chains and data markets.
 
 ### Command Aliases
 
@@ -162,7 +162,7 @@ powerloom shell
 
 You'll see:
 ```
-╭─── PowerLoom Snapshotter CLI - Interactive Mode ────╮
+╭─── Powerloom Snapshotter CLI - Interactive Mode ────╮
 │ Type 'help' for available commands, 'exit' or       │
 │ 'quit' to leave.                                    │
 │ Use Ctrl+C to cancel current command.               │
@@ -447,7 +447,7 @@ Each configuration file contains:
 - `SIGNER_ACCOUNT_ADDRESS`: Address used for signing snapshots
 - `SIGNER_ACCOUNT_PRIVATE_KEY`: Private key for signer account
 - `SOURCE_RPC_URL`: RPC endpoint for source blockchain
-- `POWERLOOM_RPC_URL`: PowerLoom protocol RPC endpoint
+- `POWERLOOM_RPC_URL`: Powerloom protocol RPC endpoint
 - `TELEGRAM_CHAT_ID`: (Optional) Telegram chat for notifications
 - `TELEGRAM_REPORTING_URL`: (Optional) Telegram webhook URL
 - `MAX_STREAM_POOL_SIZE`: Connection pool size
@@ -603,4 +603,4 @@ pyenv rehash
 
 ---
 
-For more information, visit the [PowerLoom documentation](https://docs.powerloom.io).
+For more information, visit the [Powerloom documentation](https://docs.powerloom.io).

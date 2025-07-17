@@ -11,7 +11,7 @@ run_clean() {
     env -i HOME="$HOME" PATH="/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin" bash -c "$*"
 }
 
-echo -e "${GREEN}🚀 Installing PowerLoom Snapshotter CLI...${NC}\n"
+echo -e "${GREEN}🚀 Installing Powerloom Snapshotter CLI...${NC}\n"
 
 # Install SSL dependencies based on OS
 if [[ "$OSTYPE" == "darwin"* ]]; then

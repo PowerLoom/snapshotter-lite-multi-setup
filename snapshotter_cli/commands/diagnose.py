@@ -59,7 +59,7 @@ def check_docker_compose() -> Tuple[bool, str]:
         return False, "Neither docker-compose nor Docker Compose plugin found"
 
 def get_powerloom_containers() -> List[Dict[str, str]]:
-    """Get list of PowerLoom containers with their IDs and names."""
+    """Get list of Powerloom containers with their IDs and names."""
     try:
         # Create a list of filters for different container name patterns
         filters = [
@@ -87,7 +87,7 @@ def get_powerloom_containers() -> List[Dict[str, str]]:
         return []
 
 def get_powerloom_networks() -> List[str]:
-    """Get list of PowerLoom networks."""
+    """Get list of Powerloom networks."""
     try:
         result = run_with_sudo(
             ['docker', 'network', 'ls', '--filter', 'name=snapshotter-lite-v2', '--format', '{{.Name}}'],
@@ -98,7 +98,7 @@ def get_powerloom_networks() -> List[str]:
         return []
 
 def get_powerloom_screen_sessions() -> List[Dict[str, str]]:
-    """Get list of PowerLoom screen sessions."""
+    """Get list of Powerloom screen sessions."""
     try:
         # Use screen -ls to list sessions and grep for powerloom patterns
         result = subprocess.run(['screen', '-ls'], capture_output=True, text=True)
@@ -126,7 +126,7 @@ def cleanup_resources(force: bool = False) -> None:
     networks = get_powerloom_networks()
     screen_sessions = get_powerloom_screen_sessions()
     
-    if screen_sessions and (force or typer.confirm("Would you like to terminate existing PowerLoom screen sessions?")):
+    if screen_sessions and (force or typer.confirm("Would you like to terminate existing Powerloom screen sessions?")):
         console.print("Terminating screen sessions...", style="yellow")
         for session in screen_sessions:
             try:
@@ -137,7 +137,7 @@ def cleanup_resources(force: bool = False) -> None:
                 continue
         console.print("Screen session cleanup completed", style="green")
 
-    if containers and (force or typer.confirm("Would you like to stop and remove existing PowerLoom containers?")):
+    if containers and (force or typer.confirm("Would you like to stop and remove existing Powerloom containers?")):
         console.print("Stopping and removing containers...", style="yellow")
         for container in containers:
             try:
@@ -151,7 +151,7 @@ def cleanup_resources(force: bool = False) -> None:
                 continue
         console.print("Container cleanup completed", style="green")
 
-    if networks and (force or typer.confirm("Would you like to remove PowerLoom networks?")):
+    if networks and (force or typer.confirm("Would you like to remove Powerloom networks?")):
         console.print("Removing networks...", style="yellow")
         for network in networks:
             try:
@@ -178,7 +178,7 @@ def run_diagnostics(clean: bool = False, force: bool = False) -> None:
 
     # Show existing resources
     if containers := get_powerloom_containers():
-        console.print("\nExisting PowerLoom containers:", style="yellow")
+        console.print("\nExisting Powerloom containers:", style="yellow")
         # Get full container details for display
         try:
             result = run_with_sudo(
@@ -195,12 +195,12 @@ def run_diagnostics(clean: bool = False, force: bool = False) -> None:
                 console.print(f"  • {container['name']} ({container['id']})")
 
     if networks := get_powerloom_networks():
-        console.print("\nExisting PowerLoom networks:", style="yellow")
+        console.print("\nExisting Powerloom networks:", style="yellow")
         for network in networks:
             console.print(f"  • {network}")
 
     if screen_sessions := get_powerloom_screen_sessions():
-        console.print("\nExisting PowerLoom screen sessions:", style="yellow")
+        console.print("\nExisting Powerloom screen sessions:", style="yellow")
         for session in screen_sessions:
             console.print(f"  • {session['name']}")
 
@@ -210,5 +210,5 @@ def run_diagnostics(clean: bool = False, force: bool = False) -> None:
 
 def diagnose_command(clean: bool = False, force: bool = False):
     """CLI command handler for diagnose."""
-    console.print("🔍 Running PowerLoom Snapshotter Node Diagnostics...", style="bold blue")
+    console.print("🔍 Running Powerloom Snapshotter Node Diagnostics...", style="bold blue")
     run_diagnostics(clean, force)

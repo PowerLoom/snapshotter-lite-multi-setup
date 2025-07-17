@@ -789,7 +789,7 @@ def main(data_market_choice: str, non_interactive: bool = False, latest_only: bo
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='PowerLoom mainnet multi-node setup')
+    parser = argparse.ArgumentParser(description='Powerloom mainnet multi-node setup')
     parser.add_argument('--data-market', choices=['1', '2'],
                     help='Data market choice (1: AAVEV3, 2: UNISWAPV2)')
     parser.add_argument('-y', '--yes', action='store_true',

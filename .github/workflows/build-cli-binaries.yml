@@ -198,7 +198,7 @@ jobs:
         files: |
           release/*
         body: |
-          ## PowerLoom Snapshotter CLI Binaries
+          ## Powerloom Snapshotter CLI Binaries
           
           ### Installation
           
