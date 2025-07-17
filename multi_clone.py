@@ -439,26 +439,48 @@ def run_snapshotter_lite_v2(deploy_slots: list, data_market_contract_number: int
                     active_nodes = sorted(list(deployment_tracker['active']))
                     print(f"   Still deploying: {', '.join(map(str, active_nodes[:10]))}{' ...' if len(active_nodes) > 10 else ''}")
         
-        # Verify deployment status using docker ps
-        print("\n🔍 Verifying deployment status...")
+        # Verify deployment status using docker ps with stabilization wait
+        print("\n🔍 Verifying deployment status (waiting for containers to stabilize)...")
         try:
             # Get all deployed slot IDs from the tracker
             all_deployed = deployment_tracker['completed'].union(deployment_tracker['failed'])
             
-            # Check running containers
-            result = subprocess.run(
-                f"docker ps --format '{{{{.Names}}}}' | grep -E 'snapshotter-lite-v2-[0-9]+-{full_namespace}'",
-                shell=True, capture_output=True, text=True
-            )
-            running_containers = set()
-            if result.stdout:
-                for line in result.stdout.strip().split('\n'):
-                    # Extract slot ID from container name
-                    match = re.search(r'snapshotter-lite-v2-(\d+)-', line)
-                    if match:
-                        running_containers.add(int(match.group(1)))
+            # Wait for containers to stabilize
+            previous_count = 0
+            stable_seconds = 0
+            check_interval = 3
             
-            # Check screen sessions
+            while stable_seconds < 10:  # Wait until no new containers for 10 seconds
+                # Check running containers
+                result = subprocess.run(
+                    f"docker ps --format '{{{{.Names}}}}' | grep -E 'snapshotter-lite-v2-[0-9]+-{full_namespace}'",
+                    shell=True, capture_output=True, text=True
+                )
+                running_containers = set()
+                if result.stdout:
+                    for line in result.stdout.strip().split('\n'):
+                        # Extract slot ID from container name
+                        match = re.search(r'snapshotter-lite-v2-(\d+)-', line)
+                        if match:
+                            running_containers.add(int(match.group(1)))
+                
+                current_count = len(running_containers)
+                
+                if current_count > previous_count:
+                    print(f"   📈 Container count increased: {previous_count} → {current_count}")
+                    previous_count = current_count
+                    stable_seconds = 0  # Reset stability counter
+                else:
+                    stable_seconds += check_interval
+                    if stable_seconds < 10:
+                        print(f"   ⏳ Container count stable at {current_count} ({stable_seconds}s)...")
+                
+                if stable_seconds < 10:
+                    time.sleep(check_interval)
+            
+            print(f"   ✅ Container count stabilized at {current_count}")
+            
+            # Now check screen sessions
             result = subprocess.run(
                 f"screen -ls | grep powerloom",
                 shell=True, capture_output=True, text=True
