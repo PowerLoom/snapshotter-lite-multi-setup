@@ -1,8 +1,47 @@
 # Multi node setup for multiple Powerloom Snapshotter Lite: Protocol V2 slot holders on Linux VPS
 
+## 🚀 New: PowerLoom Snapshotter CLI
+
+We now offer a powerful command-line interface (CLI) tool that simplifies node management:
+
+### Quick Start with CLI
+
+```bash
+# Download the latest binary for your platform
+# Linux x86_64
+wget https://github.com/PowerLoom/snapshotter-lite-multi-setup/releases/latest/download/powerloom-snapshotter-cli-linux-amd64
+chmod +x powerloom-snapshotter-cli-linux-amd64
+sudo mv powerloom-snapshotter-cli-linux-amd64 /usr/local/bin/powerloom
+
+# Start the interactive shell (RECOMMENDED - no startup delays!)
+powerloom shell
+
+# Now run commands instantly:
+powerloom-snapshotter> configure
+powerloom-snapshotter> deploy
+powerloom-snapshotter> list
+powerloom-snapshotter> logs --follow
+```
+
+💡 **Why use shell mode?** The CLI has a startup time for each command. Shell mode eliminates this delay, giving you instant command execution!
+
+### Key CLI Features
+
+- **🚀 Interactive Shell Mode**: Instant command execution without startup delays (RECOMMENDED!)
+- **Easy Configuration**: Set up credentials once for each chain/market combination
+- **Simple Deployment**: Deploy multiple nodes with a single command
+- **Instance Management**: Start, stop, restart, and cleanup nodes easily
+- **Cross-Platform**: Pre-built binaries for Linux (x86_64, ARM64) and macOS (ARM64)
+- **Command History**: Navigate previous commands with arrow keys in shell mode
+
+📖 **[Read the full CLI documentation](CLI_DOCUMENTATION.md)** for detailed usage instructions, examples, and troubleshooting.
+
+---
+
 ## Table of Contents
 
 - [Multi node setup for multiple Powerloom Snapshotter Lite: Protocol V2 slot holders on Linux VPS](#multi-node-setup-for-multiple-powerloom-snapshotter-lite-protocol-v2-slot-holders-on-linux-vps)
+  - [🚀 New: PowerLoom Snapshotter CLI](#-new-powerloom-snapshotter-cli)
   - [Table of Contents](#table-of-contents)
   - [1. Preparation](#1-preparation)
     - [1.1 Run Diagnostics to cleanup old instances](#11-run-diagnostics-to-cleanup-old-instances)
@@ -527,16 +566,16 @@ BOOM! Alice did it. **Four slots from three different wallet running on single V
 
 ### Building from Source
 
-There are two ways to install and use the snapshotter-cli:
+There are two ways to install and use the powerloom-snapshotter-cli:
 
 1. **Using the Package (Recommended for Users)**
 
 ```bash
 # Install using uv (recommended)
-uv tool install snapshotter-cli
+uv tool install powerloom-snapshotter-cli
 
 # Or install using pipx
-pipx install snapshotter-cli
+pipx install powerloom-snapshotter-cli
 ```
 
 2. **Building from Source (For Development)**
@@ -563,8 +602,8 @@ uv build --python $(which python)
 ```
 
 This will create:
-- A wheel file in `dist/snapshotter_cli-0.1.0-py3-none-any.whl`
-- A source distribution in `dist/snapshotter_cli-0.1.0.tar.gz`
+- A wheel file in `dist/powerloom_snapshotter_cli-0.1.0-py3-none-any.whl`
+- A source distribution in `dist/powerloom_snapshotter_cli-0.1.0.tar.gz`
 
 ### Testing the Build
 
@@ -574,8 +613,8 @@ python -m venv test_env
 source test_env/bin/activate  # On Windows: test_env\Scripts\activate
 
 # Install the built wheel
-uv pip install dist/snapshotter_cli-0.1.0-py3-none-any.whl
+uv pip install dist/powerloom_snapshotter_cli-0.1.0-py3-none-any.whl
 
 # Test the CLI
-snapshotter-cli --help
+powerloom-snapshotter-cli --help
 ```

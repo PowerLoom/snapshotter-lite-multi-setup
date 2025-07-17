@@ -54,7 +54,7 @@ def list_identities(ctx: typer.Context):
     env_files = list_env_files(cli_context)
     
     if not env_files:
-        console.print("No namespaced .env files found. Use 'snapshotter-cli configure' to create one.", style="yellow")
+        console.print("No namespaced .env files found. Use 'powerloom-snapshotter-cli configure' to create one.", style="yellow")
         return
 
     table = Table(title="Configured Identities", show_header=True, header_style="bold blue", title_style="bold cyan")
@@ -94,8 +94,8 @@ def list_identities(ctx: typer.Context):
         )
 
     console.print(table)
-    console.print("\nℹ️ Use 'snapshotter-cli identity show --chain <CHAIN> --market <MARKET> --source-chain <SOURCE_CHAIN>' to view detailed configuration.", style="blue")
-    console.print("ℹ️ Use 'snapshotter-cli configure' to create or update these configurations.", style="blue")
+    console.print("\nℹ️ Use 'powerloom-snapshotter-cli identity show --chain <CHAIN> --market <MARKET> --source-chain <SOURCE_CHAIN>' to view detailed configuration.", style="blue")
+    console.print("ℹ️ Use 'powerloom-snapshotter-cli configure' to create or update these configurations.", style="blue")
 
 @identity_app.command("show")
 def show_identity(
@@ -124,7 +124,7 @@ def show_identity(
     
     if not env_path.exists():
         console.print(f"No configuration found for {chain}/{market}/{source_chain}.", style="yellow")
-        console.print(f"Use 'snapshotter-cli configure' to create one.", style="blue")
+        console.print(f"Use 'powerloom-snapshotter-cli configure' to create one.", style="blue")
         return
 
     env_vars = parse_env_file_vars(str(env_path))

@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "snapshotter-cli"
+name = "powerloom-snapshotter-cli"
 version = "0.1.0"
 description = "PowerLoom Snapshotter Node Management CLI"
 authors = ["PowerLoom Protocol"]
@@ -31,4 +31,6 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-snapshotter-cli = "snapshotter_cli.cli:app"
+powerloom-snapshotter-cli = "snapshotter_cli.cli:app"
+powerloom = "snapshotter_cli.cli:app"
+snapshotter = "snapshotter_cli.cli:app"

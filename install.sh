@@ -96,19 +96,19 @@ if ! pyenv versions | grep -q "3.12"; then
 fi
 
 # Remove existing virtualenv if it exists
-if pyenv virtualenvs | grep -q "snapshotter-cli-global"; then
+if pyenv virtualenvs | grep -q "powerloom-snapshotter-cli-global"; then
     echo -e "${YELLOW}Removing existing virtualenv...${NC}"
-    pyenv uninstall -f snapshotter-cli-global
+    pyenv uninstall -f powerloom-snapshotter-cli-global
 fi
 
 # Create global virtualenv for the CLI
 echo -e "${YELLOW}Creating global virtualenv...${NC}"
-pyenv virtualenv 3.12 snapshotter-cli-global
+pyenv virtualenv 3.12 powerloom-snapshotter-cli-global
 
 # Activate the global virtualenv
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
-pyenv activate --quiet snapshotter-cli-global
+pyenv activate --quiet powerloom-snapshotter-cli-global
 
 # Verify we're using the correct Python version
 echo -e "${YELLOW}Verifying Python version...${NC}"
@@ -136,14 +136,14 @@ poetry build
 pip install dist/*.whl
 
 # Create wrapper script
-WRAPPER_PATH="/usr/local/bin/snapshotter-cli"
+WRAPPER_PATH="/usr/local/bin/powerloom-snapshotter-cli"
 echo -e "${YELLOW}Creating wrapper script at ${WRAPPER_PATH}...${NC}"
 
 sudo tee "$WRAPPER_PATH" > /dev/null << 'EOF'
 #!/bin/bash
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
-pyenv activate --quiet snapshotter-cli-global
+pyenv activate --quiet powerloom-snapshotter-cli-global
 python -m snapshotter_cli.cli "$@"
 EOF
 
@@ -151,5 +151,5 @@ sudo chmod +x "$WRAPPER_PATH"
 
 echo -e "\n${GREEN}✅ Installation complete!${NC}"
 echo -e "\nYou may need to restart your terminal or run: ${YELLOW}source ~/.$(basename $SHELL)rc${NC}"
-echo -e "Then you can use the CLI anywhere with: ${YELLOW}snapshotter-cli${NC}"
-echo -e "Try: ${YELLOW}snapshotter-cli --help${NC}" 
+echo -e "Then you can use the CLI anywhere with: ${YELLOW}powerloom-snapshotter-cli${NC}"
+echo -e "Try: ${YELLOW}powerloom-snapshotter-cli --help${NC}" 

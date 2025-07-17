@@ -66,4 +66,4 @@ echo -e "${YELLOW}Installing project dependencies...${NC}"
 poetry install
 
 echo -e "\n${GREEN}✅ Setup complete!${NC}"
-echo -e "\nYou can now use the CLI with: ${YELLOW}poetry run snapshotter-cli${NC}" 
+echo -e "\nYou can now use the CLI with: ${YELLOW}poetry run powerloom-snapshotter-cli${NC}" 
