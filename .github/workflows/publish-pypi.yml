@@ -8,7 +8,7 @@ on:
       - 'v*'  # Publish to PyPI on version tags
   pull_request:
     branches:
-      - main
+      - master
     types: [opened, synchronize]
   workflow_dispatch:
     inputs:
