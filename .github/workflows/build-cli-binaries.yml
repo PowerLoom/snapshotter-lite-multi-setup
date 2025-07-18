@@ -112,6 +112,7 @@ jobs:
 
         # Copy dependency files first for better caching
         COPY pyproject.toml uv.lock ./
+        COPY PYPI_README.md ./
 
         # Install dependencies (this layer will be cached)
         RUN uv sync --frozen
