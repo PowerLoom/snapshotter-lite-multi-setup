@@ -103,13 +103,15 @@ jobs:
     - name: Create Dockerfile for ARM64 build
       run: |
         cat > Dockerfile.arm64 << 'EOF'
-        FROM --platform=linux/arm64 python:3.12-slim
+        # Use multi-stage build for better caching
+        FROM --platform=linux/arm64 python:3.12-slim AS builder
 
         # Install build dependencies (this layer rarely changes)
         RUN apt-get update && apt-get install -y \
             build-essential \
             binutils \
             curl \
+            ccache \
             && rm -rf /var/lib/apt/lists/*
 
         # Install uv (version pinned for consistency)
@@ -134,19 +136,35 @@ jobs:
         # Pre-compile Python files for faster startup
         RUN python -m compileall -q /app/.venv
 
+        # Pre-analyze dependencies to cache PyInstaller's work
+        RUN --mount=type=cache,target=/app/build \
+            --mount=type=cache,target=/root/.cache/pyinstaller \
+            uv run pyinstaller --noconfirm --log-level=WARN \
+            --specpath /tmp --distpath /tmp/dist --workpath /tmp/build \
+            --onefile --name temp \
+            -c "print('temp')" || true
+
         # Copy source code (most frequently changing)
         COPY snapshotter_cli/ ./snapshotter_cli/
 
-        # Build binary with multiple cache mounts
+        # Build binary with multiple cache mounts and optimizations
         ENV PLATFORM=linux
         ENV ARCH=arm64
+        ENV PYTHONHASHSEED=0
+        ENV PYTHONDONTWRITEBYTECODE=1
+        ENV CCACHE_DIR=/ccache
+        ENV PATH="/usr/lib/ccache:$PATH"
+
         RUN --mount=type=cache,target=/app/build \
             --mount=type=cache,target=/root/.cache/pyinstaller \
             --mount=type=cache,target=/tmp \
+            --mount=type=cache,target=/root/.pyinstaller \
+            --mount=type=cache,target=/ccache \
             uv run pyinstaller pyinstaller.spec \
             --distpath /app/dist \
             --workpath /app/build \
-            --clean
+            --log-level=WARN \
+            --noconfirm
 
         # Create checksum
         RUN cd /app/dist && sha256sum powerloom-snapshotter-cli-linux-arm64 > powerloom-snapshotter-cli-linux-arm64.sha256
@@ -154,12 +172,15 @@ jobs:
 
     - name: Build ARM64 binary in Docker
       run: |
+        # Convert repository owner to lowercase for registry
+        REPO_OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+
         docker buildx build \
           --platform linux/arm64 \
           --cache-from type=gha,scope=buildkit-arm64 \
-          --cache-from type=registry,ref=ghcr.io/${{ github.repository_owner }}/snapshotter-cli-cache:arm64 \
+          --cache-from type=registry,ref=ghcr.io/${REPO_OWNER_LOWER}/snapshotter-cli-cache:arm64 \
           --cache-to type=gha,mode=max,scope=buildkit-arm64 \
-          --cache-to type=registry,ref=ghcr.io/${{ github.repository_owner }}/snapshotter-cli-cache:arm64,mode=max \
+          --cache-to type=registry,ref=ghcr.io/${REPO_OWNER_LOWER}/snapshotter-cli-cache:arm64,mode=max \
           -f Dockerfile.arm64 \
           -t powerloom-snapshotter-cli-arm64-builder \
           --load \
