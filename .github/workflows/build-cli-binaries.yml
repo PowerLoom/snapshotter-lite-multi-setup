@@ -5,11 +5,10 @@ on:
     tags:
       - 'v*'
     branches:
-      - feat/unified-cli
+      - develop
   pull_request:
     branches:
       - main
-      - develop
   workflow_dispatch:
 
 permissions:
