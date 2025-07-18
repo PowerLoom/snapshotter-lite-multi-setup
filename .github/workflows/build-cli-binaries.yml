@@ -36,25 +36,14 @@ jobs:
       with:
         python-version: '3.12'
 
-    - name: Install Poetry
-      uses: snok/install-poetry@v1
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
       with:
-        virtualenvs-create: true
-        virtualenvs-in-project: true
-
-    - name: Load cached venv
-      id: cached-poetry-dependencies
-      uses: actions/cache@v4
-      with:
-        path: .venv
-        key: venv-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('**/poetry.lock') }}
+        enable-cache: true
+        cache-dependency-path: uv.lock
 
     - name: Install dependencies
-      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-      run: poetry install --no-interaction --no-root
-
-    - name: Install PyInstaller
-      run: poetry add --group dev pyinstaller
+      run: uv sync --frozen
 
     - name: Build binary with PyInstaller
       run: |
@@ -63,7 +52,7 @@ jobs:
         export ARCH=${{ matrix.arch }}
 
         # Build using the spec file
-        poetry run pyinstaller pyinstaller.spec \
+        uv run pyinstaller pyinstaller.spec \
           --distpath dist \
           --workpath build \
           --clean
@@ -115,19 +104,18 @@ jobs:
             curl \
             && rm -rf /var/lib/apt/lists/*
 
-        # Install Poetry
-        RUN curl -sSL https://install.python-poetry.org | python3 -
+        # Install uv
+        RUN curl -LsSf https://astral.sh/uv/install.sh | sh
         ENV PATH="/root/.local/bin:$PATH"
 
         WORKDIR /app
 
         # Copy dependency files first for better caching
-        COPY pyproject.toml poetry.lock ./
+        COPY pyproject.toml uv.lock ./
 
         # Install dependencies (this layer will be cached)
-        RUN poetry config virtualenvs.create false && \
-            poetry install --no-interaction --no-ansi --no-root && \
-            pip install pyinstaller
+        RUN uv sync --frozen --no-install-project && \
+            uv pip install pyinstaller
 
         # Copy source code and spec file
         COPY snapshotter_cli/ ./snapshotter_cli/

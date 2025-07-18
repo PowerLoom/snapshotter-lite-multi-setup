@@ -24,9 +24,9 @@ if [[ "$MODE" == "check" ]]; then
     echo "Mode: CHECK (use './scripts/lint.sh fix' to auto-fix issues)"
     echo "============================================"
 
-    # Check black formatting
-    echo -e "\n📏 Checking code formatting with black..."
-    if poetry run black --check --diff snapshotter_cli/ tests/ *.py 2>/dev/null; then
+    # Check black formatting (Python files only)
+    echo -e "\n📏 Checking Python code formatting with black..."
+    if uv run black --check --diff snapshotter_cli/ tests/ *.py 2>/dev/null; then
         echo -e "${GREEN}✅ Black check passed${NC}"
     else
         echo -e "${RED}❌ Black check failed${NC}"
@@ -34,9 +34,9 @@ if [[ "$MODE" == "check" ]]; then
         exit 1
     fi
 
-    # Check isort
-    echo -e "\n📦 Checking import sorting with isort..."
-    if poetry run isort --check-only --diff snapshotter_cli/ tests/ *.py 2>/dev/null; then
+    # Check isort (Python files only)
+    echo -e "\n📦 Checking Python import sorting with isort..."
+    if uv run isort --check-only --diff snapshotter_cli/ tests/ *.py 2>/dev/null; then
         echo -e "${GREEN}✅ Isort check passed${NC}"
     else
         echo -e "${RED}❌ Isort check failed${NC}"
@@ -44,9 +44,9 @@ if [[ "$MODE" == "check" ]]; then
         exit 1
     fi
 
-    # Run pre-commit on all files
-    echo -e "\n🔧 Running all pre-commit hooks..."
-    if poetry run pre-commit run --all-files; then
+    # Run pre-commit on all files (includes non-Python checks)
+    echo -e "\n🔧 Running all pre-commit hooks (includes shell scripts, YAML, etc.)..."
+    if uv run pre-commit run --all-files; then
         echo -e "\n${GREEN}✅ All checks passed!${NC}"
     else
         echo -e "\n${RED}❌ Some checks failed${NC}"
@@ -60,17 +60,17 @@ else
 
     # Fix with isort
     echo -e "\n📦 Fixing import sorting with isort..."
-    poetry run isort snapshotter_cli/ tests/ *.py 2>/dev/null || true
+    uv run isort snapshotter_cli/ tests/ *.py 2>/dev/null || true
     echo -e "${GREEN}✅ Isort formatting applied${NC}"
 
     # Fix with black
     echo -e "\n📏 Fixing code formatting with black..."
-    poetry run black snapshotter_cli/ tests/ *.py 2>/dev/null || true
+    uv run black snapshotter_cli/ tests/ *.py 2>/dev/null || true
     echo -e "${GREEN}✅ Black formatting applied${NC}"
 
     # Check if all issues are fixed
     echo -e "\n🔍 Verifying all fixes..."
-    if poetry run pre-commit run --all-files; then
+    if uv run pre-commit run --all-files; then
         echo -e "\n${GREEN}✅ All formatting issues fixed!${NC}"
     else
         echo -e "\n${YELLOW}⚠️  Some issues may require manual attention${NC}"

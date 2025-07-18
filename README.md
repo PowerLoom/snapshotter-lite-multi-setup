@@ -581,24 +581,26 @@ pipx install powerloom-snapshotter-cli
 2. **Building from Source (For Development)**
 
 Prerequisites:
-- Python 3.12 or higher
-- pip package manager
+- uv (Python package manager)
 
 ```bash
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # Clone the repository
 git clone https://github.com/PowerLoom/snapshotter-lite-multi-setup.git
 cd snapshotter-lite-multi-setup
 
-# Create and activate a virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+# Set up development environment
+./setup-uv.sh
 
-# Install uv
-pip install uv
+# Or manually:
+# Pin Python version and install dependencies
+uv python pin 3.12
+uv sync
 
-# Install dependencies and build the package
-uv pip install -e .
-uv build --python $(which python)
+# Build the package
+uv build
 ```
 
 This will create:
@@ -608,15 +610,30 @@ This will create:
 ### Testing the Build
 
 ```bash
-# Create a test environment
-python -m venv test_env
-source test_env/bin/activate  # On Windows: test_env\Scripts\activate
+# Install the CLI globally with uv (use --force to update existing installation)
+uv tool install --force --from dist/powerloom_snapshotter_cli-0.1.0-py3-none-any.whl powerloom-snapshotter-cli
 
-# Install the built wheel
-uv pip install dist/powerloom_snapshotter_cli-0.1.0-py3-none-any.whl
+# Or for development, install in editable mode
+uv tool install --editable --from . powerloom-snapshotter-cli
 
 # Test the CLI
-powerloom-snapshotter-cli --help
+powerloom --help
+```
+
+### Development Workflow
+
+```bash
+# Run CLI during development
+uv run powerloom --help
+
+# Run tests
+uv run pytest
+
+# Format code
+./scripts/lint.sh fix
+
+# Check code quality
+./scripts/lint.sh
 ```
 
 ### Development Guidelines
