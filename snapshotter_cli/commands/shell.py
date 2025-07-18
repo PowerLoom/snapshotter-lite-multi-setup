@@ -32,16 +32,28 @@ def parse_command(command_line: str) -> tuple[str, List[str]]:
 def run_shell(app: typer.Typer, parent_ctx: typer.Context):
     """Run an interactive shell for the CLI."""
     # Setup readline history if available
+    history_file = None
     if HAS_READLINE:
         import os
         import tempfile
 
-        history_file = os.path.join(tempfile.gettempdir(), ".powerloom_shell_history")
         try:
+            history_file = os.path.join(
+                tempfile.gettempdir(), ".powerloom_shell_history"
+            )
             readline.read_history_file(history_file)
-        except FileNotFoundError:
-            pass  # History file doesn't exist yet
-        readline.set_history_length(1000)
+        except (FileNotFoundError, OSError, IOError):
+            # History file doesn't exist yet or can't be accessed
+            history_file = None
+        except Exception:
+            # Any other readline errors - disable history
+            history_file = None
+
+        try:
+            readline.set_history_length(1000)
+        except Exception:
+            # If setting history length fails, continue without it
+            pass
 
     # Import version
     from snapshotter_cli import __version__
@@ -148,7 +160,7 @@ def run_shell(app: typer.Typer, parent_ctx: typer.Context):
             break
 
     # Save history on exit
-    if HAS_READLINE:
+    if HAS_READLINE and history_file:
         try:
             readline.write_history_file(history_file)
         except:
