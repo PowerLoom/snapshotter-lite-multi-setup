@@ -1,15 +1,17 @@
 import os
 from pathlib import Path
 from typing import Dict, Optional
+
 from rich.console import Console
 
 console = Console()
+
 
 def get_credential(
     env_var_name: str,
     powerloom_chain_name: str,
     cli_option_value: Optional[str],
-    namespaced_env_content: Optional[Dict[str, str]] = None
+    namespaced_env_content: Optional[Dict[str, str]] = None,
 ) -> Optional[str]:
     """Get a credential value from various sources in order of priority:
     1. CLI option
@@ -32,6 +34,7 @@ def get_credential(
         if cwd_dot_env_path.exists():
             try:
                 from dotenv import dotenv_values
+
                 cwd_env_vars = dotenv_values(cwd_dot_env_path)
                 if env_var_name in cwd_env_vars:
                     return cwd_env_vars[env_var_name]
@@ -44,9 +47,9 @@ def get_credential(
 
     return None
 
+
 def get_source_chain_rpc_url(
-    source_chain_name: str,
-    namespaced_env_content: Optional[Dict[str, str]] = None
+    source_chain_name: str, namespaced_env_content: Optional[Dict[str, str]] = None
 ) -> Optional[str]:
     """Get source chain RPC URL from various sources in order of priority:
     1. SOURCE_RPC_{CHAIN} environment variable
@@ -67,6 +70,7 @@ def get_source_chain_rpc_url(
         if cwd_dot_env_path.exists():
             try:
                 from dotenv import dotenv_values
+
                 cwd_env_vars = dotenv_values(cwd_dot_env_path)
                 # Try chain-specific var first
                 if source_chain_specific_env_var in cwd_env_vars:
@@ -81,4 +85,4 @@ def get_source_chain_rpc_url(
     if namespaced_env_content and "SOURCE_RPC_URL" in namespaced_env_content:
         return namespaced_env_content["SOURCE_RPC_URL"]
 
-    return None 
+    return None

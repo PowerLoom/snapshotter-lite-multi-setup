@@ -58,3 +58,11 @@ build-backend = "poetry.core.masonry.api"
 powerloom-snapshotter-cli = "snapshotter_cli.cli:app"
 powerloom = "snapshotter_cli.cli:app"
 snapshotter = "snapshotter_cli.cli:app"
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+
+[tool.isort]
+profile = "black"
+line_length = 88
