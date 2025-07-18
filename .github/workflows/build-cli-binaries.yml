@@ -97,34 +97,38 @@ jobs:
         cat > Dockerfile.arm64 << 'EOF'
         FROM --platform=linux/arm64 python:3.12-slim
 
-        # Install build dependencies
+        # Install build dependencies (this layer rarely changes)
         RUN apt-get update && apt-get install -y \
             build-essential \
             binutils \
             curl \
             && rm -rf /var/lib/apt/lists/*
 
-        # Install uv
-        RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+        # Install uv (version pinned for consistency)
+        ENV UV_VERSION=0.4.10
+        RUN curl -LsSf https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-installer.sh | sh
         ENV PATH="/root/.local/bin:$PATH"
 
         WORKDIR /app
 
-        # Copy dependency files first for better caching
+        # Copy only dependency files first (most cacheable layer)
         COPY pyproject.toml uv.lock ./
         COPY PYPI_README.md ./
 
-        # Install dependencies (this layer will be cached)
-        RUN uv sync --frozen
+        # Install Python dependencies (cached when deps don't change)
+        RUN --mount=type=cache,target=/root/.cache/uv \
+            uv sync --frozen
 
-        # Copy source code and spec file
-        COPY snapshotter_cli/ ./snapshotter_cli/
+        # Copy source code (less frequently changing)
         COPY pyinstaller.spec ./
+        COPY snapshotter_cli/ ./snapshotter_cli/
 
-        # Build binary
+        # Build binary with cache mount for PyInstaller
         ENV PLATFORM=linux
         ENV ARCH=arm64
-        RUN uv run pyinstaller pyinstaller.spec \
+        RUN --mount=type=cache,target=/app/build \
+            --mount=type=cache,target=/root/.cache/pyinstaller \
+            uv run pyinstaller pyinstaller.spec \
             --distpath /app/dist \
             --workpath /app/build \
             --clean
@@ -137,8 +141,8 @@ jobs:
       run: |
         docker buildx build \
           --platform linux/arm64 \
-          --cache-from type=gha \
-          --cache-to type=gha,mode=max \
+          --cache-from type=gha,scope=buildkit-arm64 \
+          --cache-to type=gha,mode=max,scope=buildkit-arm64 \
           -f Dockerfile.arm64 \
           -t powerloom-snapshotter-cli-arm64-builder \
           --load \
