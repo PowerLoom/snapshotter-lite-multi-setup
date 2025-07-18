@@ -1,0 +1,21 @@
+#!/bin/bash
+# Pre-commit hook that checks formatting without auto-fixing
+
+# Colors
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+echo "🔍 Running pre-commit checks..."
+
+# Run pre-commit hooks
+if ! poetry run pre-commit run; then
+    echo -e "\n${RED}❌ Pre-commit checks failed!${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${YELLOW}To fix formatting issues, run:${NC}"
+    echo -e "${YELLOW}  ./scripts/lint.sh fix${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    exit 1
+fi
+
+echo "✅ All checks passed!"

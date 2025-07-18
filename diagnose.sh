@@ -98,7 +98,7 @@ if [ -n "$USED_SUBNETS" ]; then
     while read -r octet; do
         echo "172.18.${octet}.0/24"
     done <<< "$USED_SUBNETS"
-    
+
     # Find available subnets
     echo -e "\n${GREEN}First 5 available subnets:${NC}"
     current=0
@@ -175,7 +175,7 @@ if [ -n "$EXISTING_CONTAINERS" ]; then
                     docker kill "$container" 2>/dev/null || true
                 fi
             ' -- {}
-            
+
             # Give a moment for containers to die
             sleep 2
         fi
@@ -238,7 +238,7 @@ if [ -n "$EXISTING_NETWORKS" ]; then
     if [ "$remove_networks" = "y" ]; then
         echo -e "\n${YELLOW}Removing networks...${NC}"
         NETWORK_REMOVAL_FAILED=false
-        
+
         echo "$EXISTING_NETWORKS" | xargs -P64 -I {} bash -c '
             network="$1"
             if ! docker network rm "$network" 2>/dev/null; then
@@ -246,7 +246,7 @@ if [ -n "$EXISTING_NETWORKS" ]; then
                 exit 1
             fi
         ' -- {} || NETWORK_REMOVAL_FAILED=true
-        
+
         if [ "$NETWORK_REMOVAL_FAILED" = true ]; then
             echo -e "\n${YELLOW}⚠️  Warning: Some networks could not be removed due to active endpoints.${NC}"
             echo -e "${YELLOW}This usually means there are still some containers using these networks.${NC}"
@@ -284,15 +284,14 @@ else
 fi
 if [ "$deep_clean" = "y" ]; then
     echo -e "\n${YELLOW}Removing unused Docker resources...${NC}"
-    
+
     echo -e "\n${YELLOW}Running docker network prune...${NC}"
     docker network prune -f
-    
+
     echo -e "\n${YELLOW}Running docker system prune...${NC}"
     docker system prune -a
-    
+
     echo -e "${GREEN}✅ Cleanup complete${NC}"
 fi
 
 echo -e "\n${GREEN}✅ Diagnostic check complete${NC}"
-

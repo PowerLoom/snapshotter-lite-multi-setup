@@ -28,51 +28,51 @@ jobs:
             arch: arm64
 
     runs-on: ${{ matrix.os }}
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-        
+
     - name: Install Poetry
       uses: snok/install-poetry@v1
       with:
         virtualenvs-create: true
         virtualenvs-in-project: true
-        
+
     - name: Load cached venv
       id: cached-poetry-dependencies
       uses: actions/cache@v4
       with:
         path: .venv
         key: venv-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('**/poetry.lock') }}
-        
+
     - name: Install dependencies
       if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
       run: poetry install --no-interaction --no-root
-      
+
     - name: Install PyInstaller
       run: poetry add --group dev pyinstaller
-      
+
     - name: Build binary with PyInstaller
       run: |
         # Set environment variables for the spec file
         export PLATFORM=${{ matrix.platform }}
         export ARCH=${{ matrix.arch }}
-        
+
         # Build using the spec file
         poetry run pyinstaller pyinstaller.spec \
           --distpath dist \
           --workpath build \
           --clean
-        
+
     - name: Test binary
       run: |
         ./dist/powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }} --help
-        
+
     - name: Create checksums
       run: |
         cd dist
@@ -81,7 +81,7 @@ jobs:
         else
           sha256sum powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }} > powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }}.sha256
         fi
-        
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -92,48 +92,48 @@ jobs:
 
   build-cross-platform:
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
       with:
         platforms: arm64
-    
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
-    
+
     - name: Create Dockerfile for ARM64 build
       run: |
         cat > Dockerfile.arm64 << 'EOF'
         FROM --platform=linux/arm64 python:3.12-slim
-        
+
         # Install build dependencies
         RUN apt-get update && apt-get install -y \
             build-essential \
             binutils \
             curl \
             && rm -rf /var/lib/apt/lists/*
-        
+
         # Install Poetry
         RUN curl -sSL https://install.python-poetry.org | python3 -
         ENV PATH="/root/.local/bin:$PATH"
-        
+
         WORKDIR /app
-        
+
         # Copy dependency files first for better caching
         COPY pyproject.toml poetry.lock ./
-        
+
         # Install dependencies (this layer will be cached)
         RUN poetry config virtualenvs.create false && \
             poetry install --no-interaction --no-ansi --no-root && \
             pip install pyinstaller
-        
+
         # Copy source code and spec file
         COPY snapshotter_cli/ ./snapshotter_cli/
         COPY pyinstaller.spec ./
-        
+
         # Build binary
         ENV PLATFORM=linux
         ENV ARCH=arm64
@@ -141,11 +141,11 @@ jobs:
             --distpath /app/dist \
             --workpath /app/build \
             --clean
-        
+
         # Create checksum
         RUN cd /app/dist && sha256sum powerloom-snapshotter-cli-linux-arm64 > powerloom-snapshotter-cli-linux-arm64.sha256
         EOF
-    
+
     - name: Build ARM64 binary in Docker
       run: |
         docker buildx build \
@@ -159,7 +159,7 @@ jobs:
         docker create --name extract-arm64 powerloom-snapshotter-cli-arm64-builder
         docker cp extract-arm64:/app/dist ./dist-arm64
         docker rm extract-arm64
-    
+
     - name: Upload ARM64 artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -172,15 +172,15 @@ jobs:
     needs: [build-native, build-cross-platform]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Download all artifacts
       uses: actions/download-artifact@v4
       with:
         path: artifacts
-        
+
     - name: Prepare release files
       run: |
         mkdir -p release
@@ -189,7 +189,7 @@ jobs:
             cp $artifact/* release/
           fi
         done
-        
+
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
@@ -199,35 +199,35 @@ jobs:
           release/*
         body: |
           ## Powerloom Snapshotter CLI Binaries
-          
+
           ### Installation
-          
+
           #### Linux (x86_64)
           ```bash
           wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/powerloom-snapshotter-cli-linux-x86_64
           chmod +x powerloom-snapshotter-cli-linux-x86_64
           sudo mv powerloom-snapshotter-cli-linux-x86_64 /usr/local/bin/powerloom-snapshotter-cli
           ```
-          
+
           #### Linux (ARM64)
           ```bash
           wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/powerloom-snapshotter-cli-linux-arm64
           chmod +x powerloom-snapshotter-cli-linux-arm64
           sudo mv powerloom-snapshotter-cli-linux-arm64 /usr/local/bin/powerloom-snapshotter-cli
           ```
-          
+
           #### macOS (Apple Silicon)
           ```bash
           wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/powerloom-snapshotter-cli-macos-arm64
           chmod +x powerloom-snapshotter-cli-macos-arm64
           sudo mv powerloom-snapshotter-cli-macos-arm64 /usr/local/bin/powerloom-snapshotter-cli
           ```
-          
+
           ### Verify Installation
           ```bash
           powerloom-snapshotter-cli --version
           ```
-          
+
           ### Checksums
           Verify the integrity of downloaded files using the provided `.sha256` files:
           ```bash

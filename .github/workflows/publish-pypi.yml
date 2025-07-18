@@ -31,46 +31,46 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-        
+
     - name: Install Poetry
       uses: snok/install-poetry@v1
       with:
         virtualenvs-create: true
         virtualenvs-in-project: true
-        
+
     - name: Load cached venv
       id: cached-poetry-dependencies
       uses: actions/cache@v4
       with:
         path: .venv
         key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
-        
+
     - name: Install dependencies
       if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
       run: poetry install --no-interaction --no-root
-      
+
     - name: Install project
       run: poetry install --no-interaction
-      
+
     - name: Check code formatting
       run: |
         poetry run black --check snapshotter_cli/
         poetry run isort --check-only snapshotter_cli/
-      
+
     - name: Run type checking
       run: poetry run mypy snapshotter_cli/ || true  # Allow mypy to fail for now
-      
+
     - name: Run tests
       run: poetry run pytest tests/ -v || echo "No tests found, continuing..."
-      
+
     - name: Test CLI
       run: |
         poetry run powerloom-snapshotter-cli --version
@@ -82,21 +82,21 @@ jobs:
     name: Build Distribution Packages
     needs: test
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-        
+
     - name: Install Poetry
       uses: snok/install-poetry@v1
       with:
         virtualenvs-create: true
         virtualenvs-in-project: true
-        
+
     - name: Set version for TestPyPI
       if: github.ref == 'refs/heads/feat/unified-cli' && !startsWith(github.ref, 'refs/tags/')
       run: |
@@ -106,17 +106,17 @@ jobs:
         DEV_VERSION="${CURRENT_VERSION}.dev$(date +%Y%m%d%H%M%S)"
         echo "Setting version to $DEV_VERSION for TestPyPI"
         poetry version $DEV_VERSION
-        
+
     - name: Build package
       run: poetry build
-      
+
     - name: Check build artifacts
       run: |
         ls -la dist/
         # Verify wheel and sdist were created
         test -f dist/*.whl
         test -f dist/*.tar.gz
-        
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -136,24 +136,24 @@ jobs:
         github.ref == 'refs/heads/feat/unified-cli' ||
         (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_to_testpypi == 'true')
       )
-    
+
     environment:
       name: testpypi
       url: https://test.pypi.org/p/powerloom-snapshotter-cli
-      
+
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
-      
+
     steps:
     - name: Download artifacts
       uses: actions/download-artifact@v4
       with:
         name: python-package-distributions
         path: dist/
-        
+
     - name: List distribution files
       run: ls -la dist/
-      
+
     - name: Publish to TestPyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
@@ -169,24 +169,24 @@ jobs:
     if: |
       startsWith(github.ref, 'refs/tags/v') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_to_pypi == 'true' && startsWith(github.ref, 'refs/tags/'))
-    
+
     environment:
       name: pypi
       url: https://pypi.org/p/powerloom-snapshotter-cli
-      
+
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
-      
+
     steps:
     - name: Download artifacts
       uses: actions/download-artifact@v4
       with:
         name: python-package-distributions
         path: dist/
-        
+
     - name: List distribution files
       run: ls -la dist/
-      
+
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
@@ -198,52 +198,52 @@ jobs:
     needs: publish-to-pypi
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    
+
     permissions:
       contents: write
-      
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Download artifacts
       uses: actions/download-artifact@v4
       with:
         name: python-package-distributions
         path: dist/
-        
+
     - name: Create Release Notes
       run: |
         cat > release_notes.md << 'EOF'
         ## Powerloom Snapshotter CLI ${{ github.ref_name }}
-        
+
         ### Installation from PyPI
-        
+
         ```bash
         pip install powerloom-snapshotter-cli
         ```
-        
+
         ### Installation from this release
-        
+
         ```bash
         pip install https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/powerloom_snapshotter_cli-${VERSION}-py3-none-any.whl
         ```
-        
+
         ### What's Changed
-        
+
         See the [full changelog](https://github.com/${{ github.repository }}/compare/...v${VERSION})
-        
+
         ### Verification
-        
+
         After installation, verify with:
         ```bash
         powerloom-snapshotter-cli --version
         ```
         EOF
-        
+
         # Extract version from tag
         VERSION=${GITHUB_REF_NAME#v}
         sed -i "s/\${VERSION}/$VERSION/g" release_notes.md
-        
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:

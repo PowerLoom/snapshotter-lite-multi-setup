@@ -45,16 +45,16 @@ if ! command -v pyenv &> /dev/null; then
     else
         curl https://pyenv.run | bash
     fi
-    
+
     # Add pyenv to path for current session
     export PYENV_ROOT="$HOME/.pyenv"
     export PATH="$PYENV_ROOT/bin:$PATH"
-    
+
     # Initialize pyenv for current session
     eval "$(pyenv init --path)"
     eval "$(pyenv init -)"
     eval "$(pyenv virtualenv-init -)"
-    
+
     # Add to shell config without sourcing
     if [[ "$SHELL" == */zsh ]]; then
         echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc
@@ -81,13 +81,13 @@ if ! pyenv versions | grep -q "3.12"; then
     if [[ "$OSTYPE" == "darwin"* ]]; then
         # Get OpenSSL path
         OPENSSL_PATH=$(brew --prefix openssl@3)
-        
+
         # Set build flags for SSL support
         export CFLAGS="-I${OPENSSL_PATH}/include -O2"
         export LDFLAGS="-L${OPENSSL_PATH}/lib"
         export PKG_CONFIG_PATH="${OPENSSL_PATH}/lib/pkgconfig"
         export PYTHON_CONFIGURE_OPTS="--enable-optimizations --with-openssl=${OPENSSL_PATH}"
-        
+
         pyenv install 3.12
     else
         export PYTHON_CONFIGURE_OPTS="--enable-optimizations --with-openssl=$(which openssl)"
@@ -152,4 +152,4 @@ sudo chmod +x "$WRAPPER_PATH"
 echo -e "\n${GREEN}✅ Installation complete!${NC}"
 echo -e "\nYou may need to restart your terminal or run: ${YELLOW}source ~/.$(basename $SHELL)rc${NC}"
 echo -e "Then you can use the CLI anywhere with: ${YELLOW}powerloom-snapshotter-cli${NC}"
-echo -e "Try: ${YELLOW}powerloom-snapshotter-cli --help${NC}" 
+echo -e "Try: ${YELLOW}powerloom-snapshotter-cli --help${NC}"

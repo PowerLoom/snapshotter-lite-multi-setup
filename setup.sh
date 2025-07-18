@@ -25,7 +25,7 @@ if ! command -v pyenv &> /dev/null; then
     echo 'command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc
     echo 'eval "$(pyenv init -)"' >> ~/.zshrc
     echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.zshrc
-    
+
     # Source the updated profile
     source ~/.zshrc
 fi
@@ -66,4 +66,4 @@ echo -e "${YELLOW}Installing project dependencies...${NC}"
 poetry install
 
 echo -e "\n${GREEN}✅ Setup complete!${NC}"
-echo -e "\nYou can now use the CLI with: ${YELLOW}poetry run powerloom-snapshotter-cli${NC}" 
+echo -e "\nYou can now use the CLI with: ${YELLOW}poetry run powerloom-snapshotter-cli${NC}"

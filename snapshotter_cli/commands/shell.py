@@ -45,7 +45,7 @@ def run_shell(app: typer.Typer, parent_ctx: typer.Context):
 
     # Import version
     from snapshotter_cli import __version__
-    
+
     console.print(
         Panel.fit(
             f"[bold green]Powerloom Snapshotter CLI v{__version__} - Interactive Mode[/bold green]\n"

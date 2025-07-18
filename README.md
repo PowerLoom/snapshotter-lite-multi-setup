@@ -130,12 +130,12 @@ This will:
 Run below commands to install all node dependences manually.
 
 > **Setting Up the Environment**
- 
+
 Install docker and docker compose, Detailed instructions can be found at [Step 3: Setting Up the Environment](https://docs.powerloom.io/docs/build-with-powerloom/snapshotter-node/lite-node-v2/getting-started)
 
 
 > **Install `pyenv`**
- 
+
 Detailed instructions and troubleshotting can be found on the [pyenv Github repo README](https://github.com/pyenv/pyenv?tab=readme-ov-file#installation). In general, the following should take care of the installation on an Ubuntu VPS.
 
 ```
@@ -187,15 +187,15 @@ If you are Initializing .env file for first time it will output like the followi
 ```
 🟡 .env file not found, please follow the instructions below to create one!
 creating .env file...
-🫸 ▶︎ Please enter the WALLET_HOLDER_ADDRESS: 
+🫸 ▶︎ Please enter the WALLET_HOLDER_ADDRESS:
 
-🫸 ▶︎ Please enter the SOURCE_RPC_URL: 
+🫸 ▶︎ Please enter the SOURCE_RPC_URL:
 
-🫸 ▶︎ Please enter the SIGNER_ACCOUNT_ADDRESS: 
+🫸 ▶︎ Please enter the SIGNER_ACCOUNT_ADDRESS:
 
-🫸 ▶︎ Please enter the SIGNER_ACCOUNT_PRIVATE_KEY: 
+🫸 ▶︎ Please enter the SIGNER_ACCOUNT_PRIVATE_KEY:
 
-🫸 ▶︎ Please enter the TELEGRAM_CHAT_ID (press enter to skip): 
+🫸 ▶︎ Please enter the TELEGRAM_CHAT_ID (press enter to skip):
 
 🟢 .env file created successfully!
 ```
@@ -208,15 +208,15 @@ Do you wish to backup and modify the .env file? (y/n)
 y
 🟢 .env file backed up to .env.backup.20250210221149
 creating .env file...
-🫸 ▶︎ Please enter the WALLET_HOLDER_ADDRESS (press enter to keep current value: <wallet-holder-address>): 
+🫸 ▶︎ Please enter the WALLET_HOLDER_ADDRESS (press enter to keep current value: <wallet-holder-address>):
 
-🫸 ▶︎ Please enter the SOURCE_RPC_URL (press enter to keep current value: <source-rpc-url>): 
+🫸 ▶︎ Please enter the SOURCE_RPC_URL (press enter to keep current value: <source-rpc-url>):
 
-🫸 ▶︎ Please enter the SIGNER_ACCOUNT_ADDRESS (press enter to keep current value: <signer-account-address>): 
+🫸 ▶︎ Please enter the SIGNER_ACCOUNT_ADDRESS (press enter to keep current value: <signer-account-address>):
 
-🫸 ▶︎ Please enter the SIGNER_ACCOUNT_PRIVATE_KEY (press enter to keep current value: [hidden]): 
+🫸 ▶︎ Please enter the SIGNER_ACCOUNT_PRIVATE_KEY (press enter to keep current value: [hidden]):
 
-🫸 ▶︎ Please enter the TELEGRAM_CHAT_ID (press enter to skip) (press enter to keep current value: <telegram-chat-id>): 
+🫸 ▶︎ Please enter the TELEGRAM_CHAT_ID (press enter to skip) (press enter to keep current value: <telegram-chat-id>):
 
 🟢 .env file created successfully!
 ```
@@ -262,7 +262,7 @@ By default, the script uses parallel deployment to significantly speed up the pr
 
 Performance improvements:
 - 20 nodes: ~52 seconds (vs 220 seconds sequential)
-- 50 nodes: ~90 seconds (vs 520 seconds sequential) 
+- 50 nodes: ~90 seconds (vs 520 seconds sequential)
 - 100 nodes: ~152 seconds (vs 1020 seconds sequential)
 
 The script automatically calculates an optimal connection refresh interval based on the number of slots being deployed. This calculation ensures stability under load by adjusting the interval linearly.
@@ -300,18 +300,18 @@ python multi_clone.py --use-env-connection-refresh-interval
 
 > [!IMPORTANT]
 > **Local Collector Configuration Behavior**
-> 
+>
 > When deploying multiple slots using this setup script, be aware of the following behavior:
-> 
+>
 > 1. The first deployment determines the local collector's configuration:
 >    - The `MAX_STREAM_POOL_SIZE` is calculated based on the total number of slots selected for the first deployment
 >    - The `CONNECTION_REFRESH_INTERVAL_SEC` is set based on the number of slots in the first deployment
-> 
+>
 > 2. Subsequent deployments using this script:
 >    - Will NOT reconfigure or respawn the existing local collector
 >    - Will NOT adjust the `MAX_STREAM_POOL_SIZE` or `CONNECTION_REFRESH_INTERVAL_SEC` values
 >    - Will use the configuration set during the first deployment
-> 
+>
 > Therefore, it's recommended to:
 > - Plan your initial deployment carefully to include all slots you intend to run
 > - If you need to deploy additional slots later with different configurations, consider cleaning up the existing deployment first using the diagnostic script
@@ -334,7 +334,7 @@ TELEGRAM_CHAT_ID=<your telegram chat id>
 Found n slots for wallet holder address
 [xxx1, xxx2, xxx3,xxx4]
 ☑️ Do you want to deploy all slots? (y/n)n
-🫸 ▶︎ Enter the start slot ID: xxx1 
+🫸 ▶︎ Enter the start slot ID: xxx1
 🫸 ▶︎ Enter the end slot ID: xxx3 #This will deploy slot xxx1,xxx2,xxx3
 ```
 
@@ -467,7 +467,7 @@ If the diagnostic script finds any running containers tagged with `snapshotter-l
 Select `y` at the following prompt and you see some logs like the following:
 
 ```
-Would you like to stop and remove existing Powerloom containers? (y/n): y 
+Would you like to stop and remove existing Powerloom containers? (y/n): y
 
 Stopping running containers... (timeout: 10s per container)
 Attempting to stop container snapshotter-lite-v2-xxx1-mainnet-UNISWAPV2-ETH...
@@ -506,7 +506,7 @@ snapshotter-lite-v2-xxx2-mainnet-UNISWAPV2-ETH
 Enter `y` at the following prompt and you see some logs like the following. Press `y` again at the end to confirm with Docker.
 
 ```
-Would you like to remove unused Docker resources (only unused images, networks, and cache)? (y/n): y 
+Would you like to remove unused Docker resources (only unused images, networks, and cache)? (y/n): y
 
 Removing unused Docker resources...
 
@@ -618,3 +618,7 @@ uv pip install dist/powerloom_snapshotter_cli-0.1.0-py3-none-any.whl
 # Test the CLI
 powerloom-snapshotter-cli --help
 ```
+
+### Development Guidelines
+
+For code quality and pre-commit setup, please see [README_PRECOMMIT.md](README_PRECOMMIT.md)
