@@ -114,8 +114,7 @@ jobs:
         COPY pyproject.toml uv.lock ./
 
         # Install dependencies (this layer will be cached)
-        RUN uv sync --frozen --no-install-project && \
-            uv pip install pyinstaller
+        RUN uv sync --frozen
 
         # Copy source code and spec file
         COPY snapshotter_cli/ ./snapshotter_cli/
@@ -124,7 +123,7 @@ jobs:
         # Build binary
         ENV PLATFORM=linux
         ENV ARCH=arm64
-        RUN pyinstaller pyinstaller.spec \
+        RUN uv run pyinstaller pyinstaller.spec \
             --distpath /app/dist \
             --workpath /app/build \
             --clean
