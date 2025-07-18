@@ -1,9 +1,9 @@
 [tool.poetry]
 name = "powerloom-snapshotter-cli"
 version = "0.1.0"
-description = "Powerloom Snapshotter Node Management CLI"
+description = "CLI tool for deploying and managing PowerLoom Snapshotter nodes"
 authors = ["Powerloom Protocol <hello@powerloom.io>"]
-readme = "README.md"
+readme = "PYPI_README.md"
 license = "MIT"
 homepage = "https://powerloom.io"
 repository = "https://github.com/powerloom/snapshotter-lite-multi-setup"
