@@ -3,11 +3,15 @@
 import os
 import sys
 from pathlib import Path
+from PyInstaller.utils.hooks import collect_all
 
 block_cipher = None
 
 # Get the current directory
 current_dir = Path(os.getcwd())
+
+# Collect all data for py_ecc
+py_ecc_datas, py_ecc_binaries, py_ecc_hiddenimports = collect_all('py_ecc')
 
 # Determine platform-specific binary name
 platform = os.environ.get('PLATFORM', 'unknown')
@@ -17,11 +21,11 @@ binary_name = f'powerloom-snapshotter-cli-{platform}-{arch}'
 a = Analysis(
     ['snapshotter_cli/__main__.py'],
     pathex=['.'],
-    binaries=[],
+    binaries=py_ecc_binaries,
     datas=[
         (str(current_dir / 'snapshotter_cli/utils/abi/PowerloomNodes.json'), 'snapshotter_cli/utils/abi'),
         (str(current_dir / 'snapshotter_cli/utils/abi/ProtocolState.json'), 'snapshotter_cli/utils/abi'),
-    ],
+    ] + py_ecc_datas,
     hiddenimports=[
         'snapshotter_cli',
         'snapshotter_cli.cli',
@@ -44,7 +48,7 @@ a = Analysis(
         'cytoolz',
         'eth_typing',
         'eth_abi',
-    ],
+    ] + py_ecc_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
