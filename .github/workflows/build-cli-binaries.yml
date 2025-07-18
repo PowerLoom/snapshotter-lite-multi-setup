@@ -91,6 +91,14 @@ jobs:
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
+      with:
+        driver-opts: |
+          image=moby/buildkit:master
+          network=host
+        buildkitd-flags: --debug
+        config-inline: |
+          [worker.oci]
+            max-parallelism = 4
 
     - name: Create Dockerfile for ARM64 build
       run: |
@@ -117,17 +125,24 @@ jobs:
 
         # Install Python dependencies (cached when deps don't change)
         RUN --mount=type=cache,target=/root/.cache/uv \
+            --mount=type=cache,target=/root/.local/share/uv \
             uv sync --frozen
 
-        # Copy source code (less frequently changing)
+        # Copy pyinstaller spec first (rarely changes)
         COPY pyinstaller.spec ./
+
+        # Pre-compile Python files for faster startup
+        RUN python -m compileall -q /app/.venv
+
+        # Copy source code (most frequently changing)
         COPY snapshotter_cli/ ./snapshotter_cli/
 
-        # Build binary with cache mount for PyInstaller
+        # Build binary with multiple cache mounts
         ENV PLATFORM=linux
         ENV ARCH=arm64
         RUN --mount=type=cache,target=/app/build \
             --mount=type=cache,target=/root/.cache/pyinstaller \
+            --mount=type=cache,target=/tmp \
             uv run pyinstaller pyinstaller.spec \
             --distpath /app/dist \
             --workpath /app/build \
@@ -142,7 +157,9 @@ jobs:
         docker buildx build \
           --platform linux/arm64 \
           --cache-from type=gha,scope=buildkit-arm64 \
+          --cache-from type=registry,ref=ghcr.io/${{ github.repository_owner }}/snapshotter-cli-cache:arm64 \
           --cache-to type=gha,mode=max,scope=buildkit-arm64 \
+          --cache-to type=registry,ref=ghcr.io/${{ github.repository_owner }}/snapshotter-cli-cache:arm64,mode=max \
           -f Dockerfile.arm64 \
           -t powerloom-snapshotter-cli-arm64-builder \
           --load \
