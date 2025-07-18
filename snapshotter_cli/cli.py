@@ -7,6 +7,7 @@ import requests
 import typer
 from rich.console import Console
 from rich.panel import Panel
+from rich.prompt import Prompt
 from rich.table import Table
 from rich.tree import Tree
 
@@ -37,6 +38,49 @@ from .utils.system_checks import is_docker_running, list_snapshotter_screen_sess
 console = Console()
 
 MARKETS_CONFIG_URL = "https://raw.githubusercontent.com/PowerLoom/curated-datamarkets/refs/heads/feat/mainnet-devnet-add/sources.json"
+
+
+def parse_selection_string(selection: str, max_value: int) -> List[int]:
+    """Parse a selection string like '1,3-5,7' into a list of indices.
+
+    Args:
+        selection: String containing comma-separated numbers and ranges
+        max_value: Maximum valid index (1-based)
+
+    Returns:
+        List of 0-based indices
+    """
+    indices = set()
+    parts = selection.replace(" ", "").split(",")
+
+    for part in parts:
+        if not part:
+            continue
+
+        if "-" in part:
+            # Handle range like "1-3"
+            try:
+                start, end = part.split("-", 1)
+                start_idx = int(start) - 1
+                end_idx = int(end) - 1
+                if 0 <= start_idx <= end_idx < max_value:
+                    indices.update(range(start_idx, end_idx + 1))
+                else:
+                    raise ValueError(f"Invalid range: {part}")
+            except (ValueError, IndexError):
+                raise ValueError(f"Invalid range format: {part}")
+        else:
+            # Handle single number
+            try:
+                idx = int(part) - 1
+                if 0 <= idx < max_value:
+                    indices.add(idx)
+                else:
+                    raise ValueError(f"Invalid number: {part}")
+            except ValueError:
+                raise ValueError(f"Invalid number format: {part}")
+
+    return sorted(list(indices))
 
 
 def fetch_markets_config() -> List[PowerloomChainConfig]:
@@ -460,10 +504,23 @@ def deploy(
                 )
                 raise typer.Exit(0)
 
-            market_display_list = "\n".join(
-                f"[bold green]{i+1}.[/] [cyan]{name}[/] ([dim]Source: {env_config.markets[name].sourceChain}[/])"
-                for i, name in enumerate(available_market_names_on_chain)
+            # Build market display with additional options
+            market_lines = []
+            for i, name in enumerate(available_market_names_on_chain):
+                market_lines.append(
+                    f"[bold green]{i+1}.[/] [cyan]{name}[/] ([dim]Source: {env_config.markets[name].sourceChain}[/])"
+                )
+
+            # Add special options
+            market_lines.append(
+                "\n[bold yellow]0.[/] [yellow]Custom input (type market names manually)[/]"
             )
+            if len(available_market_names_on_chain) > 1:
+                market_lines.append(
+                    f"[bold yellow]A.[/] [yellow]Select all markets ({len(available_market_names_on_chain)} markets)[/]"
+                )
+
+            market_display_list = "\n".join(market_lines)
             market_panel = Panel(
                 market_display_list,
                 title=f"[bold blue]Select Data Markets on {selected_powerloom_chain_name_upper}[/]",
@@ -472,23 +529,66 @@ def deploy(
             )
             console.print(market_panel)
 
-            market_names_for_prompt = (
-                available_market_names_on_chain
-                if available_market_names_on_chain
-                else []
-            )
-            default_market_prompt = ",".join(market_names_for_prompt)
-            if len(available_market_names_on_chain) == 1:
-                default_market_prompt = available_market_names_on_chain[0]
+            # Interactive selection
+            while True:
+                if len(available_market_names_on_chain) == 1:
+                    selection = Prompt.ask(
+                        "👉 Select market", default="1", choices=["0", "1"]
+                    )
+                else:
+                    selection = Prompt.ask(
+                        "👉 Select markets (e.g., '1,3' or '1-3' or 'A' for all)",
+                        default=(
+                            "A" if len(available_market_names_on_chain) <= 3 else "1"
+                        ),
+                    )
 
-            markets_input_str = typer.prompt(
-                f"👉🏼 Select data markets (comma-separated, e.g., {default_market_prompt})",
-                type=str,
-                default=default_market_prompt,
-            )
-            final_selected_markets_str_list = [
-                m.strip() for m in markets_input_str.split(",") if m.strip()
-            ]
+                selection = selection.strip().upper()
+
+                # Handle special cases
+                if selection == "0":
+                    # Custom input - use original behavior
+                    default_market_prompt = ",".join(available_market_names_on_chain)
+                    markets_input_str = Prompt.ask(
+                        f"👉 Enter market names (comma-separated)",
+                        default=default_market_prompt,
+                    )
+                    final_selected_markets_str_list = [
+                        m.strip() for m in markets_input_str.split(",") if m.strip()
+                    ]
+                    break
+                elif selection == "A" and len(available_market_names_on_chain) > 1:
+                    # Select all
+                    final_selected_markets_str_list = available_market_names_on_chain
+                    console.print(
+                        f"✅ Selected all {len(available_market_names_on_chain)} markets",
+                        style="green",
+                    )
+                    break
+                else:
+                    # Parse numeric selection
+                    try:
+                        indices = parse_selection_string(
+                            selection, len(available_market_names_on_chain)
+                        )
+                        if indices:
+                            final_selected_markets_str_list = [
+                                available_market_names_on_chain[i] for i in indices
+                            ]
+                            console.print(
+                                f"✅ Selected {len(final_selected_markets_str_list)} market(s): {', '.join(final_selected_markets_str_list)}",
+                                style="green",
+                            )
+                            break
+                        else:
+                            console.print(
+                                "❌ No valid selections made. Please try again.",
+                                style="red",
+                            )
+                    except ValueError as e:
+                        console.print(
+                            f"❌ Invalid selection: {e}. Please try again.", style="red"
+                        )
 
         selected_market_objects: List[MarketConfig] = []
         for market_name_raw in final_selected_markets_str_list:
