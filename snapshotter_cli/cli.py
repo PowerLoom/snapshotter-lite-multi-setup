@@ -98,7 +98,7 @@ def fetch_markets_config() -> List[PowerloomChainConfig]:
 def version_callback(value: bool):
     """Show version and exit."""
     if value:
-        console.print(f"PowerLoom Snapshotter CLI version: {__version__}")
+        console.print(f"Powerloom Snapshotter CLI version: {__version__}")
         raise typer.Exit()
 
 

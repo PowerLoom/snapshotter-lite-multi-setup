@@ -1,1 +1,1 @@
-# Tests for PowerLoom Snapshotter CLI
+# Tests for Powerloom Snapshotter CLI

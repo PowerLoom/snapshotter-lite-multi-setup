@@ -1,6 +1,6 @@
-# PowerLoom Snapshotter CLI
+# Powerloom Snapshotter CLI
 
-A powerful command-line interface for deploying and managing PowerLoom Snapshotter nodes. Simplifies the process of running multiple snapshotter instances across different chains and data markets.
+A powerful command-line interface for deploying and managing Powerloom Snapshotter nodes. Simplifies the process of running multiple snapshotter instances across different chains and data markets.
 
 ## Features
 
@@ -86,7 +86,7 @@ The CLI is available through multiple aliases:
 
 - [Full Documentation](https://github.com/powerloom/snapshotter-lite-multi-setup/blob/main/CLI_DOCUMENTATION.md)
 - [GitHub Repository](https://github.com/powerloom/snapshotter-lite-multi-setup)
-- [PowerLoom Website](https://powerloom.io)
+- [Powerloom Website](https://powerloom.io)
 
 ## License
 

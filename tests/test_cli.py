@@ -1,4 +1,4 @@
-"""Basic tests for PowerLoom Snapshotter CLI"""
+"""Basic tests for Powerloom Snapshotter CLI"""
 
 from snapshotter_cli import __version__
 
