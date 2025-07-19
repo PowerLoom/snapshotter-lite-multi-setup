@@ -25,6 +25,9 @@ jobs:
           - os: macos-latest
             platform: macos
             arch: arm64
+          - os: ubuntu-latest-arm64  # GitHub's native ARM64 runner
+            platform: linux
+            arch: arm64
 
     runs-on: ${{ matrix.os }}
 
@@ -78,126 +81,9 @@ jobs:
           dist/powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }}
           dist/powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }}.sha256
 
-  build-cross-platform:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
-      with:
-        platforms: arm64
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-      with:
-        driver-opts: |
-          image=moby/buildkit:master
-          network=host
-        buildkitd-flags: --debug
-        config-inline: |
-          [worker.oci]
-            max-parallelism = 4
-
-    - name: Create Dockerfile for ARM64 build
-      run: |
-        cat > Dockerfile.arm64 << 'EOF'
-        # Use multi-stage build for better caching
-        FROM --platform=linux/arm64 python:3.12-slim AS builder
-
-        # Install build dependencies (this layer rarely changes)
-        RUN apt-get update && apt-get install -y \
-            build-essential \
-            binutils \
-            curl \
-            ccache \
-            && rm -rf /var/lib/apt/lists/*
-
-        # Install uv (version pinned for consistency)
-        ENV UV_VERSION=0.4.10
-        RUN curl -LsSf https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-installer.sh | sh
-        ENV PATH="/root/.cargo/bin:$PATH"
-
-        WORKDIR /app
-
-        # Copy only dependency files first (most cacheable layer)
-        COPY pyproject.toml uv.lock ./
-        COPY PYPI_README.md ./
-
-        # Install Python dependencies (cached when deps don't change)
-        RUN --mount=type=cache,target=/root/.cache/uv \
-            --mount=type=cache,target=/root/.local/share/uv \
-            uv sync --frozen
-
-        # Copy pyinstaller spec first (rarely changes)
-        COPY pyinstaller.spec ./
-
-        # Pre-compile Python files for faster startup
-        RUN python -m compileall -q /app/.venv
-
-        # Pre-analyze dependencies to cache PyInstaller's work
-        RUN --mount=type=cache,target=/app/build \
-            --mount=type=cache,target=/root/.cache/pyinstaller \
-            uv run pyinstaller --noconfirm --log-level=WARN \
-            --specpath /tmp --distpath /tmp/dist --workpath /tmp/build \
-            --onefile --name temp \
-            -c "print('temp')" || true
-
-        # Copy source code (most frequently changing)
-        COPY snapshotter_cli/ ./snapshotter_cli/
-
-        # Build binary with multiple cache mounts and optimizations
-        ENV PLATFORM=linux
-        ENV ARCH=arm64
-        ENV PYTHONHASHSEED=0
-        ENV PYTHONDONTWRITEBYTECODE=1
-        ENV CCACHE_DIR=/ccache
-        ENV PATH="/usr/lib/ccache:$PATH"
-
-        RUN --mount=type=cache,target=/app/build \
-            --mount=type=cache,target=/root/.cache/pyinstaller \
-            --mount=type=cache,target=/tmp \
-            --mount=type=cache,target=/root/.pyinstaller \
-            --mount=type=cache,target=/ccache \
-            uv run pyinstaller pyinstaller.spec \
-            --distpath /app/dist \
-            --workpath /app/build \
-            --log-level=WARN \
-            --noconfirm
-
-        # Create checksum
-        RUN cd /app/dist && sha256sum powerloom-snapshotter-cli-linux-arm64 > powerloom-snapshotter-cli-linux-arm64.sha256
-        EOF
-
-    - name: Build ARM64 binary in Docker
-      run: |
-        # Convert repository owner to lowercase for registry
-        REPO_OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-
-        # Use only GitHub Actions cache (no registry push needed for PRs/branches)
-        docker buildx build \
-          --platform linux/arm64 \
-          --cache-from type=gha,scope=buildkit-arm64 \
-          --cache-to type=gha,mode=max,scope=buildkit-arm64 \
-          -f Dockerfile.arm64 \
-          -t powerloom-snapshotter-cli-arm64-builder \
-          --load \
-          .
-        docker create --name extract-arm64 powerloom-snapshotter-cli-arm64-builder
-        docker cp extract-arm64:/app/dist ./dist-arm64
-        docker rm extract-arm64
-
-    - name: Upload ARM64 artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: powerloom-snapshotter-cli-linux-arm64
-        path: |
-          dist-arm64/powerloom-snapshotter-cli-linux-arm64
-          dist-arm64/powerloom-snapshotter-cli-linux-arm64.sha256
 
   release:
-    needs: [build-native, build-cross-platform]
+    needs: [build-native]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
 
