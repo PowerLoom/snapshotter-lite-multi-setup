@@ -120,11 +120,9 @@ This will:
 
 * Update VPS
 * Install Docker and Docker Compose
-* Install Pip(Python package manager)
-* Install Pyenv and their dependencies
-* Add Pyenv to Shell Environment
-* Create and activate a virtual environment
-* Install Python 3.11.5 and their Dependencies
+* Install uv (fast Python package manager)
+* Set up Python 3.12 environment
+* Install all project dependencies
 
 #### 1.2.2 Manual Node dependency installation
 Run below commands to install all node dependences manually.
@@ -134,42 +132,66 @@ Run below commands to install all node dependences manually.
 Install docker and docker compose, Detailed instructions can be found at [Step 3: Setting Up the Environment](https://docs.powerloom.io/docs/build-with-powerloom/snapshotter-node/lite-node-v2/getting-started)
 
 
-> **Install `pyenv`**
-
-Detailed instructions and troubleshotting can be found on the [pyenv Github repo README](https://github.com/pyenv/pyenv?tab=readme-ov-file#installation). In general, the following should take care of the installation on an Ubuntu VPS.
-
-```
-sudo apt update && sudo apt install -y build-essential libssl-dev zlib1g-dev libbz2-dev \
-libreadline-dev libsqlite3-dev curl libncursesw5-dev xz-utils tk-dev libxml2-dev \
-libxmlsec1-dev libffi-dev liblzma-dev
-
-curl https://pyenv.run | bash
-
-echo 'export PATH="$HOME/.pyenv/bin:$PATH"' >> ~/.bashrc
-echo 'eval "$(pyenv init --path)"' >> ~/.bashrc
-echo 'eval "$(pyenv init -)"' >> ~/.bashrc
-
-source ~/.bashrc
-
-pyenv install 3.11.5
-```
-
-> **Install `pyenv-virtualenv`**
-  Detailed instructions can be [found here](https://github.com/pyenv/pyenv-virtualenv).
-
-```
-pyenv virtualenv 3.11.5 ss_lite_multi_311
-pyenv local ss_lite_multi_311
-```
-
-> **Install all python requirements**
+> **Install uv and project dependencies**
 
 ```bash
-# install all python requirements
-pip install -r requirements.txt
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Add uv to PATH for current session
+export PATH="$HOME/.local/bin:$PATH"
+
+# Add to shell config for future sessions
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+# Install the Powerloom Snapshotter CLI
+./install-uv.sh
 ```
 
+The install script will:
+- Install uv (if not already installed)
+- Install the Powerloom Snapshotter CLI globally
+- Set up all required dependencies
+- Make commands available: `powerloom`, `snapshotter`, `powerloom-snapshotter-cli`
+
 ## 2. Setup
+
+> [!IMPORTANT]
+> **For users migrating from pyenv-based setup or preferring to run without uv:**
+>
+> If you previously used pyenv with this project, you'll need to ensure uv's Python is used instead:
+>
+> **Option 1: Use uv run (Recommended)**
+> ```bash
+> uv run python multi_clone.py
+> ```
+>
+> **Option 2: Install dependencies with pip (without uv)**
+> ```bash
+> # Install dependencies globally
+> pip install -r requirements.txt
+> python multi_clone.py
+> ```
+>
+> **Option 3: Activate the virtual environment**
+> ```bash
+> source .venv/bin/activate
+> python multi_clone.py
+> deactivate  # when done
+> ```
+>
+> **Option 4: Create a wrapper script**
+> ```bash
+> echo '#!/bin/bash
+> .venv/bin/python multi_clone.py "$@"' > multi_clone.sh
+> chmod +x multi_clone.sh
+> # Now use: ./multi_clone.sh
+> ```
+>
+> If you're still seeing pyenv Python being used, you may need to temporarily disable pyenv:
+> - Comment out pyenv initialization in your shell config (`~/.bashrc` or `~/.zshrc`)
+> - Or use the full path: `.venv/bin/python multi_clone.py`
 
 ### 2.1 Initialize Environment
 
@@ -230,18 +252,20 @@ This will:
 
 ### 2.2 Run the deploy script
 
-The deploy script can be run interactively, as is, with
+The deploy script requires Python dependencies. Since we use uv for dependency management, run it with:
 
 ```bash
-python multi_clone.py
+uv run python multi_clone.py
 ```
+
+> **Note:** The `uv run` prefix ensures all dependencies are available. See the migration note in section 2 if you're coming from a pyenv setup.
 
 #### 2.2.0 Deploy script command line flags
 
 The deploy script supports several command line flags to customize its behavior:
 
 ```bash
-python multi_clone.py [flags]
+uv run python multi_clone.py [flags]
 ```
 
 Available flags:
@@ -280,22 +304,22 @@ The `--use-env-connection-refresh-interval` flag modifies this behavior:
 Example usage:
 ```bash
 # Deploy all slots non-interactively for UNISWAPV2 (uses parallel by default)
-python multi_clone.py --data-market 2 -y
+uv run python multi_clone.py --data-market 2 -y
 
 # Deploy with specific number of parallel workers
-python multi_clone.py --parallel-workers 6 -y
+uv run python multi_clone.py --parallel-workers 6 -y
 
 # Deploy using sequential mode (old behavior)
-python multi_clone.py --sequential -y
+uv run python multi_clone.py --sequential -y
 
 # Deploy only the latest slot
-python multi_clone.py --latest-only
+uv run python multi_clone.py --latest-only
 
 # Use environment variable set at shell prompt for connection refresh interval
-CONNECTION_REFRESH_INTERVAL_SEC=300 python multi_clone.py --use-env-connection-refresh-interval
+CONNECTION_REFRESH_INTERVAL_SEC=300 uv run python multi_clone.py --use-env-connection-refresh-interval
 
 # Set the above in .env file and run the script
-python multi_clone.py --use-env-connection-refresh-interval
+uv run python multi_clone.py --use-env-connection-refresh-interval
 ```
 
 > [!IMPORTANT]
@@ -542,10 +566,10 @@ Meet Bob, The Architect of Chaos. Bob has five Powerloom slots, but he's got an 
 
 1. Bob logs into his VPS and follows [Preparation](#1-preparation).
 2. When initializing the environment (by `./bootstrap.sh`), he inputs all the necessary slot info and sets **RPC1**.
-3. Bob then runs the deploy script: (by `python multi_clone.py`). Since he's deploying a subset of slots, he follows [Deploy a subset of slots](#221-deploy-a-subset-of-slots) and sets the **start slot** and **end slot** to **slot1**. BOOM! **Slot1 is live.**
+3. Bob then runs the deploy script: (by `uv run python multi_clone.py`). Since he's deploying a subset of slots, he follows [Deploy a subset of slots](#221-deploy-a-subset-of-slots) and sets the **start slot** and **end slot** to **slot1**. BOOM! **Slot1 is live.**
 4. Bob repeats the process for **slot2** using **RPC2** and deploys **slot2** using the same method.
 5. He does the same for **RPC3** to deploy **slot3**.
-6. Now for the final trick, Bob wants **slot4 and slot5** to share **RPC4**. He reinitializes the env variables by (by `./bootstrap.sh`), and when deploying(by python multi\_clone.py), he sets **start slot to slot4 and end slot to slot5**.
+6. Now for the final trick, Bob wants **slot4 and slot5** to share **RPC4**. He reinitializes the env variables by (by `./bootstrap.sh`), and when deploying(by uv run python multi\_clone.py), he sets **start slot to slot4 and end slot to slot5**.
 
 BOOM! Bob did it. **Three slots running on three different RPCs and two slots sharing a single RPC.** Mission accomplished. 🎉
 
@@ -556,8 +580,8 @@ She clones `X(#of wallets)` multiscript directories, each with different destina
 
 1. Alice logs into her VPS and follows [Preparation](#1-preparation), She then clones the repository three times, assigning a unique destination directory name to each clone.
 2. Now, she [Setup](#2-setup) two nodes from **Wallet 1** on a single RPC. When initializing the environment (by `./bootstrap.sh`), she inputs all the necessary for wallet1 info and sets **RPC1**.
-3. Alice then runs the deploy script: (by `python multi_clone.py`). Since she's deploying a subset of slots, she follows [Deploy a subset of slots](#221-deploy-a-subset-of-slots) and sets the **start slot** to **slot1** and **end slot** to **slot2**. BOOM! **Slot1 and slot2 is live.**
-4. Alice then navigates to the second repository (by `cd <directory-name>`), initializes the environment (by `./bootstrap.sh`) and inputs all the necessary info for wallet2 and sets **RPC1**. She then deploys node from wallet 2 by running deploy script: (by `python multi_clone.py`) and follows [Deploy a subset of slots](#221-deploy-a-subset-of-slots)Finally, she repeats the same process for **Slot 3** from **Wallet 3**, just as she did for Slot 2.
+3. Alice then runs the deploy script: (by `uv run python multi_clone.py`). Since she's deploying a subset of slots, she follows [Deploy a subset of slots](#221-deploy-a-subset-of-slots) and sets the **start slot** to **slot1** and **end slot** to **slot2**. BOOM! **Slot1 and slot2 is live.**
+4. Alice then navigates to the second repository (by `cd <directory-name>`), initializes the environment (by `./bootstrap.sh`) and inputs all the necessary info for wallet2 and sets **RPC1**. She then deploys node from wallet 2 by running deploy script: (by `uv run python multi_clone.py`) and follows [Deploy a subset of slots](#221-deploy-a-subset-of-slots)Finally, she repeats the same process for **Slot 3** from **Wallet 3**, just as she did for Slot 2.
 
 BOOM! Alice did it. **Four slots from three different wallet running on single VPS.** Mission accomplished. 🎉
 

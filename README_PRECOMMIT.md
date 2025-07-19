@@ -6,7 +6,7 @@ This project uses pre-commit hooks to ensure code quality. Follow these steps to
 
 ```bash
 # Install pre-commit hooks
-poetry run pre-commit install
+uv run pre-commit install
 ```
 
 ## How It Works
@@ -47,10 +47,10 @@ git commit --no-verify
 
 If you see "command not found" errors:
 ```bash
-poetry install --with dev
+uv sync
 ```
 
 If hooks aren't running:
 ```bash
-poetry run pre-commit install --force
+uv run pre-commit install --force
 ```

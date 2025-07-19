@@ -25,63 +25,30 @@ else
     echo -e "${GREEN}Docker is already installed.${NC}"
 fi
 
-# Install Pip
-if ! command -v pip3 &> /dev/null; then
-    echo -e "${GREEN}Installing Pip (Python package manager)...${NC}"
-    sudo apt install -y -qq python3-pip
+# Install uv
+if ! command -v uv &> /dev/null; then
+    echo -e "${GREEN}Installing uv (fast Python package manager)...${NC}"
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    # Add uv to PATH for current session
+    export PATH="$HOME/.local/bin:$PATH"
+
+    # Add to shell config for future sessions
+    if [[ "$SHELL" == */zsh ]]; then
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+    else
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+    fi
 else
-    echo -e "${GREEN}Pip is already installed.${NC}"
+    echo -e "${GREEN}uv is already installed.${NC}"
 fi
 
-# Install dependencies for Pyenv
-echo -e "${GREEN}Installing dependencies for Pyenv...${NC}"
-sudo apt update -qq && sudo apt install -y -qq build-essential libssl-dev zlib1g-dev libbz2-dev \
-    libreadline-dev libsqlite3-dev curl libncursesw5-dev xz-utils tk-dev libxml2-dev \
-    libxmlsec1-dev libffi-dev liblzma-dev
+# Make sure uv is in PATH
+export PATH="$HOME/.local/bin:$PATH"
 
-# Install Pyenv
-if ! command -v pyenv &> /dev/null; then
-    echo -e "${GREEN}Installing Pyenv...${NC}"
-    curl https://pyenv.run | bash
-else
-    echo -e "${GREEN}Pyenv is already installed.${NC}"
-fi
-
-# Add Pyenv to Shell Environment
-echo -e "${GREEN}Configuring Pyenv...${NC}"
-echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
-echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
-echo 'eval "$(pyenv init --path)"' >> ~/.bashrc
-echo 'eval "$(pyenv init -)"' >> ~/.bashrc
-echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bashrc
-
-source ~/.bashrc
-
-# Apply Pyenv Configuration Immediately
-export PYENV_ROOT="$HOME/.pyenv"
-export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init --path)"
-eval "$(pyenv init -)"
-eval "$(pyenv virtualenv-init -)"
-
-# Check if Python 3.11.5 is already installed
-if pyenv versions | grep -q "3.11.5"; then
-    echo -e "${GREEN}Python 3.11.5 is already installed. Skipping installation.${NC}"
-else
-    echo -e "${GREEN}Installing Python 3.11.5 with Pyenv... This might take 10-15 minutes depending on VPS specs. Go touch grass 🌱${NC}"
-    pyenv install -v 3.11.5
-fi
-
-# Create and activate a virtual environment
-echo -e "${GREEN}Setting up a virtual environment for Python 3.11.5...${NC}"
-pyenv virtualenv 3.11.5 ss_lite_multi_311
-pyenv local ss_lite_multi_311
-
-# Install Python Dependencies
-echo -e "${GREEN}Installing required Python packages...${NC}"
-pip install --break-system-packages -r requirements.txt
+# Install Powerloom Snapshotter CLI and dependencies
+echo -e "${GREEN}Installing Powerloom Snapshotter CLI and dependencies...${NC}"
+./install-uv.sh
 
 # Success message
-echo -e "${GREEN}🎉 All dependencies installed successfully! You're all set🚀. Run these two commands to deploy your nodes! 👇\n\n1) ./bootstrap.sh\n2) python multi_clone.py ${NC}"
-
-exec "$SHELL"
+echo -e "${GREEN}🎉 All dependencies installed successfully! You're all set🚀. Run these two commands to deploy your nodes! 👇\n\n1) ./bootstrap.sh\n2) uv run python multi_clone.py ${NC}"

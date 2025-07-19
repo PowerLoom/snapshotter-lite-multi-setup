@@ -79,24 +79,21 @@ pipx install powerloom-snapshotter-cli
 git clone https://github.com/PowerLoom/snapshotter-lite-multi-setup.git
 cd snapshotter-lite-multi-setup
 
-# Install poetry (if not already installed)
-curl -sSL https://install.python-poetry.org | python3 -
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Install dependencies
-poetry install
+uv sync
 
-# If using pyenv, refresh the shims to make commands available
-pyenv rehash
-
-# Now you can run the CLI directly
-powerloom-snapshotter-cli --help
+# Now you can run the CLI
+uv run powerloom-snapshotter-cli --help
 
 # Or use the shorter aliases
-powerloom --help
-snapshotter --help
+uv run powerloom --help
+uv run snapshotter --help
 
-# Alternative: Use poetry run (if commands aren't in PATH)
-poetry run powerloom-snapshotter-cli --help
+# For direct terminal access, install globally:
+uv tool install --from . powerloom-snapshotter-cli
 ```
 
 ## Quick Start
@@ -117,7 +114,7 @@ powerloom-snapshotter> list
 powerloom-snapshotter> logs --follow
 ```
 
-**Note:** After installation with `poetry install` and `pyenv rehash`, the commands are available directly in your terminal. No need for `poetry run` or `poetry shell`.
+**Note:** After installation with `uv sync`, commands are available through `uv run`. For direct terminal access without the `uv run` prefix, use `uv tool install`.
 
 ### Alternative: Individual Commands
 
@@ -474,12 +471,12 @@ The CLI respects the following environment variables as fallbacks:
 sudo systemctl start docker
 ```
 
-#### 2. "Command not found" after poetry install
-**Solution:** If using pyenv, refresh the shims:
+#### 2. "Command not found" after uv sync
+**Solution:** Use the `uv run` prefix:
 ```bash
-pyenv rehash
+uv run powerloom --help
 ```
-This updates pyenv's command database to recognize newly installed executables.
+Or install globally with `uv tool install` for direct access.
 
 #### 3. "Wallet Holder Address could not be resolved"
 **Solution:** Run `powerloom configure` to set up credentials for the chain/market combination.
@@ -527,7 +524,7 @@ powerloom deploy --env devnet --market uniswapv2
 
 ### Prerequisites
 - Python 3.12+
-- Poetry
+- uv (Python package manager)
 - Git
 
 ### Build Instructions
@@ -537,17 +534,17 @@ powerloom deploy --env devnet --market uniswapv2
 git clone https://github.com/PowerLoom/snapshotter-lite-multi-setup.git
 cd snapshotter-lite-multi-setup
 
-# Install poetry if not already installed
-curl -sSL https://install.python-poetry.org | python3 -
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Install dependencies
-poetry install
+uv sync
 
-# Run from source (after pyenv rehash, commands are available directly)
-powerloom-snapshotter-cli --help
+# Run from source
+uv run powerloom-snapshotter-cli --help
 
 # Build the package
-poetry build
+uv build
 
 # This will create:
 # - dist/powerloom_snapshotter_cli-0.1.0-py3-none-any.whl
@@ -563,24 +560,21 @@ ls -la dist/
 ### Development Workflow
 
 ```bash
-# Install development dependencies (included by default with poetry install)
-poetry install
-
-# Refresh pyenv shims if needed
-pyenv rehash
+# Install development dependencies (included by default with uv sync)
+uv sync
 
 # Run tests
-pytest
+uv run pytest
 
 # Format code
-black snapshotter_cli/
-isort snapshotter_cli/
+uv run black snapshotter_cli/
+uv run isort snapshotter_cli/
 
 # Type checking
-mypy snapshotter_cli/
+uv run mypy snapshotter_cli/
 
-# Note: After poetry install and pyenv rehash, all commands are available directly.
-# No need for 'poetry run' prefix or 'poetry shell'.
+# Note: Commands require the 'uv run' prefix.
+# For direct access, use 'uv tool install'.
 ```
 
 ### Uninstalling
@@ -588,7 +582,7 @@ mypy snapshotter_cli/
 To uninstall the CLI:
 
 ```bash
-# If installed with pip/poetry in development
+# If installed with pip/uv in development
 pip uninstall powerloom-snapshotter-cli -y
 
 # If installed with pipx

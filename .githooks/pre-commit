@@ -9,7 +9,7 @@ NC='\033[0m' # No Color
 echo "🔍 Running pre-commit checks..."
 
 # Run pre-commit hooks
-if ! poetry run pre-commit run; then
+if ! uv run pre-commit run; then
     echo -e "\n${RED}❌ Pre-commit checks failed!${NC}"
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${YELLOW}To fix formatting issues, run:${NC}"
