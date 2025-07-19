@@ -23,7 +23,7 @@ create_env() {
         local prompt=$1
         local key=$2
         local existing_value=$(get_existing_value "$key")
-        
+
         if [ ! -f "$BACKUP_FILE" ]; then
             # First time setup - show simple prompt
             echo "🫸 ▶︎ $prompt: "
@@ -42,7 +42,7 @@ create_env() {
         local key=$1
         local value=$2
         local existing_value=$(get_existing_value "$key")
-        
+
         if [[ "$OSTYPE" == "darwin"* ]]; then
             sed -i '' "s|^$key=.*|$key=$value|g" .env
         else

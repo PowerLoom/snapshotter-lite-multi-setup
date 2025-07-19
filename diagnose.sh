@@ -47,7 +47,7 @@ while getopts "y" opt; do
     esac
 done
 
-echo "🔍 Starting PowerLoom Node Diagnostics..."
+echo "🔍 Starting Powerloom Node Diagnostics..."
 
 # Phase 1: System Checks
 echo -e "\n📦 Checking Docker installation..."
@@ -75,17 +75,17 @@ echo -e "${GREEN}✅ Docker Compose is available${NC}"
 
 
 # Check existing containers and networks
-echo -e "\n🔍 Checking existing PowerLoom containers..."
+echo -e "\n🔍 Checking existing Powerloom containers..."
 EXISTING_CONTAINERS=$(docker ps -a --filter "name=snapshotter-lite-v2" --filter "name=powerloom" --filter "name=local-collector" --filter "name=autoheal" --format "{{.Names}}")
 if [ -n "$EXISTING_CONTAINERS" ]; then
-    echo -e "${YELLOW}Found existing PowerLoom containers:${NC}"
+    echo -e "${YELLOW}Found existing Powerloom containers:${NC}"
     echo "$EXISTING_CONTAINERS"
 fi
 
-echo -e "\n🌐 Checking existing Legacy Docker networks for PowerLoom Snapshotter containers..."
+echo -e "\n🌐 Checking existing Legacy Docker networks for Powerloom Snapshotter containers..."
 EXISTING_NETWORKS=$(docker network ls --filter "name=snapshotter-lite-v2" --format "{{.Name}}")
 if [ -n "$EXISTING_NETWORKS" ]; then
-    echo -e "${YELLOW}Found existing PowerLoom networks:${NC}"
+    echo -e "${YELLOW}Found existing Powerloom networks:${NC}"
     echo "$EXISTING_NETWORKS"
 fi
 
@@ -98,7 +98,7 @@ if [ -n "$USED_SUBNETS" ]; then
     while read -r octet; do
         echo "172.18.${octet}.0/24"
     done <<< "$USED_SUBNETS"
-    
+
     # Find available subnets
     echo -e "\n${GREEN}First 5 available subnets:${NC}"
     current=0
@@ -113,7 +113,7 @@ if [ -n "$USED_SUBNETS" ]; then
 fi
 
 # Check for cloned directories (but don't remove them yet)
-echo -e "\n📁 Checking for PowerLoom deployment directories..."
+echo -e "\n📁 Checking for Powerloom deployment directories..."
 # Matches patterns like:
 # - powerloom-premainnet-v2-*
 # - powerloom-testnet-v2-*
@@ -127,7 +127,7 @@ else
 fi
 
 if [ -n "$EXISTING_DIRS" ]; then
-    echo -e "${YELLOW}Found existing PowerLoom deployment directories:${NC}"
+    echo -e "${YELLOW}Found existing Powerloom deployment directories:${NC}"
     echo "$EXISTING_DIRS"
 fi
 
@@ -138,7 +138,7 @@ if [ -n "$EXISTING_CONTAINERS" ]; then
     if [ "$AUTO_CLEANUP" = true ]; then
         remove_containers="y"
     else
-        read -p "Would you like to stop and remove existing PowerLoom containers? (y/n): " remove_containers
+        read -p "Would you like to stop and remove existing Powerloom containers? (y/n): " remove_containers
     fi
     if [ "$remove_containers" = "y" ]; then
         echo -e "\n${YELLOW}Stopping running containers... (timeout: 10s per container)${NC}"
@@ -175,7 +175,7 @@ if [ -n "$EXISTING_CONTAINERS" ]; then
                     docker kill "$container" 2>/dev/null || true
                 fi
             ' -- {}
-            
+
             # Give a moment for containers to die
             sleep 2
         fi
@@ -212,10 +212,10 @@ if [ -n "$EXISTING_CONTAINERS" ]; then
 fi
 
 # Check for existing screen sessions
-echo -e "\n🖥️ Checking existing PowerLoom screen sessions..."
-EXISTING_SCREENS=$(screen -ls | grep -E 'powerloom-(premainnet|testnet|mainnet)-v2|snapshotter' || true)
+echo -e "\n🖥️ Checking existing Powerloom screen sessions..."
+EXISTING_SCREENS=$(screen -ls | grep -E 'powerloom-(premainnet|testnet|mainnet)-v2|snapshotter|pl_.*_.*_[0-9]+' || true)
 if [ -n "$EXISTING_SCREENS" ]; then
-    echo -e "${YELLOW}Found existing PowerLoom screen sessions:${NC}"
+    echo -e "${YELLOW}Found existing Powerloom screen sessions:${NC}"
     echo "$EXISTING_SCREENS"
     if [ "$AUTO_CLEANUP" = true ]; then
         kill_screens="y"
@@ -233,12 +233,12 @@ if [ -n "$EXISTING_NETWORKS" ]; then
     if [ "$AUTO_CLEANUP" = true ]; then
         remove_networks="y"
     else
-        read -p "Would you like to remove existing PowerLoom networks? (y/n): " remove_networks
+        read -p "Would you like to remove existing Powerloom networks? (y/n): " remove_networks
     fi
     if [ "$remove_networks" = "y" ]; then
         echo -e "\n${YELLOW}Removing networks...${NC}"
         NETWORK_REMOVAL_FAILED=false
-        
+
         echo "$EXISTING_NETWORKS" | xargs -P64 -I {} bash -c '
             network="$1"
             if ! docker network rm "$network" 2>/dev/null; then
@@ -246,7 +246,7 @@ if [ -n "$EXISTING_NETWORKS" ]; then
                 exit 1
             fi
         ' -- {} || NETWORK_REMOVAL_FAILED=true
-        
+
         if [ "$NETWORK_REMOVAL_FAILED" = true ]; then
             echo -e "\n${YELLOW}⚠️  Warning: Some networks could not be removed due to active endpoints.${NC}"
             echo -e "${YELLOW}This usually means there are still some containers using these networks.${NC}"
@@ -262,7 +262,7 @@ if [ -n "$EXISTING_DIRS" ]; then
     if [ "$AUTO_CLEANUP" = true ]; then
         remove_dirs="y"
     else
-        read -p "Would you like to remove the PowerLoom deployment directories? (y/n): " remove_dirs
+        read -p "Would you like to remove the Powerloom deployment directories? (y/n): " remove_dirs
     fi
     if [ "$remove_dirs" = "y" ]; then
         echo -e "\n${YELLOW}Removing deployment directories...${NC}"
@@ -284,15 +284,14 @@ else
 fi
 if [ "$deep_clean" = "y" ]; then
     echo -e "\n${YELLOW}Removing unused Docker resources...${NC}"
-    
+
     echo -e "\n${YELLOW}Running docker network prune...${NC}"
     docker network prune -f
-    
+
     echo -e "\n${YELLOW}Running docker system prune...${NC}"
     docker system prune -a
-    
+
     echo -e "${GREEN}✅ Cleanup complete${NC}"
 fi
 
 echo -e "\n${GREEN}✅ Diagnostic check complete${NC}"
-
