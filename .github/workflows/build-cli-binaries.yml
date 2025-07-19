@@ -175,12 +175,11 @@ jobs:
         # Convert repository owner to lowercase for registry
         REPO_OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
 
+        # Use only GitHub Actions cache (no registry push needed for PRs/branches)
         docker buildx build \
           --platform linux/arm64 \
           --cache-from type=gha,scope=buildkit-arm64 \
-          --cache-from type=registry,ref=ghcr.io/${REPO_OWNER_LOWER}/snapshotter-cli-cache:arm64 \
           --cache-to type=gha,mode=max,scope=buildkit-arm64 \
-          --cache-to type=registry,ref=ghcr.io/${REPO_OWNER_LOWER}/snapshotter-cli-cache:arm64,mode=max \
           -f Dockerfile.arm64 \
           -t powerloom-snapshotter-cli-arm64-builder \
           --load \
