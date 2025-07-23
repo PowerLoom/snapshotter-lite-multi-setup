@@ -10,6 +10,8 @@ on:
     branches:
       - master
     types: [opened, synchronize]
+  release:
+    types: [published]  # Trigger when a release is published via GitHub UI
   workflow_dispatch:
     inputs:
       publish_to_testpypi:
@@ -162,11 +164,12 @@ jobs:
 
   publish-to-pypi:
     name: Publish to PyPI
-    needs: [build, publish-to-testpypi]
+    needs: build
     runs-on: ubuntu-latest
-    # Only publish to PyPI on version tags
+    # Only publish to PyPI on version tags or release events
     if: |
       startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'release' && github.event.action == 'published') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_to_pypi == 'true' && startsWith(github.ref, 'refs/tags/'))
 
     environment:
@@ -191,63 +194,3 @@ jobs:
       with:
         verbose: true
         # No skip-existing for production PyPI - we want it to fail if version exists
-
-  create-github-release:
-    name: Create GitHub Release
-    needs: publish-to-pypi
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-
-    permissions:
-      contents: write
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Download artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
-
-    - name: Create Release Notes
-      run: |
-        cat > release_notes.md << 'EOF'
-        ## Powerloom Snapshotter CLI ${{ github.ref_name }}
-
-        ### Installation from PyPI
-
-        ```bash
-        pip install powerloom-snapshotter-cli
-        ```
-
-        ### Installation from this release
-
-        ```bash
-        pip install https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/powerloom_snapshotter_cli-${VERSION}-py3-none-any.whl
-        ```
-
-        ### What's Changed
-
-        See the [full changelog](https://github.com/${{ github.repository }}/compare/...v${VERSION})
-
-        ### Verification
-
-        After installation, verify with:
-        ```bash
-        powerloom-snapshotter-cli --version
-        ```
-        EOF
-
-        # Extract version from tag
-        VERSION=${GITHUB_REF_NAME#v}
-        sed -i "s/\${VERSION}/$VERSION/g" release_notes.md
-
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v2
-      with:
-        draft: false
-        prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
-        body_path: release_notes.md
-        files: |
-          dist/*
