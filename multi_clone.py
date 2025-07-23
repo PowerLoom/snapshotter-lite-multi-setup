@@ -732,9 +732,9 @@ def main(
     # Initialize Web3 and contract connections
     w3 = Web3(Web3.HTTPProvider(powerloom_rpc_url))
     # Load contract ABIs
-    with open("ProtocolState.json", "r") as f:
+    with open("snapshotter_cli/utils/abi/ProtocolState.json", "r") as f:
         protocol_state_abi = json.load(f)
-    with open("PowerloomNodes.json", "r") as f:
+    with open("snapshotter_cli/utils/abi/PowerloomNodes.json", "r") as f:
         powerloom_nodes_abi = json.load(f)
 
     try:
