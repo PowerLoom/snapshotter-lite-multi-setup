@@ -113,7 +113,7 @@ To proceed, choose one of the following installation methods:
 > Important: You only need to complete one of the methods. After installation, skip to [2. Setup](#2-setup)
 
 #### 1.2.1 Automated Node dependency installation
-Run below command to install all node dependences in one go, It might take 10-15 mins depending on VPS specs.
+Run below command to install all node dependences in one go, It might take 5-10 mins depending on VPS specs.
 
 ``` bash
 ./prep.sh
@@ -121,11 +121,15 @@ Run below command to install all node dependences in one go, It might take 10-15
 
 This will:
 
-* Update VPS
-* Install Docker and Docker Compose
+* Detect your operating system (supports Ubuntu, Debian, Fedora, RHEL, CentOS, Rocky Linux, AlmaLinux)
+* Update your system packages
+* Install Docker and Docker Compose (using apt or yum/dnf as appropriate)
 * Install uv (fast Python package manager)
-* Set up Python 3.12 environment
-* Install all project dependencies
+* Install the Powerloom Snapshotter CLI
+
+**Supported Operating Systems:**
+- **Debian-based**: Ubuntu, Debian, Raspbian
+- **Red Hat-based**: Fedora, RHEL, CentOS, Rocky Linux, AlmaLinux, Oracle Linux
 
 #### 1.2.2 Manual Node dependency installation
 Run below commands to install all node dependences manually.

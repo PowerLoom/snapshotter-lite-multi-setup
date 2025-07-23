@@ -42,13 +42,10 @@ check_privileges() {
     fi
 }
 
-# Function to install Docker
-install_docker() {
+# Function to install Docker for apt-based systems
+install_docker_apt() {
     echo -e "${GREEN}Installing Docker and Docker Compose... No Docker? No party. 🐳${NC}"
-
-    # Detect OS
-    detect_os
-    echo -e "${BLUE}Detected OS: $OS $VERSION ($CODENAME)${NC}"
+    echo -e "${BLUE}Using apt package manager for $OS${NC}"
 
     # Install prerequisites
     echo -e "${GREEN}Installing prerequisites...${NC}"
@@ -144,16 +141,125 @@ install_docker() {
     fi
 }
 
+# Function to install Docker for yum/dnf-based systems
+install_docker_yum() {
+    echo -e "${GREEN}Installing Docker and Docker Compose... No Docker? No party. 🐳${NC}"
+    echo -e "${BLUE}Using $PKG_MANAGER package manager for $OS${NC}"
+
+    # Remove old Docker versions if any
+    echo -e "${GREEN}Removing old Docker versions if present...${NC}"
+    sudo $PKG_MANAGER remove -y -q docker docker-client docker-client-latest docker-common \
+        docker-latest docker-latest-logrotate docker-logrotate docker-engine \
+        podman runc 2>/dev/null || true
+
+    # Install prerequisites
+    echo -e "${GREEN}Installing prerequisites...${NC}"
+    if ! sudo $PKG_MANAGER install -y -q yum-utils device-mapper-persistent-data lvm2; then
+        echo -e "${RED}Failed to install prerequisites.${NC}"
+        exit 1
+    fi
+
+    # Add Docker repository
+    echo -e "${GREEN}Adding Docker repository...${NC}"
+
+    # Download the Docker repo file directly - more reliable across different systems
+    local repo_url="https://download.docker.com/linux/${OS}/docker-ce.repo"
+
+    # For RHEL-based systems that don't have their own repo, use CentOS repo
+    if [[ "$OS" =~ ^(rhel|rocky|almalinux|ol)$ ]]; then
+        repo_url="https://download.docker.com/linux/centos/docker-ce.repo"
+    fi
+
+    # Download and install the repo file
+    if ! sudo curl -fsSL "$repo_url" -o /etc/yum.repos.d/docker-ce.repo; then
+        echo -e "${RED}Failed to download Docker repository file.${NC}"
+        exit 1
+    fi
+
+    echo -e "${GREEN}✓ Docker repository added successfully.${NC}"
+
+    # Install Docker
+    echo -e "${GREEN}Installing Docker packages...${NC}"
+    if ! sudo $PKG_MANAGER install -y -q docker-ce docker-ce-cli containerd.io docker-compose-plugin; then
+        echo -e "${RED}Failed to install Docker packages.${NC}"
+        exit 1
+    fi
+
+    # Start and enable Docker service
+    echo -e "${GREEN}Starting Docker service...${NC}"
+    if ! sudo systemctl start docker; then
+        echo -e "${RED}Failed to start Docker service.${NC}"
+        exit 1
+    fi
+
+    if ! sudo systemctl enable docker; then
+        echo -e "${YELLOW}Warning: Failed to enable Docker service on boot.${NC}"
+    fi
+
+    # Add current user to docker group (if not root)
+    if [[ $EUID -ne 0 ]]; then
+        echo -e "${GREEN}Adding user $USER to docker group...${NC}"
+        if ! sudo usermod -aG docker "$USER"; then
+            echo -e "${YELLOW}Warning: Failed to add user to docker group.${NC}"
+        else
+            echo -e "${YELLOW}Note: You'll need to log out and back in for group changes to take effect.${NC}"
+            echo -e "${YELLOW}Or run: newgrp docker${NC}"
+        fi
+    fi
+
+    # Verify Docker installation
+    echo -e "${GREEN}Verifying Docker installation...${NC}"
+    if sudo docker run --rm hello-world >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ Docker is working correctly!${NC}"
+    else
+        echo -e "${RED}Docker test failed. Please check Docker daemon status.${NC}"
+        sudo systemctl status docker --no-pager || true
+        exit 1
+    fi
+
+    # Verify Docker Compose v2
+    echo -e "${GREEN}Verifying Docker Compose v2...${NC}"
+    if docker compose version >/dev/null 2>&1; then
+        COMPOSE_VERSION=$(docker compose version --short)
+        echo -e "${GREEN}✓ Docker Compose v2 is installed (version: $COMPOSE_VERSION)${NC}"
+    else
+        echo -e "${RED}Docker Compose v2 is not properly installed.${NC}"
+        exit 1
+    fi
+}
+
+# Function to install Docker (router)
+install_docker() {
+    case "$PKG_MANAGER" in
+        apt)
+            install_docker_apt
+            ;;
+        dnf|yum)
+            install_docker_yum
+            ;;
+    esac
+}
+
 # Detect OS first to check compatibility
 detect_os
 
-# Check if OS is supported
+# Check if OS is supported and set package manager
 case "$OS" in
     ubuntu|debian|raspbian)
-        echo -e "${GREEN}✓ Detected supported OS: $OS${NC}"
+        echo -e "${GREEN}✓ Detected supported OS: $OS (apt-based)${NC}"
+        PKG_MANAGER="apt"
+        ;;
+    fedora|rhel|centos|rocky|almalinux|ol)
+        echo -e "${GREEN}✓ Detected supported OS: $OS (yum/dnf-based)${NC}"
+        # Use dnf if available, otherwise fall back to yum
+        if command -v dnf &> /dev/null; then
+            PKG_MANAGER="dnf"
+        else
+            PKG_MANAGER="yum"
+        fi
         ;;
     *)
-        echo -e "${RED}⚠️  Warning: This script is designed for Debian-based systems (Ubuntu, Debian, Raspbian).${NC}"
+        echo -e "${RED}⚠️  Warning: Unsupported OS detected.${NC}"
         echo -e "${RED}   Detected OS: $OS${NC}"
         echo -e "${YELLOW}   You'll need to manually install:${NC}"
         echo -e "${YELLOW}   1. Docker and Docker Compose${NC}"
@@ -170,9 +276,18 @@ check_privileges
 
 # Update package lists
 echo -e "${GREEN}Updating package lists...${NC}"
-if ! sudo apt-get update -qq -y; then
-    echo -e "${YELLOW}Warning: Package update had issues. Continuing anyway...${NC}"
-fi
+case "$PKG_MANAGER" in
+    apt)
+        if ! sudo apt-get update -qq -y; then
+            echo -e "${YELLOW}Warning: Package update had issues. Continuing anyway...${NC}"
+        fi
+        ;;
+    dnf|yum)
+        if ! sudo $PKG_MANAGER makecache -q; then
+            echo -e "${YELLOW}Warning: Package cache update had issues. Continuing anyway...${NC}"
+        fi
+        ;;
+esac
 
 # Install Docker and Docker Compose
 if ! command -v docker &> /dev/null; then
@@ -192,10 +307,20 @@ else
     # Check Docker Compose v2
     if ! docker compose version >/dev/null 2>&1; then
         echo -e "${YELLOW}Docker Compose v2 not found. Installing...${NC}"
-        if ! sudo apt-get install -y -qq docker-compose-plugin; then
-            echo -e "${RED}Failed to install Docker Compose v2.${NC}"
-            exit 1
-        fi
+        case "$PKG_MANAGER" in
+            apt)
+                if ! sudo apt-get install -y -qq docker-compose-plugin; then
+                    echo -e "${RED}Failed to install Docker Compose v2.${NC}"
+                    exit 1
+                fi
+                ;;
+            dnf|yum)
+                if ! sudo $PKG_MANAGER install -y -q docker-compose-plugin; then
+                    echo -e "${RED}Failed to install Docker Compose v2.${NC}"
+                    exit 1
+                fi
+                ;;
+        esac
     fi
 
     # Check if user is in docker group (if not root)
