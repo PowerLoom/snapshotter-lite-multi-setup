@@ -11,7 +11,7 @@ NC='\033[0m' # No Color
 set -euo pipefail
 trap 'echo -e "${RED}Error occurred at line $LINENO. Exiting.${NC}" >&2' ERR
 
-echo -e "${GREEN}This process might take 10-15 mins depending on VPS specs. Time to grab a coffee! ☕ ${NC}"
+echo -e "${GREEN}This process might take 5-10 mins depending on VPS specs. Time to grab a coffee! ☕ ${NC}"
 
 # Function to detect OS and distribution
 detect_os() {
@@ -143,6 +143,27 @@ install_docker() {
         exit 1
     fi
 }
+
+# Detect OS first to check compatibility
+detect_os
+
+# Check if OS is supported
+case "$OS" in
+    ubuntu|debian|raspbian)
+        echo -e "${GREEN}✓ Detected supported OS: $OS${NC}"
+        ;;
+    *)
+        echo -e "${RED}⚠️  Warning: This script is designed for Debian-based systems (Ubuntu, Debian, Raspbian).${NC}"
+        echo -e "${RED}   Detected OS: $OS${NC}"
+        echo -e "${YELLOW}   You'll need to manually install:${NC}"
+        echo -e "${YELLOW}   1. Docker and Docker Compose${NC}"
+        echo -e "${YELLOW}   2. Then run: ./install-uv.sh${NC}"
+        echo -e ""
+        echo -e "${YELLOW}   For Docker installation on $OS, visit:${NC}"
+        echo -e "${YELLOW}   https://docs.docker.com/engine/install/${NC}"
+        exit 1
+        ;;
+esac
 
 # Check privileges
 check_privileges
