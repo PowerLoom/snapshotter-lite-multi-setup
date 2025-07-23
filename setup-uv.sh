@@ -56,7 +56,7 @@ uv run powerloom-snapshotter-cli --version
 
 echo -e "\n${GREEN}✅ Setup complete!${NC}"
 echo -e "\nDevelopment commands:"
-echo -e "  Run CLI:          ${YELLOW}uv run powerloom${NC}"
+echo -e "  Run CLI:          ${YELLOW}uv run powerloom-snapshotter-cli${NC}"
 echo -e "  Run tests:        ${YELLOW}uv run pytest${NC}"
 echo -e "  Format code:      ${YELLOW}./scripts/lint.sh fix${NC}"
 echo -e "  Check code:       ${YELLOW}./scripts/lint.sh${NC}"

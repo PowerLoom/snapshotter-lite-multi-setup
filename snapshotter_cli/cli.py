@@ -37,7 +37,7 @@ from .utils.system_checks import is_docker_running, list_snapshotter_screen_sess
 
 console = Console()
 
-MARKETS_CONFIG_URL = "https://raw.githubusercontent.com/PowerLoom/curated-datamarkets/refs/heads/main/sources.json"
+MARKETS_CONFIG_URL = "https://raw.githubusercontent.com/PowerLoom/curated-datamarkets/refs/heads/master/sources.json"
 
 
 def parse_selection_string(selection: str, max_value: int) -> List[int]:

@@ -7,7 +7,7 @@ readme = "PYPI_README.md"
 license = {text = "MIT"}
 homepage = "https://powerloom.io"
 repository = "https://github.com/powerloom/snapshotter-lite-multi-setup"
-documentation = "https://github.com/powerloom/snapshotter-lite-multi-setup/blob/main/CLI_DOCUMENTATION.md"
+documentation = "https://github.com/powerloom/snapshotter-lite-multi-setup/blob/master/CLI_DOCUMENTATION.md"
 keywords = ["powerloom", "snapshotter", "blockchain", "cli", "node-management", "web3", "ethereum"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -43,7 +43,6 @@ dependencies = [
 
 [project.scripts]
 powerloom-snapshotter-cli = "snapshotter_cli.cli:app"
-powerloom = "snapshotter_cli.cli:app"
 snapshotter = "snapshotter_cli.cli:app"
 
 [tool.uv]

@@ -27,7 +27,7 @@ pipx install powerloom-snapshotter-cli
 
 ```bash
 # Start interactive shell for faster command execution
-powerloom shell
+powerloom-snapshotter-cli shell
 
 # In shell mode:
 powerloom-snapshotter> configure
@@ -39,16 +39,16 @@ powerloom-snapshotter> status
 
 ```bash
 # Configure credentials for a chain/market
-powerloom configure --env mainnet --market uniswapv2
+powerloom-snapshotter-cli configure --env mainnet --market uniswapv2
 
 # Deploy a snapshotter instance
-powerloom deploy
+powerloom-snapshotter-cli deploy
 
 # Check status of running instances
-powerloom status
+powerloom-snapshotter-cli status
 
 # View logs
-powerloom logs --follow
+powerloom-snapshotter-cli logs --follow
 ```
 
 ## Available Commands
@@ -67,8 +67,7 @@ powerloom logs --follow
 
 The CLI is available through multiple aliases:
 - `powerloom-snapshotter-cli` (full name)
-- `powerloom` (short)
-- `snapshotter` (shortest)
+- `snapshotter` (short)
 
 ## Supported Chains & Markets
 
@@ -84,13 +83,13 @@ The CLI is available through multiple aliases:
 
 ## Documentation
 
-- [Full Documentation](https://github.com/powerloom/snapshotter-lite-multi-setup/blob/main/CLI_DOCUMENTATION.md)
+- [Full Documentation](https://github.com/powerloom/snapshotter-lite-multi-setup/blob/master/CLI_DOCUMENTATION.md)
 - [GitHub Repository](https://github.com/powerloom/snapshotter-lite-multi-setup)
 - [Powerloom Website](https://powerloom.io)
 
 ## License
 
-MIT License - see [LICENSE](https://github.com/powerloom/snapshotter-lite-multi-setup/blob/main/LICENSE) for details.
+MIT License - see [LICENSE](https://github.com/powerloom/snapshotter-lite-multi-setup/blob/master/LICENSE) for details.
 
 ## Support
 

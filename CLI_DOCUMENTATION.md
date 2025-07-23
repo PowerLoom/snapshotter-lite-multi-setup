@@ -29,10 +29,9 @@ The Powerloom Snapshotter CLI (`powerloom-snapshotter-cli`) is a command-line to
 
 The CLI provides multiple command aliases for convenience:
 - `powerloom-snapshotter-cli` - Full command name
-- `powerloom` - Short alias
-- `snapshotter` - Shortest alias
+- `snapshotter` - Short alias
 
-All three commands are equivalent and can be used interchangeably.
+Both commands are equivalent and can be used interchangeably.
 
 ### Key Features
 
@@ -59,7 +58,11 @@ All three commands are equivalent and can be used interchangeably.
 
 3. Move to a directory in your PATH (optional):
    ```bash
-   sudo mv powerloom-snapshotter-cli-* /usr/local/bin/powerloom
+   # Use the full name
+   sudo mv powerloom-snapshotter-cli-* /usr/local/bin/powerloom-snapshotter-cli
+
+   # Or use a shorter alias for convenience
+   sudo mv powerloom-snapshotter-cli-* /usr/local/bin/snapshotter
    ```
 
 ### From PyPI Package
@@ -88,8 +91,7 @@ uv sync
 # Now you can run the CLI
 uv run powerloom-snapshotter-cli --help
 
-# Or use the shorter aliases
-uv run powerloom --help
+# Or use the shorter alias
 uv run snapshotter --help
 
 # For direct terminal access, install globally:
@@ -104,8 +106,8 @@ The CLI has a startup time when running individual commands. We strongly recomme
 
 ```bash
 # Start the interactive shell (one-time startup cost)
-powerloom shell
-# Or use any alias: snapshotter shell
+powerloom-snapshotter-cli shell
+# Or use the alias: snapshotter shell
 
 # Now run commands instantly without delays:
 powerloom-snapshotter> configure
@@ -122,22 +124,22 @@ If you prefer to run individual commands:
 
 1. **Configure credentials for a chain/market combination:**
    ```bash
-   powerloom configure --env devnet --market uniswapv2
+   powerloom-snapshotter-cli configure --env devnet --market uniswapv2
    ```
 
 2. **Deploy snapshotter instances:**
    ```bash
-   powerloom deploy --env devnet --market uniswapv2
+   powerloom-snapshotter-cli deploy --env devnet --market uniswapv2
    ```
 
 3. **Check status of running instances:**
    ```bash
-   powerloom list
+   powerloom-snapshotter-cli list
    ```
 
 4. **View logs:**
    ```bash
-   powerloom logs --env devnet --market uniswapv2
+   powerloom-snapshotter-cli logs --env devnet --market uniswapv2
    ```
 
 ## Interactive Shell Mode (Recommended)
@@ -154,7 +156,7 @@ The shell mode provides a persistent session that eliminates the startup time fo
 ### Starting the Shell
 
 ```bash
-powerloom shell
+powerloom-snapshotter-cli shell
 ```
 
 You'll see:
@@ -171,7 +173,7 @@ powerloom-snapshotter>
 ### Example Shell Session
 
 ```bash
-$ powerloom shell
+$ powerloom-snapshotter-cli shell
 
 powerloom-snapshotter> configure
 [Interactive configuration process...]
@@ -210,7 +212,7 @@ All regular CLI commands work in shell mode, plus:
 Set up credentials and settings for a specific chain and data market combination.
 
 ```bash
-powerloom configure [OPTIONS]
+powerloom-snapshotter-cli configure [OPTIONS]
 ```
 
 **Options:**
@@ -227,10 +229,10 @@ powerloom configure [OPTIONS]
 **Example:**
 ```bash
 # Interactive mode (recommended)
-powerloom configure
+powerloom-snapshotter-cli configure
 
 # With options
-powerloom configure --env devnet --market uniswapv2 --wallet 0x123...
+powerloom-snapshotter-cli configure --env devnet --market uniswapv2 --wallet 0x123...
 ```
 
 **Configuration files are stored in:** `~/.powerloom-snapshotter-cli/envs/`
@@ -240,7 +242,7 @@ powerloom configure --env devnet --market uniswapv2 --wallet 0x123...
 Deploy snapshotter nodes for specified environment and data markets.
 
 ```bash
-powerloom deploy [OPTIONS]
+powerloom-snapshotter-cli deploy [OPTIONS]
 ```
 
 **Options:**
@@ -254,16 +256,16 @@ powerloom deploy [OPTIONS]
 **Examples:**
 ```bash
 # Interactive deployment
-powerloom deploy
+powerloom-snapshotter-cli deploy
 
 # Deploy specific market
-powerloom deploy --env devnet --market uniswapv2
+powerloom-snapshotter-cli deploy --env devnet --market uniswapv2
 
 # Deploy specific slots
-powerloom deploy --env devnet --market uniswapv2 --slot 123 --slot 456
+powerloom-snapshotter-cli deploy --env devnet --market uniswapv2 --slot 123 --slot 456
 
 # Deploy multiple markets
-powerloom deploy --env devnet --market uniswapv2 --market aavev3
+powerloom-snapshotter-cli deploy --env devnet --market uniswapv2 --market aavev3
 ```
 
 ### list
@@ -271,7 +273,7 @@ powerloom deploy --env devnet --market uniswapv2 --market aavev3
 List all active snapshotter instances.
 
 ```bash
-powerloom list
+powerloom-snapshotter-cli list
 ```
 
 **Output includes:**
@@ -285,7 +287,7 @@ powerloom list
 Stop snapshotter instances.
 
 ```bash
-powerloom stop [OPTIONS]
+powerloom-snapshotter-cli stop [OPTIONS]
 ```
 
 **Options:**
@@ -296,16 +298,16 @@ powerloom stop [OPTIONS]
 **Examples:**
 ```bash
 # Stop all instances
-powerloom stop
+powerloom-snapshotter-cli stop
 
 # Stop all instances for a chain
-powerloom stop --env devnet
+powerloom-snapshotter-cli stop --env devnet
 
 # Stop specific market instances
-powerloom stop --env devnet --market uniswapv2
+powerloom-snapshotter-cli stop --env devnet --market uniswapv2
 
 # Stop specific slot
-powerloom stop --env devnet --market uniswapv2 --slot 123
+powerloom-snapshotter-cli stop --env devnet --market uniswapv2 --slot 123
 ```
 
 ### restart
@@ -313,7 +315,7 @@ powerloom stop --env devnet --market uniswapv2 --slot 123
 Restart snapshotter instances (stop and start).
 
 ```bash
-powerloom restart [OPTIONS]
+powerloom-snapshotter-cli restart [OPTIONS]
 ```
 
 **Options:**
@@ -326,7 +328,7 @@ powerloom restart [OPTIONS]
 Remove stopped instances and clean up resources.
 
 ```bash
-powerloom cleanup [OPTIONS]
+powerloom-snapshotter-cli cleanup [OPTIONS]
 ```
 
 **Options:**
@@ -338,10 +340,10 @@ powerloom cleanup [OPTIONS]
 **Example:**
 ```bash
 # Cleanup with confirmation
-powerloom cleanup --env devnet --market uniswapv2
+powerloom-snapshotter-cli cleanup --env devnet --market uniswapv2
 
 # Force cleanup without confirmation
-powerloom cleanup --force
+powerloom-snapshotter-cli cleanup --force
 ```
 
 ### logs
@@ -349,7 +351,7 @@ powerloom cleanup --force
 View logs for snapshotter instances.
 
 ```bash
-powerloom logs [OPTIONS]
+powerloom-snapshotter-cli logs [OPTIONS]
 ```
 
 **Options:**
@@ -363,13 +365,13 @@ powerloom logs [OPTIONS]
 **Examples:**
 ```bash
 # View recent logs
-powerloom logs --env devnet --market uniswapv2
+powerloom-snapshotter-cli logs --env devnet --market uniswapv2
 
 # Follow logs in real-time
-powerloom logs --env devnet --market uniswapv2 --follow
+powerloom-snapshotter-cli logs --env devnet --market uniswapv2 --follow
 
 # View specific container logs
-powerloom logs --env devnet --market uniswapv2 --container core-api
+powerloom-snapshotter-cli logs --env devnet --market uniswapv2 --container core-api
 ```
 
 ### diagnose
@@ -377,7 +379,7 @@ powerloom logs --env devnet --market uniswapv2 --container core-api
 Run diagnostics on the system and check requirements.
 
 ```bash
-powerloom diagnose [OPTIONS]
+powerloom-snapshotter-cli diagnose [OPTIONS]
 ```
 
 **Options:**
@@ -397,7 +399,7 @@ powerloom diagnose [OPTIONS]
 Manage signer identities.
 
 ```bash
-powerloom identity COMMAND
+powerloom-snapshotter-cli identity COMMAND
 ```
 
 **Subcommands:**
@@ -405,13 +407,13 @@ powerloom identity COMMAND
 #### identity generate
 Generate a new signer account:
 ```bash
-powerloom identity generate
+powerloom-snapshotter-cli identity generate
 ```
 
 #### identity show
 Display signer address from a configuration:
 ```bash
-powerloom identity show --env devnet --market uniswapv2
+powerloom-snapshotter-cli identity show --env devnet --market uniswapv2
 ```
 
 **Options:**
@@ -423,7 +425,7 @@ powerloom identity show --env devnet --market uniswapv2
 Start an interactive shell session for faster command execution. **This is the recommended way to use the CLI.**
 
 ```bash
-powerloom shell
+powerloom-snapshotter-cli shell
 ```
 
 The shell mode eliminates the startup delay for each command, making it ideal for managing your snapshotter nodes efficiently. See the [Interactive Shell Mode](#interactive-shell-mode-recommended) section above for detailed usage and examples.
@@ -474,12 +476,12 @@ sudo systemctl start docker
 #### 2. "Command not found" after uv sync
 **Solution:** Use the `uv run` prefix:
 ```bash
-uv run powerloom --help
+uv run powerloom-snapshotter-cli --help
 ```
 Or install globally with `uv tool install` for direct access.
 
 #### 3. "Wallet Holder Address could not be resolved"
-**Solution:** Run `powerloom configure` to set up credentials for the chain/market combination.
+**Solution:** Run `powerloom-snapshotter-cli configure` to set up credentials for the chain/market combination.
 
 #### 4. "Screen session already exists"
 **Solution:** Clean up existing sessions:
@@ -491,7 +493,7 @@ screen -ls
 screen -X -S session_name quit
 
 # Or use cleanup command
-powerloom cleanup --force
+powerloom-snapshotter-cli cleanup --force
 ```
 
 #### 5. "ABI files not found"
@@ -511,7 +513,7 @@ For detailed debugging information:
 export POWERLOOM_CLI_DEBUG=1
 
 # Run commands with debug output
-powerloom deploy --env devnet --market uniswapv2
+powerloom-snapshotter-cli deploy --env devnet --market uniswapv2
 ```
 
 ### Getting Help

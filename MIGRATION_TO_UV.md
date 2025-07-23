@@ -46,7 +46,7 @@ This guide covers the migration from Poetry to uv for the Powerloom Snapshotter 
 uv sync
 
 # Run the CLI
-uv run powerloom --help
+uv run powerloom-snapshotter-cli --help
 
 # Run tests
 uv run pytest
@@ -67,7 +67,7 @@ PLATFORM=linux ARCH=x86_64 uv run pyinstaller pyinstaller.spec
 
 End users can install using the new installation script:
 ```bash
-curl -sSL https://raw.githubusercontent.com/powerloom/snapshotter-lite-multi-setup/main/install-uv.sh | bash
+curl -sSL https://raw.githubusercontent.com/PowerLoom/snapshotter-lite-multi-setup/master/install-uv.sh | bash
 ```
 
 Or install from PyPI when published:

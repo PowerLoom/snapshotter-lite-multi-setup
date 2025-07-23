@@ -11,10 +11,12 @@ We now offer a powerful command-line interface (CLI) tool that simplifies node m
 # Linux x86_64
 wget https://github.com/PowerLoom/snapshotter-lite-multi-setup/releases/latest/download/powerloom-snapshotter-cli-linux-amd64
 chmod +x powerloom-snapshotter-cli-linux-amd64
-sudo mv powerloom-snapshotter-cli-linux-amd64 /usr/local/bin/powerloom
+# Move to PATH - you can use the full name or a shorter alias like 'snapshotter'
+sudo mv powerloom-snapshotter-cli-linux-amd64 /usr/local/bin/powerloom-snapshotter-cli
+# Or for a shorter command: sudo mv powerloom-snapshotter-cli-linux-amd64 /usr/local/bin/snapshotter
 
 # Start the interactive shell (RECOMMENDED - no startup delays!)
-powerloom shell
+powerloom-snapshotter-cli shell
 
 # Now run commands instantly:
 powerloom-snapshotter> configure
@@ -68,7 +70,7 @@ powerloom-snapshotter> logs --follow
     - [Testing the Build](#testing-the-build)
 
 > [!NOTE]
-> This setup is for Lite nodes participating in the latest V2 of Powerloom Protocol with multiple data markets. [Protocol V1 setup](https://github.com/PowerLoom/snapshotter-lite-multi-setup/tree/main) is deprecated and its data markets are archived. Your submission data, rewards on it are finalized and recorded as [announced on Discord](https://discord.com/channels/777248105636560948/1146931631039463484/1242876184509812847).
+> This setup is for Lite nodes participating in the latest V2 of Powerloom Protocol with multiple data markets. [Protocol V1 setup](https://github.com/PowerLoom/snapshotter-lite-multi-setup/tree/master) is deprecated and its data markets are archived. Your submission data, rewards on it are finalized and recorded as [announced on Discord](https://discord.com/channels/777248105636560948/1146931631039463484/1242876184509812847).
 
 ## 1\. Preparation
 
@@ -154,7 +156,7 @@ The install script will:
 - Install uv (if not already installed)
 - Install the Powerloom Snapshotter CLI globally
 - Set up all required dependencies
-- Make commands available: `powerloom`, `snapshotter`, `powerloom-snapshotter-cli`
+- Make commands available: `powerloom-snapshotter-cli`, `snapshotter`
 
 ## 2. Setup
 
@@ -642,14 +644,14 @@ uv tool install --force --from dist/powerloom_snapshotter_cli-0.1.0-py3-none-any
 uv tool install --editable --from . powerloom-snapshotter-cli
 
 # Test the CLI
-powerloom --help
+powerloom-snapshotter-cli --help
 ```
 
 ### Development Workflow
 
 ```bash
 # Run CLI during development
-uv run powerloom --help
+uv run powerloom-snapshotter-cli --help
 
 # Run tests
 uv run pytest

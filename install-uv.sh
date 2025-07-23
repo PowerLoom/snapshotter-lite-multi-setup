@@ -63,6 +63,5 @@ fi
 echo -e "\n${GREEN}✅ Installation complete!${NC}"
 echo -e "\nYou can now use any of these commands:"
 echo -e "  ${YELLOW}powerloom-snapshotter-cli${NC}"
-echo -e "  ${YELLOW}powerloom${NC}"
 echo -e "  ${YELLOW}snapshotter${NC}"
-echo -e "\nTry: ${YELLOW}powerloom --help${NC}"
+echo -e "\nTry: ${YELLOW}powerloom-snapshotter-cli --help${NC}"
