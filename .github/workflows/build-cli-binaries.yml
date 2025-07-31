@@ -21,7 +21,7 @@ jobs:
         include:
           - os: ubuntu-22.04
             platform: linux
-            arch: x86_64
+            arch: amd64
           - os: macos-latest
             platform: macos
             arch: arm64
@@ -116,11 +116,11 @@ jobs:
 
           ### Installation
 
-          #### Linux (x86_64)
+          #### Linux (AMD64)
           ```bash
-          wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/powerloom-snapshotter-cli-linux-x86_64
-          chmod +x powerloom-snapshotter-cli-linux-x86_64
-          sudo mv powerloom-snapshotter-cli-linux-x86_64 /usr/local/bin/powerloom-snapshotter-cli
+          wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/powerloom-snapshotter-cli-linux-amd64
+          chmod +x powerloom-snapshotter-cli-linux-amd64
+          sudo mv powerloom-snapshotter-cli-linux-amd64 /usr/local/bin/powerloom-snapshotter-cli
           ```
 
           #### Linux (ARM64)
