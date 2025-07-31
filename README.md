@@ -635,14 +635,14 @@ uv build
 ```
 
 This will create:
-- A wheel file in `dist/powerloom_snapshotter_cli-0.1.0-py3-none-any.whl`
-- A source distribution in `dist/powerloom_snapshotter_cli-0.1.0.tar.gz`
+- A wheel file in `dist/powerloom_snapshotter_cli-0.1.1-py3-none-any.whl`
+- A source distribution in `dist/powerloom_snapshotter_cli-0.1.1.tar.gz`
 
 ### Testing the Build
 
 ```bash
 # Install the CLI globally with uv (use --force to update existing installation)
-uv tool install --force --from dist/powerloom_snapshotter_cli-0.1.0-py3-none-any.whl powerloom-snapshotter-cli
+uv tool install --force --from dist/powerloom_snapshotter_cli-0.1.1-py3-none-any.whl powerloom-snapshotter-cli
 
 # Or for development, install in editable mode
 uv tool install --editable --from . powerloom-snapshotter-cli
