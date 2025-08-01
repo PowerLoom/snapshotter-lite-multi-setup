@@ -119,15 +119,18 @@ def configure_command(
 
     # --- Get Powerloom RPC URL from chain config ---
     chain_config = chain_data.chain_config
-    default_rpc_url = str(chain_config.rpcURL)
+    default_rpc_url = str(chain_config.rpcURL).rstrip("/")
 
     # --- Select Powerloom RPC URL ---
-    if not powerloom_rpc_url:
-        final_powerloom_rpc_url = Prompt.ask(
-            "👉 Enter Powerloom RPC URL", default=default_rpc_url
-        )
-    else:
+    if powerloom_rpc_url:
         final_powerloom_rpc_url = powerloom_rpc_url
+    else:
+        # Auto-use default RPC URL
+        final_powerloom_rpc_url = default_rpc_url
+        console.print(
+            f"✅ Using default Powerloom RPC URL: [bold cyan]{default_rpc_url}[/bold cyan]",
+            style="green",
+        )
     available_markets = sorted(chain_data.markets.keys())
     if not available_markets:
         console.print(

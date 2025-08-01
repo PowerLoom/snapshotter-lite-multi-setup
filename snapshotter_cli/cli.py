@@ -515,7 +515,7 @@ def deploy(
             fetched_slots_result = fetch_owned_slots(
                 wallet_address=final_wallet_address,
                 powerloom_chain_name=env_config.chain_config.name,
-                rpc_url=str(env_config.chain_config.rpcURL),
+                rpc_url=str(env_config.chain_config.rpcURL).rstrip("/"),
                 protocol_state_contract_address=protocol_state_contract_address,
             )
             if fetched_slots_result is None:
@@ -1073,7 +1073,7 @@ def list_chains_and_markets(ctx: typer.Context):
         chain_config_val = chain_data_val.chain_config
         markets_dict = chain_data_val.markets
 
-        chain_details = f"[bold green]{chain_name}[/] ([dim]Chain ID: {chain_config_val.chainId}, RPC: {str(chain_config_val.rpcURL)}[/])"
+        chain_details = f"[bold green]{chain_name}[/] ([dim]Chain ID: {chain_config_val.chainId}, RPC: {str(chain_config_val.rpcURL).rstrip('/')}[/])"
         chain_branch = tree.add(chain_details)
 
         if not markets_dict:

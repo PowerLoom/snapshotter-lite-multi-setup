@@ -233,7 +233,7 @@ def deploy_snapshotter_instance(
     final_env_vars["SLOT_ID"] = str(slot_id)
     final_env_vars["SIGNER_ACCOUNT_ADDRESS"] = signer_address
     final_env_vars["SIGNER_ACCOUNT_PRIVATE_KEY"] = signer_private_key
-    final_env_vars["POWERLOOM_RPC_URL"] = str(powerloom_chain_config.rpcURL)
+    final_env_vars["POWERLOOM_RPC_URL"] = str(powerloom_chain_config.rpcURL).rstrip("/")
     final_env_vars["SOURCE_RPC_URL"] = source_chain_rpc_url
 
     final_env_vars["DATA_MARKET_CONTRACT"] = market_config.contractAddress
