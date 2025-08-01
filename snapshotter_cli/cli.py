@@ -344,38 +344,42 @@ def deploy(
                 )
                 raise typer.Exit(0)
 
-            # Build market display with additional options
-            market_lines = []
-            for i, name in enumerate(available_market_names_on_chain):
-                market_lines.append(
-                    f"[bold green]{i+1}.[/] [cyan]{name}[/] ([dim]Source: {env_config.markets[name].sourceChain}[/])"
+            # Auto-select if only one market is available
+            if len(available_market_names_on_chain) == 1:
+                final_selected_markets_str_list = available_market_names_on_chain
+                console.print(
+                    f"✅ Auto-selected the only available market: [bold cyan]{available_market_names_on_chain[0]}[/bold cyan]",
+                    style="green",
                 )
-
-            # Add special options
-            market_lines.append(
-                "\n[bold yellow]0.[/] [yellow]Custom input (type market names manually)[/]"
-            )
-            if len(available_market_names_on_chain) > 1:
-                market_lines.append(
-                    f"[bold yellow]A.[/] [yellow]Select all markets ({len(available_market_names_on_chain)} markets)[/]"
-                )
-
-            market_display_list = "\n".join(market_lines)
-            market_panel = Panel(
-                market_display_list,
-                title=f"[bold blue]Select Data Markets on {selected_powerloom_chain_name_upper}[/]",
-                border_style="blue",
-                padding=(1, 2),
-            )
-            console.print(market_panel)
-
-            # Interactive selection
-            while True:
-                if len(available_market_names_on_chain) == 1:
-                    selection = Prompt.ask(
-                        "👉 Select market", default="1", choices=["0", "1"]
+            else:
+                # Multiple markets available - show selection UI
+                # Build market display with additional options
+                market_lines = []
+                for i, name in enumerate(available_market_names_on_chain):
+                    market_lines.append(
+                        f"[bold green]{i+1}.[/] [cyan]{name}[/] ([dim]Source: {env_config.markets[name].sourceChain}[/])"
                     )
-                else:
+
+                # Add special options
+                market_lines.append(
+                    "\n[bold yellow]0.[/] [yellow]Custom input (type market names manually)[/]"
+                )
+                if len(available_market_names_on_chain) > 1:
+                    market_lines.append(
+                        f"[bold yellow]A.[/] [yellow]Select all markets ({len(available_market_names_on_chain)} markets)[/]"
+                    )
+
+                market_display_list = "\n".join(market_lines)
+                market_panel = Panel(
+                    market_display_list,
+                    title=f"[bold blue]Select Data Markets on {selected_powerloom_chain_name_upper}[/]",
+                    border_style="blue",
+                    padding=(1, 2),
+                )
+                console.print(market_panel)
+
+                # Interactive selection
+                while True:
                     selection = Prompt.ask(
                         "👉 Select markets (e.g., '1,3' or '1-3' or 'A' for all)",
                         default=(
@@ -383,52 +387,57 @@ def deploy(
                         ),
                     )
 
-                selection = selection.strip().upper()
+                    selection = selection.strip().upper()
 
-                # Handle special cases
-                if selection == "0":
-                    # Custom input - use original behavior
-                    default_market_prompt = ",".join(available_market_names_on_chain)
-                    markets_input_str = Prompt.ask(
-                        f"👉 Enter market names (comma-separated)",
-                        default=default_market_prompt,
-                    )
-                    final_selected_markets_str_list = [
-                        m.strip() for m in markets_input_str.split(",") if m.strip()
-                    ]
-                    break
-                elif selection == "A" and len(available_market_names_on_chain) > 1:
-                    # Select all
-                    final_selected_markets_str_list = available_market_names_on_chain
-                    console.print(
-                        f"✅ Selected all {len(available_market_names_on_chain)} markets",
-                        style="green",
-                    )
-                    break
-                else:
-                    # Parse numeric selection
-                    try:
-                        indices = parse_selection_string(
-                            selection, len(available_market_names_on_chain)
+                    # Handle special cases
+                    if selection == "0":
+                        # Custom input - use original behavior
+                        default_market_prompt = ",".join(
+                            available_market_names_on_chain
                         )
-                        if indices:
-                            final_selected_markets_str_list = [
-                                available_market_names_on_chain[i] for i in indices
-                            ]
-                            console.print(
-                                f"✅ Selected {len(final_selected_markets_str_list)} market(s): {', '.join(final_selected_markets_str_list)}",
-                                style="green",
+                        markets_input_str = Prompt.ask(
+                            f"👉 Enter market names (comma-separated)",
+                            default=default_market_prompt,
+                        )
+                        final_selected_markets_str_list = [
+                            m.strip() for m in markets_input_str.split(",") if m.strip()
+                        ]
+                        break
+                    elif selection == "A" and len(available_market_names_on_chain) > 1:
+                        # Select all
+                        final_selected_markets_str_list = (
+                            available_market_names_on_chain
+                        )
+                        console.print(
+                            f"✅ Selected all {len(available_market_names_on_chain)} markets",
+                            style="green",
+                        )
+                        break
+                    else:
+                        # Parse numeric selection
+                        try:
+                            indices = parse_selection_string(
+                                selection, len(available_market_names_on_chain)
                             )
-                            break
-                        else:
+                            if indices:
+                                final_selected_markets_str_list = [
+                                    available_market_names_on_chain[i] for i in indices
+                                ]
+                                console.print(
+                                    f"✅ Selected {len(final_selected_markets_str_list)} market(s): {', '.join(final_selected_markets_str_list)}",
+                                    style="green",
+                                )
+                                break
+                            else:
+                                console.print(
+                                    "❌ No valid selections made. Please try again.",
+                                    style="red",
+                                )
+                        except ValueError as e:
                             console.print(
-                                "❌ No valid selections made. Please try again.",
+                                f"❌ Invalid selection: {e}. Please try again.",
                                 style="red",
                             )
-                    except ValueError as e:
-                        console.print(
-                            f"❌ Invalid selection: {e}. Please try again.", style="red"
-                        )
 
         # --- Load market-specific namespaced .env file (for first selected market) ---
         namespaced_env_content: Optional[Dict[str, str]] = None
