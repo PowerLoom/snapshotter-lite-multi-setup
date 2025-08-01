@@ -6,11 +6,10 @@ from typing import Dict, List, Optional
 import requests
 import typer
 from rich.panel import Panel
-from rich.prompt import Prompt
 from rich.table import Table
 from rich.tree import Tree
 
-from snapshotter_cli.utils.console import console
+from snapshotter_cli.utils.console import Prompt, console
 
 from . import __version__
 from .commands.configure import configure_command

@@ -5,9 +5,8 @@ from typing import Dict, Optional
 import typer
 from dotenv import dotenv_values
 from rich.panel import Panel
-from rich.prompt import Prompt
 
-from snapshotter_cli.utils.console import console
+from snapshotter_cli.utils.console import Prompt, console
 from snapshotter_cli.utils.deployment import (
     CONFIG_DIR,
     CONFIG_ENV_FILENAME_TEMPLATE,
