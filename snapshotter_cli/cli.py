@@ -5,11 +5,12 @@ from typing import Dict, List, Optional
 
 import requests
 import typer
-from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
 from rich.tree import Tree
+
+from snapshotter_cli.utils.console import console
 
 from . import __version__
 from .commands.configure import configure_command
@@ -34,8 +35,6 @@ from .utils.models import (
     PowerloomChainConfig,
 )
 from .utils.system_checks import is_docker_running, list_snapshotter_screen_sessions
-
-console = Console()
 
 MARKETS_CONFIG_URL = (
     "https://raw.githubusercontent.com/powerloom/curated-datamarkets/main/sources.json"

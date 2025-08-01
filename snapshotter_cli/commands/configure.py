@@ -4,18 +4,16 @@ from typing import Dict, Optional
 
 import typer
 from dotenv import dotenv_values
-from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
 
+from snapshotter_cli.utils.console import console
 from snapshotter_cli.utils.deployment import (
     CONFIG_DIR,
     CONFIG_ENV_FILENAME_TEMPLATE,
     calculate_connection_refresh_interval,
 )
 from snapshotter_cli.utils.models import CLIContext, MarketConfig, PowerloomChainConfig
-
-console = Console()
 
 ENV_FILENAME_TEMPLATE = ".env.{}.{}.{}"  # e.g. .env.devnet.uniswapv2.eth-mainnet
 

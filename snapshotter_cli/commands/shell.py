@@ -3,9 +3,10 @@ import sys
 from typing import Any, Dict, List, Optional
 
 import typer
-from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
+
+from snapshotter_cli.utils.console import console
 
 try:
     import readline
@@ -13,8 +14,6 @@ try:
     HAS_READLINE = True
 except ImportError:
     HAS_READLINE = False
-
-console = Console()
 
 # Global variables for autocomplete
 COMMANDS = {}
