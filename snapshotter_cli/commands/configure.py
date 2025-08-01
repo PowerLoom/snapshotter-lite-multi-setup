@@ -236,11 +236,6 @@ def configure_command(
         )
         if final_signer_key == "(hidden)" or final_signer_key == "":
             final_signer_key = existing_key
-        else:
-            confirm_key = Prompt.ask("👉 Confirm signer private key", password=True)
-            if final_signer_key != confirm_key:
-                console.print("❌ Private keys do not match.", style="bold red")
-                raise typer.Exit(1)
 
     final_source_rpc = source_rpc_url or Prompt.ask(
         f"👉 Enter RPC URL for {selected_market_obj.sourceChain}",
