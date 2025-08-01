@@ -48,10 +48,28 @@ class Prompt(RichPrompt):
         if console is None:
             console = globals()["console"]  # Use our global console instance
 
-        # Add explicit newline for PyInstaller builds
-        if getattr(sys, "frozen", False) and not prompt.endswith("\n"):
-            prompt = prompt + "\n"
+        # For PyInstaller builds on Linux, use a simpler approach
+        if getattr(sys, "frozen", False) and sys.platform.startswith("linux"):
+            # Print prompt with default value on the same line
+            prompt_text = prompt
+            if show_default and default is not ... and default != "":
+                prompt_text = f"{prompt} ({default})"
 
+            # Use standard input() to avoid Rich's terminal handling issues
+            if password:
+                import getpass
+
+                console.print(prompt_text, end="")
+                value = getpass.getpass(" ")
+            else:
+                value = input(f"{prompt_text}: ").strip()
+
+            # Return default if empty input
+            if not value and default is not ...:
+                return str(default)
+            return value
+
+        # Use normal Rich prompt for non-frozen builds
         return super().ask(
             prompt,
             console=console,
