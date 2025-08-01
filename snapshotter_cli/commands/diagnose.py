@@ -3,10 +3,9 @@ import subprocess
 from typing import Dict, List, Tuple
 
 import typer
-from rich.console import Console
 from rich.panel import Panel
 
-console = Console()
+from snapshotter_cli.utils.console import console
 
 
 def check_sudo_access() -> bool:

@@ -1,8 +1,6 @@
 import subprocess
 
-from rich.console import Console
-
-console = Console()
+from snapshotter_cli.utils.console import console
 
 
 def is_docker_running() -> bool:

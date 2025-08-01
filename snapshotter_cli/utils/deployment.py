@@ -5,16 +5,13 @@ import time
 from pathlib import Path
 from typing import Dict, Optional
 
-from rich.console import Console
-
+from snapshotter_cli.utils.console import console
 from snapshotter_cli.utils.models import (  # PowerloomChainConfig is the one with .name
     ChainConfig,
     MarketConfig,
 )
 
 from .system_checks import does_screen_session_exist
-
-console = Console()
 
 SNAPSHOTTER_LITE_V2_DIR = Path("snapshotter-lite-v2")
 ENV_EXAMPLE_BASENAME = "env.example"

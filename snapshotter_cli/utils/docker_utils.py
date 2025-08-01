@@ -1,9 +1,7 @@
 import subprocess
 from typing import Dict, List, Optional
 
-from rich.console import Console
-
-console = Console()
+from snapshotter_cli.utils.console import console
 
 
 def get_docker_container_status_for_instance(
