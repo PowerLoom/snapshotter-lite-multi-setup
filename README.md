@@ -8,7 +8,7 @@ We now offer a powerful command-line interface (CLI) tool that simplifies node m
 
 ```bash
 # Download the latest binary for your platform
-# Linux x86_64
+# Linux AMD64
 wget https://github.com/PowerLoom/snapshotter-lite-multi-setup/releases/latest/download/powerloom-snapshotter-cli-linux-amd64
 chmod +x powerloom-snapshotter-cli-linux-amd64
 # Move to PATH - you can use the full name or a shorter alias like 'snapshotter'
@@ -26,6 +26,25 @@ powerloom-snapshotter> logs --follow
 ```
 
 💡 **Why use shell mode?** The CLI has a startup time for each command. Shell mode eliminates this delay, giving you instant command execution!
+
+### Recent CLI Improvements (August 1st 2025)
+
+The CLI has been enhanced with several UX improvements:
+
+- **🎯 Smart Market Selection**:
+  - Single-market chains (like MAINNET) auto-select without prompting
+  - Multi-market chains show selection UI only when needed
+  - Market selection happens before env file loading (fixes auto-selection issue)
+
+- **⚡ Streamlined Configuration**:
+  - Powerloom RPC URLs auto-use official defaults - no manual entry needed
+  - Fewer prompts for common scenarios
+  - Clean URLs without trailing slashes
+
+- **🐧 Linux Compatibility**:
+  - Fixed terminal display issues in PyInstaller builds
+  - All prompts now display correctly with proper newlines
+  - Binaries built on Ubuntu 22.04 for better compatibility
 
 ### Key CLI Features
 
