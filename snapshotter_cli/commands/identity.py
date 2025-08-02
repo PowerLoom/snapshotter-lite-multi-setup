@@ -4,8 +4,9 @@ from pathlib import Path
 from typing import List, Optional
 
 import typer
-from rich.console import Console
 from rich.table import Table
+
+from snapshotter_cli.utils.console import console
 
 from ..utils.deployment import (
     CONFIG_DIR,
@@ -13,8 +14,6 @@ from ..utils.deployment import (
     parse_env_file_vars,
 )
 from ..utils.models import CLIContext
-
-console = Console()
 
 identity_app = typer.Typer(
     name="identity",

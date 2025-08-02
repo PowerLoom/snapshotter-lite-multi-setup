@@ -2,9 +2,7 @@ import os
 from pathlib import Path
 from typing import Dict, Optional
 
-from rich.console import Console
-
-console = Console()
+from snapshotter_cli.utils.console import console
 
 
 def get_credential(

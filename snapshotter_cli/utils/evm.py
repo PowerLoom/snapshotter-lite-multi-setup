@@ -3,10 +3,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
-from rich.console import Console
-
-console = Console()
-
+from snapshotter_cli.utils.console import console
 
 # Handle PyInstaller bundled files
 if getattr(sys, "frozen", False):
