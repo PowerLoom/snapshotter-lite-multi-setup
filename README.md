@@ -689,3 +689,21 @@ uv run pytest
 ### Development Guidelines
 
 For code quality and pre-commit setup, please see [README_PRECOMMIT.md](README_PRECOMMIT.md)
+
+## Recent Improvements (2025-08-04)
+
+### Enhanced Shell Mode
+- **Market Selection**: Shell mode now properly fetches and displays all available markets for the selected chain (e.g., both AAVEV3 and UNISWAPV2 for DEVNET)
+- **Smart Auto-selection**: Single-market chains (like MAINNET) automatically select the only available market without prompting
+- **Better Defaults**: MAINNET is now the default chain, ETH-MAINNET is the default source chain
+- **Case-insensitive Input**: Chain and market names now accept mixed case input (e.g., "mainnet", "Mainnet", "MAINNET" all work)
+
+### Streamlined Configuration
+- **Powerloom RPC URL**: Automatically uses defaults from sources.json without prompting
+- **Single Market Auto-selection**: Both `deploy` and `configure` commands auto-select when only one market is available
+- **Fixed Terminal Display**: Resolved issues with prompts appearing on the same line in Linux PyInstaller builds
+
+### Build and Compatibility
+- **Linux Binary Naming**: Changed from `x86_64` to `amd64` for consistency
+- **glibc Compatibility**: Binaries now built on Ubuntu 22.04 for broader compatibility
+- **ARM64 Native Builds**: Using GitHub's native ARM64 runners for faster builds
