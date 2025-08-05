@@ -8,7 +8,7 @@ We now offer a powerful command-line interface (CLI) tool that simplifies node m
 
 ```bash
 # Download the latest binary for your platform
-# Linux x86_64
+# Linux AMD64
 wget https://github.com/PowerLoom/snapshotter-lite-multi-setup/releases/latest/download/powerloom-snapshotter-cli-linux-amd64
 chmod +x powerloom-snapshotter-cli-linux-amd64
 # Move to PATH - you can use the full name or a shorter alias like 'snapshotter'
@@ -26,6 +26,25 @@ powerloom-snapshotter> logs --follow
 ```
 
 💡 **Why use shell mode?** The CLI has a startup time for each command. Shell mode eliminates this delay, giving you instant command execution!
+
+### Recent CLI Improvements (August 1st 2025)
+
+The CLI has been enhanced with several UX improvements:
+
+- **🎯 Smart Market Selection**:
+  - Single-market chains (like MAINNET) auto-select without prompting
+  - Multi-market chains show selection UI only when needed
+  - Market selection happens before env file loading (fixes auto-selection issue)
+
+- **⚡ Streamlined Configuration**:
+  - Powerloom RPC URLs auto-use official defaults - no manual entry needed
+  - Fewer prompts for common scenarios
+  - Clean URLs without trailing slashes
+
+- **🐧 Linux Compatibility**:
+  - Fixed terminal display issues in PyInstaller builds
+  - All prompts now display correctly with proper newlines
+  - Binaries built on Ubuntu 22.04 for better compatibility
 
 ### Key CLI Features
 
@@ -670,3 +689,21 @@ uv run pytest
 ### Development Guidelines
 
 For code quality and pre-commit setup, please see [README_PRECOMMIT.md](README_PRECOMMIT.md)
+
+## Recent Improvements (2025-08-04)
+
+### Enhanced Shell Mode
+- **Market Selection**: Shell mode now properly fetches and displays all available markets for the selected chain (e.g., both AAVEV3 and UNISWAPV2 for DEVNET)
+- **Smart Auto-selection**: Single-market chains (like MAINNET) automatically select the only available market without prompting
+- **Better Defaults**: MAINNET is now the default chain, ETH-MAINNET is the default source chain
+- **Case-insensitive Input**: Chain and market names now accept mixed case input (e.g., "mainnet", "Mainnet", "MAINNET" all work)
+
+### Streamlined Configuration
+- **Powerloom RPC URL**: Automatically uses defaults from sources.json without prompting
+- **Single Market Auto-selection**: Both `deploy` and `configure` commands auto-select when only one market is available
+- **Fixed Terminal Display**: Resolved issues with prompts appearing on the same line in Linux PyInstaller builds
+
+### Build and Compatibility
+- **Linux Binary Naming**: Changed from `x86_64` to `amd64` for consistency
+- **glibc Compatibility**: Binaries now built on Ubuntu 22.04 for broader compatibility
+- **ARM64 Native Builds**: Using GitHub's native ARM64 runners for faster builds

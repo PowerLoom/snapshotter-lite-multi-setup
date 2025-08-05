@@ -330,14 +330,124 @@ def deploy(
             style="bold green",
         )
 
-        # --- Load market-specific namespaced .env file ---
-        # We need to load this before getting credentials to ensure we use the right wallet address
+        # --- Market Selection (moved before env loading) ---
+        available_market_names_on_chain = list(env_config.markets.keys())
+        final_selected_markets_str_list: List[str] = []
+
+        if data_markets_opt:
+            final_selected_markets_str_list = data_markets_opt
+        else:
+            if not available_market_names_on_chain:
+                console.print(
+                    f"🤷 No data markets available for {selected_powerloom_chain_name_upper} in sources.json.",
+                    style="yellow",
+                )
+                raise typer.Exit(0)
+
+            # Auto-select if only one market is available
+            if len(available_market_names_on_chain) == 1:
+                final_selected_markets_str_list = available_market_names_on_chain
+                console.print(
+                    f"✅ Auto-selected the only available market: [bold cyan]{available_market_names_on_chain[0]}[/bold cyan]",
+                    style="green",
+                )
+            else:
+                # Multiple markets available - show selection UI
+                # Build market display with additional options
+                market_lines = []
+                for i, name in enumerate(available_market_names_on_chain):
+                    market_lines.append(
+                        f"[bold green]{i+1}.[/] [cyan]{name}[/] ([dim]Source: {env_config.markets[name].sourceChain}[/])"
+                    )
+
+                # Add special options
+                market_lines.append(
+                    "\n[bold yellow]0.[/] [yellow]Custom input (type market names manually)[/]"
+                )
+                if len(available_market_names_on_chain) > 1:
+                    market_lines.append(
+                        f"[bold yellow]A.[/] [yellow]Select all markets ({len(available_market_names_on_chain)} markets)[/]"
+                    )
+
+                market_display_list = "\n".join(market_lines)
+                market_panel = Panel(
+                    market_display_list,
+                    title=f"[bold blue]Select Data Markets on {selected_powerloom_chain_name_upper}[/]",
+                    border_style="blue",
+                    padding=(1, 2),
+                )
+                console.print(market_panel)
+
+                # Interactive selection
+                while True:
+                    selection = Prompt.ask(
+                        "👉 Select markets (e.g., '1,3' or '1-3' or 'A' for all)",
+                        default=(
+                            "A" if len(available_market_names_on_chain) <= 3 else "1"
+                        ),
+                    )
+
+                    selection = selection.strip().upper()
+
+                    # Handle special cases
+                    if selection == "0":
+                        # Custom input - use original behavior
+                        default_market_prompt = ",".join(
+                            available_market_names_on_chain
+                        )
+                        markets_input_str = Prompt.ask(
+                            f"👉 Enter market names (comma-separated)",
+                            default=default_market_prompt,
+                        )
+                        final_selected_markets_str_list = [
+                            m.strip() for m in markets_input_str.split(",") if m.strip()
+                        ]
+                        break
+                    elif selection == "A" and len(available_market_names_on_chain) > 1:
+                        # Select all
+                        final_selected_markets_str_list = (
+                            available_market_names_on_chain
+                        )
+                        console.print(
+                            f"✅ Selected all {len(available_market_names_on_chain)} markets",
+                            style="green",
+                        )
+                        break
+                    else:
+                        # Parse numeric selection
+                        try:
+                            indices = parse_selection_string(
+                                selection, len(available_market_names_on_chain)
+                            )
+                            if indices:
+                                final_selected_markets_str_list = [
+                                    available_market_names_on_chain[i] for i in indices
+                                ]
+                                console.print(
+                                    f"✅ Selected {len(final_selected_markets_str_list)} market(s): {', '.join(final_selected_markets_str_list)}",
+                                    style="green",
+                                )
+                                break
+                            else:
+                                console.print(
+                                    "❌ No valid selections made. Please try again.",
+                                    style="red",
+                                )
+                        except ValueError as e:
+                            console.print(
+                                f"❌ Invalid selection: {e}. Please try again.",
+                                style="red",
+                            )
+
+        # --- Load market-specific namespaced .env file (for first selected market) ---
         namespaced_env_content: Optional[Dict[str, str]] = None
         norm_pl_chain_name_for_file = selected_powerloom_chain_name_upper.lower()
 
-        # Since we don't know which market yet, try all markets to find a matching wallet
-        for market_name, market_obj in env_config.markets.items():
-            norm_market_name_for_file = market_name.lower()
+        if final_selected_markets_str_list:
+            # Use the first selected market for loading env file
+            first_market_name = final_selected_markets_str_list[0]
+            market_obj = env_config.markets[first_market_name.upper()]
+            norm_market_name_for_file = first_market_name.lower()
             norm_source_chain_name_for_file = market_obj.sourceChain.lower().replace(
                 "-", "_"
             )
@@ -351,21 +461,21 @@ def deploy(
             config_file_path = CONFIG_DIR / potential_config_filename
             if config_file_path.exists():
                 console.print(
-                    f"✓ Found namespaced .env for market {market_name}: {config_file_path}",
+                    f"✓ Found namespaced .env for market {first_market_name}: {config_file_path}",
                     style="dim",
                 )
                 namespaced_env_content = parse_env_file_vars(str(config_file_path))
-                break
-
-            # If not found in config directory, check current directory for backward compatibility
-            cwd_config_file_path = Path(os.getcwd()) / potential_config_filename
-            if cwd_config_file_path.exists():
-                console.print(
-                    f"⚠️ Found legacy env file in current directory: {cwd_config_file_path}. Consider moving it to {CONFIG_DIR}",
-                    style="yellow",
-                )
-                namespaced_env_content = parse_env_file_vars(str(cwd_config_file_path))
-                break
+            else:
+                # If not found in config directory, check current directory for backward compatibility
+                cwd_config_file_path = Path(os.getcwd()) / potential_config_filename
+                if cwd_config_file_path.exists():
+                    console.print(
+                        f"⚠️ Found legacy env file in current directory: {cwd_config_file_path}. Consider moving it to {CONFIG_DIR}",
+                        style="yellow",
+                    )
+                    namespaced_env_content = parse_env_file_vars(
+                        str(cwd_config_file_path)
+                    )
 
         final_wallet_address = get_credential(
             "WALLET_HOLDER_ADDRESS",
@@ -405,7 +515,7 @@ def deploy(
             fetched_slots_result = fetch_owned_slots(
                 wallet_address=final_wallet_address,
                 powerloom_chain_name=env_config.chain_config.name,
-                rpc_url=str(env_config.chain_config.rpcURL),
+                rpc_url=str(env_config.chain_config.rpcURL).rstrip("/"),
                 protocol_state_contract_address=protocol_state_contract_address,
             )
             if fetched_slots_result is None:
@@ -490,105 +600,6 @@ def deploy(
                 style="bold red",
             )
             raise typer.Exit(1)
-
-        available_market_names_on_chain = list(env_config.markets.keys())
-        final_selected_markets_str_list: List[str] = []
-
-        if data_markets_opt:
-            final_selected_markets_str_list = data_markets_opt
-        else:
-            if not available_market_names_on_chain:
-                console.print(
-                    f"🤷 No data markets available for {selected_powerloom_chain_name_upper} in sources.json.",
-                    style="yellow",
-                )
-                raise typer.Exit(0)
-
-            # Build market display with additional options
-            market_lines = []
-            for i, name in enumerate(available_market_names_on_chain):
-                market_lines.append(
-                    f"[bold green]{i+1}.[/] [cyan]{name}[/] ([dim]Source: {env_config.markets[name].sourceChain}[/])"
-                )
-
-            # Add special options
-            market_lines.append(
-                "\n[bold yellow]0.[/] [yellow]Custom input (type market names manually)[/]"
-            )
-            if len(available_market_names_on_chain) > 1:
-                market_lines.append(
-                    f"[bold yellow]A.[/] [yellow]Select all markets ({len(available_market_names_on_chain)} markets)[/]"
-                )
-
-            market_display_list = "\n".join(market_lines)
-            market_panel = Panel(
-                market_display_list,
-                title=f"[bold blue]Select Data Markets on {selected_powerloom_chain_name_upper}[/]",
-                border_style="blue",
-                padding=(1, 2),
-            )
-            console.print(market_panel)
-
-            # Interactive selection
-            while True:
-                if len(available_market_names_on_chain) == 1:
-                    selection = Prompt.ask(
-                        "👉 Select market", default="1", choices=["0", "1"]
-                    )
-                else:
-                    selection = Prompt.ask(
-                        "👉 Select markets (e.g., '1,3' or '1-3' or 'A' for all)",
-                        default=(
-                            "A" if len(available_market_names_on_chain) <= 3 else "1"
-                        ),
-                    )
-
-                selection = selection.strip().upper()
-
-                # Handle special cases
-                if selection == "0":
-                    # Custom input - use original behavior
-                    default_market_prompt = ",".join(available_market_names_on_chain)
-                    markets_input_str = Prompt.ask(
-                        f"👉 Enter market names (comma-separated)",
-                        default=default_market_prompt,
-                    )
-                    final_selected_markets_str_list = [
-                        m.strip() for m in markets_input_str.split(",") if m.strip()
-                    ]
-                    break
-                elif selection == "A" and len(available_market_names_on_chain) > 1:
-                    # Select all
-                    final_selected_markets_str_list = available_market_names_on_chain
-                    console.print(
-                        f"✅ Selected all {len(available_market_names_on_chain)} markets",
-                        style="green",
-                    )
-                    break
-                else:
-                    # Parse numeric selection
-                    try:
-                        indices = parse_selection_string(
-                            selection, len(available_market_names_on_chain)
-                        )
-                        if indices:
-                            final_selected_markets_str_list = [
-                                available_market_names_on_chain[i] for i in indices
-                            ]
-                            console.print(
-                                f"✅ Selected {len(final_selected_markets_str_list)} market(s): {', '.join(final_selected_markets_str_list)}",
-                                style="green",
-                            )
-                            break
-                        else:
-                            console.print(
-                                "❌ No valid selections made. Please try again.",
-                                style="red",
-                            )
-                    except ValueError as e:
-                        console.print(
-                            f"❌ Invalid selection: {e}. Please try again.", style="red"
-                        )
 
         selected_market_objects: List[MarketConfig] = []
         for market_name_raw in final_selected_markets_str_list:
@@ -1062,7 +1073,7 @@ def list_chains_and_markets(ctx: typer.Context):
         chain_config_val = chain_data_val.chain_config
         markets_dict = chain_data_val.markets
 
-        chain_details = f"[bold green]{chain_name}[/] ([dim]Chain ID: {chain_config_val.chainId}, RPC: {str(chain_config_val.rpcURL)}[/])"
+        chain_details = f"[bold green]{chain_name}[/] ([dim]Chain ID: {chain_config_val.chainId}, RPC: {str(chain_config_val.rpcURL).rstrip('/')}[/])"
         chain_branch = tree.add(chain_details)
 
         if not markets_dict:

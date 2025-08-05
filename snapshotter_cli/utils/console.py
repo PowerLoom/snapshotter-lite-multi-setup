@@ -50,16 +50,21 @@ class Prompt(RichPrompt):
 
         # For PyInstaller builds on Linux, use a simpler approach
         if getattr(sys, "frozen", False) and sys.platform.startswith("linux"):
+            # Strip Rich markup tags for plain text display
+            import re
+
+            plain_prompt = re.sub(r"\[.*?\]", "", prompt)
+
             # Print prompt with default value on the same line
-            prompt_text = prompt
+            prompt_text = plain_prompt
             if show_default and default is not ... and default != "":
-                prompt_text = f"{prompt} ({default})"
+                prompt_text = f"{plain_prompt} ({default})"
 
             # Use standard input() to avoid Rich's terminal handling issues
             if password:
                 import getpass
 
-                console.print(prompt_text, end="")
+                print(prompt_text, end="", flush=True)
                 value = getpass.getpass(" ")
             else:
                 value = input(f"{prompt_text}: ").strip()

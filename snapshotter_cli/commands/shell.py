@@ -101,7 +101,9 @@ def parse_command(command_line: str) -> tuple[str, List[str]]:
         return "", []
 
 
-def get_missing_parameters(click_cmd, args: List[str]) -> List[str]:
+def get_missing_parameters(
+    click_cmd, args: List[str], parent_ctx: Optional[typer.Context] = None
+) -> List[str]:
     """Interactively prompt for missing required parameters."""
     import click
 
@@ -146,21 +148,110 @@ def get_missing_parameters(click_cmd, args: List[str]) -> List[str]:
 
                     # Special handling for known parameters
                     if param_name == "source_chain" or param_name == "source-chain":
-                        value = Prompt.ask(
-                            f"\n[cyan]{param_help}[/cyan]",
-                            default="ETH-MAINNET",
+                        # Auto-select ETH-MAINNET without prompting
+                        value = "ETH-MAINNET"
+                        console.print(
+                            f"✅ Auto-selected source chain: [bold cyan]{value}[/bold cyan]"
                         )
                     elif param_name == "chain":
-                        value = Prompt.ask(
-                            f"\n[cyan]{param_help}[/cyan]",
-                            choices=["DEVNET", "MAINNET"],
-                            default="MAINNET",
+                        # Get available chains from CLI context
+                        available_chains = ["DEVNET", "MAINNET"]
+                        if parent_ctx and hasattr(parent_ctx, "obj") and parent_ctx.obj:
+                            cli_context = parent_ctx.obj
+                            if hasattr(cli_context, "available_environments"):
+                                available_chains = sorted(
+                                    cli_context.available_environments
+                                )
+
+                        # Show available chains
+                        console.print(
+                            f"\nAvailable chains: {', '.join(available_chains)}"
                         )
+
+                        while True:
+                            chain_input = Prompt.ask(
+                                f"[cyan]{param_help}[/cyan]", default="MAINNET"
+                            )
+
+                            # Check case-insensitive match
+                            chain_upper = chain_input.upper()
+                            if chain_upper in available_chains:
+                                value = chain_upper
+                                break
+
+                            console.print(
+                                f"❌ Invalid selection. Please choose from: {', '.join(available_chains)}",
+                                style="red",
+                            )
                     elif param_name == "market":
-                        # Could fetch available markets, for now use common ones
-                        value = Prompt.ask(
-                            f"\n[cyan]{param_help}[/cyan]", default="UNISWAPV2"
-                        )
+                        # Try to get available markets based on selected chain
+                        available_markets = None
+                        selected_chain = None
+
+                        # Check if chain was provided in args or already prompted
+                        for i, arg in enumerate(collected_args):
+                            if arg in ["--chain", "-c"] and i + 1 < len(collected_args):
+                                selected_chain = collected_args[i + 1].upper()
+                                break
+
+                        # Get available markets from CLI context
+                        if (
+                            parent_ctx
+                            and hasattr(parent_ctx, "obj")
+                            and parent_ctx.obj
+                            and selected_chain
+                        ):
+                            cli_context = parent_ctx.obj
+                            if (
+                                hasattr(cli_context, "chain_markets_map")
+                                and selected_chain in cli_context.chain_markets_map
+                            ):
+                                chain_data = cli_context.chain_markets_map[
+                                    selected_chain
+                                ]
+                                if hasattr(chain_data, "markets"):
+                                    available_markets = sorted(
+                                        chain_data.markets.keys()
+                                    )
+
+                        if available_markets:
+                            # Auto-select if only one market is available
+                            if len(available_markets) == 1:
+                                value = available_markets[0]
+                                console.print(
+                                    f"✅ Auto-selected the only available market: [bold cyan]{value}[/bold cyan]"
+                                )
+                            else:
+                                # Show available markets
+                                console.print(
+                                    f"\nAvailable markets for {selected_chain}:"
+                                )
+                                for i, market in enumerate(available_markets, 1):
+                                    console.print(
+                                        f"  [bold green]{i}.[/] [cyan]{market}[/]"
+                                    )
+
+                                while True:
+                                    market_input = Prompt.ask(
+                                        "👉 Select data market (number or name)"
+                                    )
+                                    if market_input.isdigit():
+                                        idx = int(market_input) - 1
+                                        if 0 <= idx < len(available_markets):
+                                            value = available_markets[idx]
+                                            break
+                                    elif market_input.upper() in available_markets:
+                                        value = market_input.upper()
+                                        break
+                                    console.print(
+                                        "❌ Invalid selection. Please try again.",
+                                        style="red",
+                                    )
+                        else:
+                            # Fallback to default if no markets found
+                            value = Prompt.ask(
+                                f"\n[cyan]{param_help}[/cyan]", default="UNISWAPV2"
+                            )
                     else:
                         # Generic prompt
                         value = Prompt.ask(f"\n[cyan]{param_help}[/cyan]")
@@ -348,11 +439,15 @@ def run_shell(app: typer.Typer, parent_ctx: typer.Context):
                             ):
                                 # This is a subcommand
                                 target_cmd = click_cmd.commands[args[0]]
-                                new_args = get_missing_parameters(target_cmd, args[1:])
+                                new_args = get_missing_parameters(
+                                    target_cmd, args[1:], parent_ctx
+                                )
                                 final_args = [args[0]] + new_args
                             else:
                                 # Regular command
-                                final_args = get_missing_parameters(click_cmd, args)
+                                final_args = get_missing_parameters(
+                                    click_cmd, args, parent_ctx
+                                )
 
                             # Try executing again with collected parameters
                             with click_group.make_context(

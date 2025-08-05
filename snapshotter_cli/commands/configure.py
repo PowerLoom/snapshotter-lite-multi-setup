@@ -119,15 +119,18 @@ def configure_command(
 
     # --- Get Powerloom RPC URL from chain config ---
     chain_config = chain_data.chain_config
-    default_rpc_url = str(chain_config.rpcURL)
+    default_rpc_url = str(chain_config.rpcURL).rstrip("/")
 
     # --- Select Powerloom RPC URL ---
-    if not powerloom_rpc_url:
-        final_powerloom_rpc_url = Prompt.ask(
-            "👉 Enter Powerloom RPC URL", default=default_rpc_url
-        )
-    else:
+    if powerloom_rpc_url:
         final_powerloom_rpc_url = powerloom_rpc_url
+    else:
+        # Auto-use default RPC URL
+        final_powerloom_rpc_url = default_rpc_url
+        console.print(
+            f"✅ Using default Powerloom RPC URL: [bold cyan]{default_rpc_url}[/bold cyan]",
+            style="green",
+        )
     available_markets = sorted(chain_data.markets.keys())
     if not available_markets:
         console.print(
@@ -146,22 +149,31 @@ def configure_command(
             )
             raise typer.Exit(1)
     else:
-        for i, market in enumerate(available_markets, 1):
-            market_obj = chain_data.markets[market]
+        # Auto-select if only one market is available
+        if len(available_markets) == 1:
+            selected_market_name_upper = available_markets[0]
             console.print(
-                f"[bold green]{i}.[/] [cyan]{market}[/] ([dim]Source: {market_obj.sourceChain}[/])"
+                f"✅ Auto-selected the only available market: [bold cyan]{selected_market_name_upper}[/bold cyan]",
+                style="green",
             )
-        while True:
-            market_input = Prompt.ask("👉 Select data market (number or name)")
-            if market_input.isdigit():
-                idx = int(market_input) - 1
-                if 0 <= idx < len(available_markets):
-                    selected_market_name_upper = available_markets[idx]
+        else:
+            # Multiple markets - show selection UI
+            for i, market in enumerate(available_markets, 1):
+                market_obj = chain_data.markets[market]
+                console.print(
+                    f"[bold green]{i}.[/] [cyan]{market}[/] ([dim]Source: {market_obj.sourceChain}[/])"
+                )
+            while True:
+                market_input = Prompt.ask("👉 Select data market (number or name)")
+                if market_input.isdigit():
+                    idx = int(market_input) - 1
+                    if 0 <= idx < len(available_markets):
+                        selected_market_name_upper = available_markets[idx]
+                        break
+                elif market_input.upper() in available_markets:
+                    selected_market_name_upper = market_input.upper()
                     break
-            elif market_input.upper() in available_markets:
-                selected_market_name_upper = market_input.upper()
-                break
-            console.print("❌ Invalid selection. Please try again.", style="red")
+                console.print("❌ Invalid selection. Please try again.", style="red")
 
     selected_market_obj = chain_data.markets[selected_market_name_upper]
 
