@@ -4,18 +4,15 @@ from typing import Dict, Optional
 
 import typer
 from dotenv import dotenv_values
-from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Prompt
 
+from snapshotter_cli.utils.console import Prompt, console
 from snapshotter_cli.utils.deployment import (
     CONFIG_DIR,
     CONFIG_ENV_FILENAME_TEMPLATE,
     calculate_connection_refresh_interval,
 )
 from snapshotter_cli.utils.models import CLIContext, MarketConfig, PowerloomChainConfig
-
-console = Console()
 
 ENV_FILENAME_TEMPLATE = ".env.{}.{}.{}"  # e.g. .env.devnet.uniswapv2.eth-mainnet
 
@@ -238,11 +235,6 @@ def configure_command(
         )
         if final_signer_key == "(hidden)" or final_signer_key == "":
             final_signer_key = existing_key
-        else:
-            confirm_key = Prompt.ask("👉 Confirm signer private key", password=True)
-            if final_signer_key != confirm_key:
-                console.print("❌ Private keys do not match.", style="bold red")
-                raise typer.Exit(1)
 
     final_source_rpc = source_rpc_url or Prompt.ask(
         f"👉 Enter RPC URL for {selected_market_obj.sourceChain}",
