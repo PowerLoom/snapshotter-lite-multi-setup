@@ -314,10 +314,10 @@ def run_shell(app: typer.Typer, parent_ctx: typer.Context):
             readline.parse_and_bind("tab: complete")
 
     # Import version
-    from snapshotter_cli import __version__
+    from snapshotter_cli import get_version_string
 
     # Build the welcome message
-    welcome_msg = f"[bold green]Powerloom Snapshotter CLI v{__version__} - Interactive Mode[/bold green]\n"
+    welcome_msg = f"[bold green]Powerloom Snapshotter CLI v{get_version_string()} - Interactive Mode[/bold green]\n"
     welcome_msg += "Type 'help' for available commands, 'exit' or 'quit' to leave.\n"
     if HAS_READLINE:
         welcome_msg += (
