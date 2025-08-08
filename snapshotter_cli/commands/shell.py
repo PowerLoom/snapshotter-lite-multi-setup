@@ -295,9 +295,9 @@ def run_shell(app: typer.Typer, parent_ctx: typer.Context):
 
         # Setup autocomplete
         readline.set_completer(command_completer)
+        # Only use standard tab completion binding
+        # Avoid using 'bind' command which can cause issues with lowercase letters
         readline.parse_and_bind("tab: complete")
-        # Also support common keybindings
-        readline.parse_and_bind("bind ^I rl_complete")  # Ctrl+I (Tab)
 
     # Import version
     from snapshotter_cli import __version__
