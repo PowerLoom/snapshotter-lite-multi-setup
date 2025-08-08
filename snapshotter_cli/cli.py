@@ -11,7 +11,7 @@ from rich.tree import Tree
 
 from snapshotter_cli.utils.console import Prompt, console
 
-from . import __version__
+from . import __version__, get_version_string
 from .commands.configure import configure_command
 from .commands.diagnose import diagnose_command
 from .commands.identity import identity_app
@@ -98,7 +98,7 @@ def fetch_markets_config() -> List[PowerloomChainConfig]:
 def version_callback(value: bool):
     """Show version and exit."""
     if value:
-        console.print(f"Powerloom Snapshotter CLI version: {__version__}")
+        console.print(f"Powerloom Snapshotter CLI version: {get_version_string()}")
         raise typer.Exit()
 
 

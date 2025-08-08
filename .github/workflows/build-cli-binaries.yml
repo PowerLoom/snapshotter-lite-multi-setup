@@ -48,6 +48,11 @@ jobs:
     - name: Install dependencies
       run: uv sync --frozen
 
+    - name: Embed git commit for binary
+      run: |
+        uv run python scripts/embed_version.py
+        echo "Git commit embedded in version info"
+
     - name: Build binary with PyInstaller
       run: |
         # Set environment variables for the spec file
@@ -60,9 +65,16 @@ jobs:
           --workpath build \
           --clean
 
+    - name: Restore version file
+      if: always()
+      run: |
+        uv run python scripts/embed_version.py --restore
+
     - name: Test binary
       run: |
         ./dist/powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }} --help
+        echo "Testing version display:"
+        ./dist/powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }} --version
 
     - name: Create checksums
       run: |
