@@ -11,8 +11,16 @@ try:
     import readline
 
     HAS_READLINE = True
+
+    # Check if we're using libedit (macOS) vs GNU readline
+    # libedit requires different binding syntax for tab completion
+    USING_LIBEDIT = False
+    if hasattr(readline, "__doc__") and readline.__doc__:
+        if "libedit" in readline.__doc__:
+            USING_LIBEDIT = True
 except ImportError:
     HAS_READLINE = False
+    USING_LIBEDIT = False
 
 # Global variables for autocomplete
 COMMANDS = {}
@@ -295,9 +303,15 @@ def run_shell(app: typer.Typer, parent_ctx: typer.Context):
 
         # Setup autocomplete
         readline.set_completer(command_completer)
-        # Only use standard tab completion binding
-        # Avoid using 'bind' command which can cause issues with lowercase letters
-        readline.parse_and_bind("tab: complete")
+
+        # Configure readline bindings based on implementation
+        if USING_LIBEDIT:
+            # libedit (macOS) requires this specific binding for tab completion
+            readline.parse_and_bind("bind ^I rl_complete")
+        else:
+            # GNU readline (Linux) works best with standard tab binding
+            # Avoid 'bind' command on Linux as it can cause input issues (e.g., lowercase 'b' removal)
+            readline.parse_and_bind("tab: complete")
 
     # Import version
     from snapshotter_cli import __version__
