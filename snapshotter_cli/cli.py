@@ -784,11 +784,33 @@ def deploy(
                 continue
 
             for idx, slot_id_val in enumerate(deploy_slots):
-                build_sh_args_for_instance = (
+                # Build base args for build.sh
+                base_args = (
                     "--skip-credential-update"
                     if idx == 0
                     else "--no-collector --skip-credential-update"
                 )
+
+                # Determine data market contract number based on market name
+                market_name = market_conf_obj.name.upper()
+                if market_name == "AAVEV3":
+                    data_market_number = "1"
+                elif market_name == "UNISWAPV2":
+                    data_market_number = "2"
+                else:
+                    # Default to 2 for unknown markets
+                    data_market_number = "2"
+
+                # Add data market contract number
+                base_args = (
+                    f"{base_args} --data-market-contract-number {data_market_number}"
+                )
+
+                # Add --devnet flag if deploying to devnet
+                if selected_powerloom_chain_name_upper == "DEVNET":
+                    build_sh_args_for_instance = f"--devnet {base_args}"
+                else:
+                    build_sh_args_for_instance = base_args
 
                 console.print(
                     f"   🔩 Deploying slot {slot_id_val} for market {market_conf_obj.name} (Source RPC: {source_rpc_url})",
