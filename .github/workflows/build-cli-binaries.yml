@@ -75,6 +75,9 @@ jobs:
         ./dist/powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }} --help
         echo "Testing version display:"
         ./dist/powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }} --version
+        # Test changelog command
+        echo "Testing changelog in shell:"
+        echo -e "changelog\nexit" | timeout 5s ./dist/powerloom-snapshotter-cli-${{ matrix.platform }}-${{ matrix.arch }} shell || true
 
     - name: Create checksums
       run: |

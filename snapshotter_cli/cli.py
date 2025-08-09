@@ -102,6 +102,15 @@ def version_callback(value: bool):
         raise typer.Exit()
 
 
+def changelog_callback(value: bool):
+    """Show changelog and exit."""
+    if value:
+        from snapshotter_cli.utils.changelog import display_changelog
+
+        display_changelog()
+        raise typer.Exit()
+
+
 def load_default_config(
     ctx: typer.Context,
     version: bool = typer.Option(
@@ -110,6 +119,13 @@ def load_default_config(
         callback=version_callback,
         is_eager=True,
         help="Show version and exit.",
+    ),
+    changelog: bool = typer.Option(
+        None,
+        "--changelog",
+        callback=changelog_callback,
+        is_eager=True,
+        help="Show changelog and exit.",
     ),
 ):
     """Load default configuration, available markets, and user settings"""

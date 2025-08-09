@@ -1,10 +1,15 @@
 import shlex
 import sys
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import typer
+from rich.console import Console
+from rich.pager import Pager
 from rich.panel import Panel
+from rich.text import Text
 
+from snapshotter_cli.utils.changelog import display_changelog, get_latest_changes
 from snapshotter_cli.utils.console import Prompt, console
 
 try:
@@ -335,6 +340,18 @@ def run_shell(app: typer.Typer, parent_ctx: typer.Context):
         )
     )
 
+    # Show latest changes if available
+    latest_changes = get_latest_changes()
+    if latest_changes:
+        console.print(
+            Panel(
+                latest_changes,
+                title="[bold blue]What's New[/bold blue]",
+                border_style="blue",
+                padding=(1, 2),
+            )
+        )
+
     # Build command map from the app
     commands = {}
 
@@ -349,9 +366,6 @@ def run_shell(app: typer.Typer, parent_ctx: typer.Context):
             if name != "shell":  # Don't include shell itself
                 commands[name] = click_group.commands[name]
 
-    # Update global COMMANDS for autocomplete
-    COMMANDS = commands
-
     # Add special commands
     special_commands = {
         "help": lambda: show_help(commands),
@@ -359,7 +373,11 @@ def run_shell(app: typer.Typer, parent_ctx: typer.Context):
         "quit": lambda: sys.exit(0),
         "clear": lambda: console.clear(),
         "cls": lambda: console.clear(),
+        "changelog": display_changelog,
     }
+
+    # Update global COMMANDS to include both regular and special commands for autocomplete
+    COMMANDS = {**commands, **{name: None for name in special_commands}}
 
     while True:
         try:
@@ -526,6 +544,7 @@ def show_help(commands: dict):
     # Special commands
     console.print("\n[bold]Special Commands:[/bold]")
     console.print("  [cyan]help[/cyan]           Show this help message")
+    console.print("  [cyan]changelog[/cyan]      Show the full changelog")
     console.print("  [cyan]clear/cls[/cyan]      Clear the screen")
     console.print("  [cyan]exit/quit[/cyan]      Exit the shell")
     console.print(

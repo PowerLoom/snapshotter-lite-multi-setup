@@ -49,6 +49,7 @@ The CLI has been enhanced with several UX improvements:
 ### Key CLI Features
 
 - **🚀 Interactive Shell Mode**: Instant command execution without startup delays (RECOMMENDED!)
+- **📋 Integrated Changelog**: View latest changes on shell startup, full changelog with `changelog` command
 - **Easy Configuration**: Set up credentials once for each chain/market combination
 - **Simple Deployment**: Deploy multiple nodes with a single command
 - **Instance Management**: Start, stop, restart, and cleanup nodes easily
@@ -57,6 +58,8 @@ The CLI has been enhanced with several UX improvements:
 - **Command History**: Navigate previous commands with arrow keys in shell mode
 
 📖 **[Read the full CLI documentation](CLI_DOCUMENTATION.md)** for detailed usage instructions, examples, and troubleshooting.
+
+📋 **[View the Changelog](CHANGELOG.md)** to see what's new in each release.
 
 ---
 
