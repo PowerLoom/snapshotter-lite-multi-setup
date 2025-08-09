@@ -7,6 +7,7 @@ import typer
 from rich.console import Console
 from rich.pager import Pager
 from rich.panel import Panel
+from rich.text import Text
 
 from snapshotter_cli.utils.console import Prompt, console
 
@@ -327,12 +328,13 @@ def get_latest_changes() -> Optional[str]:
         with open(changelog_path, "r") as f:
             content = f.read()
 
-        # Parse the changelog to get the latest unreleased section
+        # Parse the changelog to get the latest unreleased section or latest release
         lines = content.split("\n")
         in_unreleased = False
         in_latest_release = False
         changes = []
         version_count = 0
+        has_unreleased_content = False
 
         for line in lines:
             # Check for version headers
@@ -341,23 +343,52 @@ def get_latest_changes() -> Optional[str]:
                 if "Unreleased" in line:
                     in_unreleased = True
                     in_latest_release = False
-                    changes.append(
-                        f"[bold cyan]📋 Latest Changes (Unreleased)[/bold cyan]\n"
-                    )
-                elif version_count == 2:  # First released version after Unreleased
-                    if (
-                        not in_unreleased
-                    ):  # If no unreleased section, show latest release
+                    # Don't add header yet, wait to see if there's content
+                elif version_count == 1 and not in_unreleased:
+                    # First version header and it's not Unreleased - this is the latest release
+                    in_latest_release = True
+                    version_info = line.replace("## ", "").strip()
+                    # Replace brackets with unicode lookalikes to avoid Rich markup issues
+                    version_info = version_info.replace("[", "［").replace("]", "］")
+                    changes = [
+                        f"[bold cyan]📋 Latest Release: {version_info}[/bold cyan]\n"
+                    ]
+                elif version_count == 2:  # Second version header
+                    if in_unreleased and not has_unreleased_content:
+                        # Unreleased was empty, show this version instead
+                        in_unreleased = False
                         in_latest_release = True
                         version_info = line.replace("## ", "").strip()
+                        # Replace brackets with unicode lookalikes to avoid Rich markup issues
+                        version_info = version_info.replace("[", "［").replace(
+                            "]", "］"
+                        )
                         changes = [
                             f"[bold cyan]📋 Latest Release: {version_info}[/bold cyan]\n"
                         ]
                     else:
-                        break  # Stop after unreleased section
+                        break  # Stop after unreleased section or first release
                 elif version_count > 2:
                     break  # Stop after first version section
-            elif (in_unreleased or in_latest_release) and line.strip():
+            elif in_unreleased and line.strip() and not line.startswith("## "):
+                # Found content in unreleased section
+                if not has_unreleased_content:
+                    # Add the header now that we know there's content
+                    changes.insert(
+                        0, f"[bold cyan]📋 Latest Changes (Unreleased)[/bold cyan]\n"
+                    )
+                    has_unreleased_content = True
+                # Convert markdown headers to rich formatting
+                if line.startswith("### "):
+                    formatted_line = line.replace("### ", "\n[bold yellow]")
+                    formatted_line += "[/bold yellow]"
+                    changes.append(formatted_line)
+                elif line.startswith("- "):
+                    # Format bullet points
+                    changes.append(f"  • {line[2:]}")
+                elif line.strip() and not line.startswith("#"):
+                    changes.append(line)
+            elif in_latest_release and line.strip():
                 # Convert markdown headers to rich formatting
                 if line.startswith("### "):
                     formatted_line = line.replace("### ", "\n[bold yellow]")
@@ -530,8 +561,15 @@ def run_shell(app: typer.Typer, parent_ctx: typer.Context):
                             f"[bold magenta]{line[2:]}[/bold magenta]"
                         )
                     elif line.startswith("## "):
-                        # Version headers
-                        formatted_lines.append(f"\n[bold cyan]{line[3:]}[/bold cyan]")
+                        # Version headers - handle brackets without escaping issues
+                        version_line = line[3:]  # Remove "## "
+                        # Replace brackets with unicode lookalikes to avoid Rich markup interpretation
+                        version_line = version_line.replace("[", "［").replace(
+                            "]", "］"
+                        )
+                        formatted_lines.append(
+                            f"\n[bold cyan]{version_line}[/bold cyan]"
+                        )
                     elif line.startswith("### "):
                         # Section headers
                         formatted_lines.append(

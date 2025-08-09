@@ -5,7 +5,7 @@ All notable changes to the Powerloom Snapshotter CLI and setup tools will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.3] - 2025-08-09
+## [v0.1.3] - 2025-08-09
 
 ### Fixed
 - **Critical: ENV file case mismatch (#72)** - CLI now generates `.env-mainnet-UNISWAPV2-ETH` instead of `.env-MAINNET-UNISWAPV2-ETH` to match `build.sh` expectations
@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Enhanced
 - **Shell mode** - Applied chain ordering and title case improvements to interactive shell
 
-## [0.1.2] - 2025-08-08
+## [v0.1.2] - 2025-08-08
 
 ### Fixed
 - Character removal in wallet address input on Linux - lowercase 'b' characters were being incorrectly removed
@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Git commit info to version display for better tracking
 
-## [0.1.1] - 2025-08-05
+## [v0.1.1] - 2025-08-05
 
 ### Fixed
 - Terminal display issues in Linux CLI builds - prompts now display correctly with proper newlines
@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Streamlined configuration UX - auto-uses defaults from sources.json, no RPC URL prompt needed
 - Auto-selection for single-market chains
 
-## [0.1.0] - 2025-07-23
+## [v0.1.0] - 2025-07-23
 
 ### Added
 - Initial release of `powerloom-snapshotter-cli`
@@ -64,3 +64,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `multi_clone.py` for deployment
   - `diagnose.sh` for system diagnostics
   - `prep.sh` for automated system preparation
+
+---
+
+[v0.1.3]: https://github.com/powerloom/snapshotter-lite-multi-setup/releases/tag/v0.1.3
+[v0.1.2]: https://github.com/powerloom/snapshotter-lite-multi-setup/releases/tag/v0.1.2
+[v0.1.1]: https://github.com/powerloom/snapshotter-lite-multi-setup/releases/tag/v0.1.1
+[v0.1.0]: https://github.com/powerloom/snapshotter-lite-multi-setup/releases/tag/v0.1.0
