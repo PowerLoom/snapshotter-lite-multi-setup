@@ -9,6 +9,7 @@ from rich.pager import Pager
 from rich.panel import Panel
 from rich.text import Text
 
+from snapshotter_cli.utils.changelog import display_changelog, get_latest_changes
 from snapshotter_cli.utils.console import Prompt, console
 
 try:
@@ -278,140 +279,6 @@ def get_missing_parameters(
     return collected_args
 
 
-def get_latest_changes() -> Optional[str]:
-    """Extract the latest changes from CHANGELOG.md file."""
-    try:
-        # Try to find CHANGELOG.md in various locations
-        possible_paths = []
-
-        # Check if running from PyInstaller bundle
-        if getattr(sys, "frozen", False):
-            # Running from PyInstaller bundle
-            bundle_dir = Path(sys._MEIPASS)
-            possible_paths.append(bundle_dir / "CHANGELOG.md")
-        else:
-            # Check pip package installation location
-            try:
-                import importlib.resources as resources
-
-                # For Python 3.9+
-                if hasattr(resources, "files"):
-                    package_files = resources.files("snapshotter_cli")
-                    possible_paths.append(package_files / "CHANGELOG.md")
-                # For Python 3.7-3.8 compatibility (fallback)
-                elif hasattr(resources, "read_text"):
-                    # We'll handle this differently below
-                    pass
-            except ImportError:
-                pass
-
-        # Also check regular locations
-        possible_paths.extend(
-            [
-                Path("CHANGELOG.md"),  # Current directory
-                Path(__file__).parent.parent
-                / "CHANGELOG.md",  # Pip installed package location
-                Path(__file__).parent.parent.parent
-                / "CHANGELOG.md",  # Relative to this file (dev)
-            ]
-        )
-
-        changelog_path = None
-        for path in possible_paths:
-            if path.exists():
-                changelog_path = path
-                break
-
-        if not changelog_path:
-            return None
-
-        with open(changelog_path, "r") as f:
-            content = f.read()
-
-        # Parse the changelog to get the latest unreleased section or latest release
-        lines = content.split("\n")
-        in_unreleased = False
-        in_latest_release = False
-        changes = []
-        version_count = 0
-        has_unreleased_content = False
-
-        for line in lines:
-            # Check for version headers
-            if line.startswith("## ["):
-                version_count += 1
-                if "Unreleased" in line:
-                    in_unreleased = True
-                    in_latest_release = False
-                    # Don't add header yet, wait to see if there's content
-                elif version_count == 1 and not in_unreleased:
-                    # First version header and it's not Unreleased - this is the latest release
-                    in_latest_release = True
-                    version_info = line.replace("## ", "").strip()
-                    # Replace brackets with unicode lookalikes to avoid Rich markup issues
-                    version_info = version_info.replace("[", "［").replace("]", "］")
-                    changes = [
-                        f"[bold cyan]📋 Latest Release: {version_info}[/bold cyan]\n"
-                    ]
-                elif version_count == 2:  # Second version header
-                    if in_unreleased and not has_unreleased_content:
-                        # Unreleased was empty, show this version instead
-                        in_unreleased = False
-                        in_latest_release = True
-                        version_info = line.replace("## ", "").strip()
-                        # Replace brackets with unicode lookalikes to avoid Rich markup issues
-                        version_info = version_info.replace("[", "［").replace(
-                            "]", "］"
-                        )
-                        changes = [
-                            f"[bold cyan]📋 Latest Release: {version_info}[/bold cyan]\n"
-                        ]
-                    else:
-                        break  # Stop after unreleased section or first release
-                elif version_count > 2:
-                    break  # Stop after first version section
-            elif in_unreleased and line.strip() and not line.startswith("## "):
-                # Found content in unreleased section
-                if not has_unreleased_content:
-                    # Add the header now that we know there's content
-                    changes.insert(
-                        0, f"[bold cyan]📋 Latest Changes (Unreleased)[/bold cyan]\n"
-                    )
-                    has_unreleased_content = True
-                # Convert markdown headers to rich formatting
-                if line.startswith("### "):
-                    formatted_line = line.replace("### ", "\n[bold yellow]")
-                    formatted_line += "[/bold yellow]"
-                    changes.append(formatted_line)
-                elif line.startswith("- "):
-                    # Format bullet points
-                    changes.append(f"  • {line[2:]}")
-                elif line.strip() and not line.startswith("#"):
-                    changes.append(line)
-            elif in_latest_release and line.strip():
-                # Convert markdown headers to rich formatting
-                if line.startswith("### "):
-                    formatted_line = line.replace("### ", "\n[bold yellow]")
-                    formatted_line += "[/bold yellow]"
-                    changes.append(formatted_line)
-                elif line.startswith("- "):
-                    # Format bullet points
-                    changes.append(f"  • {line[2:]}")
-                elif line.strip() and not line.startswith("#"):
-                    changes.append(line)
-
-        if changes:
-            result = "\n".join(changes[:20])  # Limit to first 20 lines
-            result += '\n\n[dim]Type "changelog" to see the full changelog[/dim]'
-            return result
-
-        return None
-
-    except Exception:
-        # Silently fail if we can't read the changelog
-        return None
-
-
 def run_shell(app: typer.Typer, parent_ctx: typer.Context):
     """Run an interactive shell for the CLI."""
     global COMMANDS
@@ -499,121 +366,14 @@ def run_shell(app: typer.Typer, parent_ctx: typer.Context):
             if name != "shell":  # Don't include shell itself
                 commands[name] = click_group.commands[name]
 
-    # Add special commands first (before updating COMMANDS)
-    def show_changelog():
-        """Display the full changelog with formatted markdown."""
-        try:
-            # Try to find CHANGELOG.md
-            possible_paths = []
-
-            # Check if running from PyInstaller bundle
-            if getattr(sys, "frozen", False):
-                # Running from PyInstaller bundle
-                bundle_dir = Path(sys._MEIPASS)
-                possible_paths.append(bundle_dir / "CHANGELOG.md")
-            else:
-                # Check pip package installation location
-                try:
-                    import importlib.resources as resources
-
-                    # For Python 3.9+
-                    if hasattr(resources, "files"):
-                        package_files = resources.files("snapshotter_cli")
-                        possible_paths.append(package_files / "CHANGELOG.md")
-                except ImportError:
-                    pass
-
-            # Also check regular locations
-            possible_paths.extend(
-                [
-                    Path("CHANGELOG.md"),
-                    Path(__file__).parent.parent
-                    / "CHANGELOG.md",  # Pip installed package location
-                    Path(__file__).parent.parent.parent
-                    / "CHANGELOG.md",  # Dev location
-                ]
-            )
-
-            changelog_path = None
-            for path in possible_paths:
-                if path.exists():
-                    changelog_path = path
-                    break
-
-            if changelog_path:
-                with open(changelog_path, "r") as f:
-                    content = f.read()
-
-                # Format the markdown content
-                formatted_lines = []
-                lines = content.split("\n")
-
-                # Add header
-                formatted_lines.append("[bold cyan]📋 Changelog[/bold cyan]")
-                formatted_lines.append(
-                    "[dim]Use arrow keys or Page Up/Down to scroll, 'q' to quit[/dim]\n"
-                )
-
-                for line in lines:
-                    if line.startswith("# "):
-                        # Main header
-                        formatted_lines.append(
-                            f"[bold magenta]{line[2:]}[/bold magenta]"
-                        )
-                    elif line.startswith("## "):
-                        # Version headers - handle brackets without escaping issues
-                        version_line = line[3:]  # Remove "## "
-                        # Replace brackets with unicode lookalikes to avoid Rich markup interpretation
-                        version_line = version_line.replace("[", "［").replace(
-                            "]", "］"
-                        )
-                        formatted_lines.append(
-                            f"\n[bold cyan]{version_line}[/bold cyan]"
-                        )
-                    elif line.startswith("### "):
-                        # Section headers
-                        formatted_lines.append(
-                            f"\n[bold yellow]{line[4:]}[/bold yellow]"
-                        )
-                    elif line.startswith("- "):
-                        # Bullet points
-                        formatted_lines.append(f"  • {line[2:]}")
-                    elif line.startswith("  - "):
-                        # Sub-bullet points
-                        formatted_lines.append(f"    ◦ {line[4:]}")
-                    elif (
-                        line.startswith("**") and line.endswith("**") and len(line) > 4
-                    ):
-                        # Bold text
-                        formatted_lines.append(f"[bold]{line[2:-2]}[/bold]")
-                    elif line.strip():
-                        formatted_lines.append(line)
-                    else:
-                        formatted_lines.append("")
-
-                formatted_content = "\n".join(formatted_lines)
-
-                # Use pager for long content
-                with console.pager(styles=True):
-                    console.print(formatted_content)
-
-            else:
-                console.print(
-                    "[yellow]Changelog file not found. View online at:[/yellow]"
-                )
-                console.print(
-                    "https://github.com/powerloom/snapshotter-lite-multi-setup/blob/master/CHANGELOG.md"
-                )
-        except Exception as e:
-            console.print(f"[red]Error reading changelog: {e}[/red]")
-
+    # Add special commands
     special_commands = {
         "help": lambda: show_help(commands),
         "exit": lambda: sys.exit(0),
         "quit": lambda: sys.exit(0),
         "clear": lambda: console.clear(),
         "cls": lambda: console.clear(),
-        "changelog": show_changelog,
+        "changelog": display_changelog,
     }
 
     # Update global COMMANDS to include both regular and special commands for autocomplete

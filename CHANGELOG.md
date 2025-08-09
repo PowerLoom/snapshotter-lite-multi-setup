@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [v0.1.3] - 2025-08-09
 
+### Added
+- **Changelog support** - Display latest changes on shell startup and via `changelog` command
+- **CLI --changelog flag** - View changelog directly from command line without entering shell mode
+
 ### Fixed
 - **Critical: ENV file case mismatch (#72)** - CLI now generates `.env-mainnet-UNISWAPV2-ETH` instead of `.env-MAINNET-UNISWAPV2-ETH` to match `build.sh` expectations
 - **Devnet deployments** - Added missing `--devnet` flag when deploying to devnet
