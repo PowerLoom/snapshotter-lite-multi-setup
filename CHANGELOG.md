@@ -5,7 +5,7 @@ All notable changes to the Powerloom Snapshotter CLI and setup tools will be doc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2025-08-09
+## [0.1.3] - 2025-08-09
 
 ### Fixed
 - **Critical: ENV file case mismatch (#72)** - CLI now generates `.env-mainnet-UNISWAPV2-ETH` instead of `.env-MAINNET-UNISWAPV2-ETH` to match `build.sh` expectations
