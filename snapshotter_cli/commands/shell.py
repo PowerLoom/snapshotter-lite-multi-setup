@@ -281,16 +281,39 @@ def get_latest_changes() -> Optional[str]:
     """Extract the latest changes from CHANGELOG.md file."""
     try:
         # Try to find CHANGELOG.md in various locations
-        possible_paths = [
-            Path("CHANGELOG.md"),  # Current directory
-            Path(__file__).parent.parent.parent
-            / "CHANGELOG.md",  # Relative to this file
-            Path.home()
-            / "code"
-            / "powerloom"
-            / "snapshotter-lite-multi-setup"
-            / "CHANGELOG.md",  # Dev path
-        ]
+        possible_paths = []
+
+        # Check if running from PyInstaller bundle
+        if getattr(sys, "frozen", False):
+            # Running from PyInstaller bundle
+            bundle_dir = Path(sys._MEIPASS)
+            possible_paths.append(bundle_dir / "CHANGELOG.md")
+        else:
+            # Check pip package installation location
+            try:
+                import importlib.resources as resources
+
+                # For Python 3.9+
+                if hasattr(resources, "files"):
+                    package_files = resources.files("snapshotter_cli")
+                    possible_paths.append(package_files / "CHANGELOG.md")
+                # For Python 3.7-3.8 compatibility (fallback)
+                elif hasattr(resources, "read_text"):
+                    # We'll handle this differently below
+                    pass
+            except ImportError:
+                pass
+
+        # Also check regular locations
+        possible_paths.extend(
+            [
+                Path("CHANGELOG.md"),  # Current directory
+                Path(__file__).parent.parent
+                / "CHANGELOG.md",  # Pip installed package location
+                Path(__file__).parent.parent.parent
+                / "CHANGELOG.md",  # Relative to this file (dev)
+            ]
+        )
 
         changelog_path = None
         for path in possible_paths:
@@ -450,10 +473,35 @@ def run_shell(app: typer.Typer, parent_ctx: typer.Context):
         """Display the full changelog with formatted markdown."""
         try:
             # Try to find CHANGELOG.md
-            possible_paths = [
-                Path("CHANGELOG.md"),
-                Path(__file__).parent.parent.parent / "CHANGELOG.md",
-            ]
+            possible_paths = []
+
+            # Check if running from PyInstaller bundle
+            if getattr(sys, "frozen", False):
+                # Running from PyInstaller bundle
+                bundle_dir = Path(sys._MEIPASS)
+                possible_paths.append(bundle_dir / "CHANGELOG.md")
+            else:
+                # Check pip package installation location
+                try:
+                    import importlib.resources as resources
+
+                    # For Python 3.9+
+                    if hasattr(resources, "files"):
+                        package_files = resources.files("snapshotter_cli")
+                        possible_paths.append(package_files / "CHANGELOG.md")
+                except ImportError:
+                    pass
+
+            # Also check regular locations
+            possible_paths.extend(
+                [
+                    Path("CHANGELOG.md"),
+                    Path(__file__).parent.parent
+                    / "CHANGELOG.md",  # Pip installed package location
+                    Path(__file__).parent.parent.parent
+                    / "CHANGELOG.md",  # Dev location
+                ]
+            )
 
             changelog_path = None
             for path in possible_paths:
