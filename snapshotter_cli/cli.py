@@ -798,8 +798,8 @@ def deploy(
                 elif market_name == "UNISWAPV2":
                     data_market_number = "2"
                 else:
-                    # Default to 2 for unknown markets
-                    data_market_number = "2"
+                    # Default to 1 for unknown markets
+                    data_market_number = "1"
 
                 # Add data market contract number
                 base_args = (
