@@ -259,7 +259,14 @@ def deploy(
                 )
                 raise typer.Exit(1)
         else:
-            all_powerloom_chains_from_config = cli_context.markets_config
+            # Sort chains to prioritize MAINNET first
+            all_powerloom_chains_from_config = sorted(
+                cli_context.markets_config,
+                key=lambda x: (
+                    x.powerloomChain.name.upper() != "MAINNET",
+                    x.powerloomChain.name.upper(),
+                ),
+            )
             if not all_powerloom_chains_from_config:
                 console.print(
                     "❌ No Powerloom chains found in the remote configuration. Cannot proceed.",
@@ -268,7 +275,7 @@ def deploy(
                 raise typer.Exit(1)
 
             chain_list_display = "\n".join(
-                f"[bold green]{i+1}.[/] [cyan]{chain.powerloomChain.name}[/]"
+                f"[bold green]{i+1}.[/] [cyan]{chain.powerloomChain.name.title()}[/]"
                 for i, chain in enumerate(all_powerloom_chains_from_config)
             )
             panel = Panel(
@@ -777,11 +784,33 @@ def deploy(
                 continue
 
             for idx, slot_id_val in enumerate(deploy_slots):
-                build_sh_args_for_instance = (
+                # Build base args for build.sh
+                base_args = (
                     "--skip-credential-update"
                     if idx == 0
                     else "--no-collector --skip-credential-update"
                 )
+
+                # Determine data market contract number based on market name
+                market_name = market_conf_obj.name.upper()
+                if market_name == "AAVEV3":
+                    data_market_number = "1"
+                elif market_name == "UNISWAPV2":
+                    data_market_number = "2"
+                else:
+                    # Default to 1 for unknown markets
+                    data_market_number = "1"
+
+                # Add data market contract number
+                base_args = (
+                    f"{base_args} --data-market-contract-number {data_market_number}"
+                )
+
+                # Add --devnet flag if deploying to devnet
+                if selected_powerloom_chain_name_upper == "DEVNET":
+                    build_sh_args_for_instance = f"--devnet {base_args}"
+                else:
+                    build_sh_args_for_instance = base_args
 
                 console.print(
                     f"   🔩 Deploying slot {slot_id_val} for market {market_conf_obj.name} (Source RPC: {source_rpc_url})",

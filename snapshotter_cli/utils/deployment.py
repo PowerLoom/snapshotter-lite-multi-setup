@@ -135,9 +135,9 @@ def deploy_snapshotter_instance(
 
     instance_subpath = f"{norm_pl_chain_name}/{norm_market_name}_{norm_source_chain_name_for_path}/slot-{slot_id}"
     instance_dir = SNAPSHOTTER_LITE_V2_DIR / instance_subpath
-    # e.g., MAINNET-UNISWAPV2-ETH
+    # e.g., mainnet-UNISWAPV2-ETH (lowercase chain name to match build.sh expectations)
     env_file_suffix = (
-        f"{pl_chain_name_upper}-{market_name_upper}-{source_chain_prefix_upper}"
+        f"{norm_pl_chain_name}-{market_name_upper}-{source_chain_prefix_upper}"
     )
     env_file_path = instance_dir / f".env-{env_file_suffix}"
 

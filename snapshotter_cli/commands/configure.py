@@ -99,9 +99,25 @@ def configure_command(
             )
             raise typer.Exit(1)
     else:
-        chain_list = sorted(cli_context.available_environments)
-        for i, chain in enumerate(chain_list, 1):
-            console.print(f"[bold green]{i}.[/] [cyan]{chain}[/]")
+        # Sort chains to prioritize MAINNET first
+        chain_list = sorted(
+            cli_context.available_environments,
+            key=lambda x: (x.upper() != "MAINNET", x.upper()),
+        )
+
+        # Display chains in a panel like deployment command
+        chain_list_display = "\n".join(
+            f"[bold green]{i}.[/] [cyan]{chain.title()}[/]"
+            for i, chain in enumerate(chain_list, 1)
+        )
+        panel = Panel(
+            chain_list_display,
+            title="[bold blue]Select Powerloom Chain[/]",
+            border_style="blue",
+            padding=(1, 2),
+        )
+        console.print(panel)
+
         while True:
             chain_input = Prompt.ask("👉 Select Powerloom chain (number or name)")
             if chain_input.isdigit():
