@@ -38,7 +38,7 @@ dependencies = [
 
 [project.urls]
 "Bug Tracker" = "https://github.com/powerloom/snapshotter-lite-multi-setup/issues"
-"Changelog" = "https://github.com/powerloom/snapshotter-lite-multi-setup/releases"
+"Changelog" = "https://github.com/powerloom/snapshotter-lite-multi-setup/blob/master/CHANGELOG.md"
 "Twitter" = "https://x.com/powerloom"
 
 [project.scripts]

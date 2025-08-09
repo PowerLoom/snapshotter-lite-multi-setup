@@ -1,8 +1,11 @@
 import shlex
 import sys
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import typer
+from rich.console import Console
+from rich.pager import Pager
 from rich.panel import Panel
 
 from snapshotter_cli.utils.console import Prompt, console
@@ -274,6 +277,87 @@ def get_missing_parameters(
     return collected_args
 
 
+def get_latest_changes() -> Optional[str]:
+    """Extract the latest changes from CHANGELOG.md file."""
+    try:
+        # Try to find CHANGELOG.md in various locations
+        possible_paths = [
+            Path("CHANGELOG.md"),  # Current directory
+            Path(__file__).parent.parent.parent
+            / "CHANGELOG.md",  # Relative to this file
+            Path.home()
+            / "code"
+            / "powerloom"
+            / "snapshotter-lite-multi-setup"
+            / "CHANGELOG.md",  # Dev path
+        ]
+
+        changelog_path = None
+        for path in possible_paths:
+            if path.exists():
+                changelog_path = path
+                break
+
+        if not changelog_path:
+            return None
+
+        with open(changelog_path, "r") as f:
+            content = f.read()
+
+        # Parse the changelog to get the latest unreleased section
+        lines = content.split("\n")
+        in_unreleased = False
+        in_latest_release = False
+        changes = []
+        version_count = 0
+
+        for line in lines:
+            # Check for version headers
+            if line.startswith("## ["):
+                version_count += 1
+                if "Unreleased" in line:
+                    in_unreleased = True
+                    in_latest_release = False
+                    changes.append(
+                        f"[bold cyan]📋 Latest Changes (Unreleased)[/bold cyan]\n"
+                    )
+                elif version_count == 2:  # First released version after Unreleased
+                    if (
+                        not in_unreleased
+                    ):  # If no unreleased section, show latest release
+                        in_latest_release = True
+                        version_info = line.replace("## ", "").strip()
+                        changes = [
+                            f"[bold cyan]📋 Latest Release: {version_info}[/bold cyan]\n"
+                        ]
+                    else:
+                        break  # Stop after unreleased section
+                elif version_count > 2:
+                    break  # Stop after first version section
+            elif (in_unreleased or in_latest_release) and line.strip():
+                # Convert markdown headers to rich formatting
+                if line.startswith("### "):
+                    formatted_line = line.replace("### ", "\n[bold yellow]")
+                    formatted_line += "[/bold yellow]"
+                    changes.append(formatted_line)
+                elif line.startswith("- "):
+                    # Format bullet points
+                    changes.append(f"  • {line[2:]}")
+                elif line.strip() and not line.startswith("#"):
+                    changes.append(line)
+
+        if changes:
+            result = "\n".join(changes[:20])  # Limit to first 20 lines
+            result += '\n\n[dim]Type "changelog" to see the full changelog[/dim]'
+            return result
+
+        return None
+
+    except Exception:
+        # Silently fail if we can't read the changelog
+        return None
+
+
 def run_shell(app: typer.Typer, parent_ctx: typer.Context):
     """Run an interactive shell for the CLI."""
     global COMMANDS
@@ -335,6 +419,18 @@ def run_shell(app: typer.Typer, parent_ctx: typer.Context):
         )
     )
 
+    # Show latest changes if available
+    latest_changes = get_latest_changes()
+    if latest_changes:
+        console.print(
+            Panel(
+                latest_changes,
+                title="[bold blue]What's New[/bold blue]",
+                border_style="blue",
+                padding=(1, 2),
+            )
+        )
+
     # Build command map from the app
     commands = {}
 
@@ -349,17 +445,93 @@ def run_shell(app: typer.Typer, parent_ctx: typer.Context):
             if name != "shell":  # Don't include shell itself
                 commands[name] = click_group.commands[name]
 
-    # Update global COMMANDS for autocomplete
-    COMMANDS = commands
+    # Add special commands first (before updating COMMANDS)
+    def show_changelog():
+        """Display the full changelog with formatted markdown."""
+        try:
+            # Try to find CHANGELOG.md
+            possible_paths = [
+                Path("CHANGELOG.md"),
+                Path(__file__).parent.parent.parent / "CHANGELOG.md",
+            ]
 
-    # Add special commands
+            changelog_path = None
+            for path in possible_paths:
+                if path.exists():
+                    changelog_path = path
+                    break
+
+            if changelog_path:
+                with open(changelog_path, "r") as f:
+                    content = f.read()
+
+                # Format the markdown content
+                formatted_lines = []
+                lines = content.split("\n")
+
+                # Add header
+                formatted_lines.append("[bold cyan]📋 Changelog[/bold cyan]")
+                formatted_lines.append(
+                    "[dim]Use arrow keys or Page Up/Down to scroll, 'q' to quit[/dim]\n"
+                )
+
+                for line in lines:
+                    if line.startswith("# "):
+                        # Main header
+                        formatted_lines.append(
+                            f"[bold magenta]{line[2:]}[/bold magenta]"
+                        )
+                    elif line.startswith("## "):
+                        # Version headers
+                        formatted_lines.append(f"\n[bold cyan]{line[3:]}[/bold cyan]")
+                    elif line.startswith("### "):
+                        # Section headers
+                        formatted_lines.append(
+                            f"\n[bold yellow]{line[4:]}[/bold yellow]"
+                        )
+                    elif line.startswith("- "):
+                        # Bullet points
+                        formatted_lines.append(f"  • {line[2:]}")
+                    elif line.startswith("  - "):
+                        # Sub-bullet points
+                        formatted_lines.append(f"    ◦ {line[4:]}")
+                    elif (
+                        line.startswith("**") and line.endswith("**") and len(line) > 4
+                    ):
+                        # Bold text
+                        formatted_lines.append(f"[bold]{line[2:-2]}[/bold]")
+                    elif line.strip():
+                        formatted_lines.append(line)
+                    else:
+                        formatted_lines.append("")
+
+                formatted_content = "\n".join(formatted_lines)
+
+                # Use pager for long content
+                with console.pager(styles=True):
+                    console.print(formatted_content)
+
+            else:
+                console.print(
+                    "[yellow]Changelog file not found. View online at:[/yellow]"
+                )
+                console.print(
+                    "https://github.com/powerloom/snapshotter-lite-multi-setup/blob/master/CHANGELOG.md"
+                )
+        except Exception as e:
+            console.print(f"[red]Error reading changelog: {e}[/red]")
+
     special_commands = {
         "help": lambda: show_help(commands),
         "exit": lambda: sys.exit(0),
         "quit": lambda: sys.exit(0),
         "clear": lambda: console.clear(),
         "cls": lambda: console.clear(),
+        "changelog": show_changelog,
     }
+
+    # Update global COMMANDS to include both regular and special commands for autocomplete
+    COMMANDS = {**commands, **{name: None for name in special_commands}}
 
     while True:
         try:
@@ -526,6 +698,7 @@ def show_help(commands: dict):
     # Special commands
     console.print("\n[bold]Special Commands:[/bold]")
     console.print("  [cyan]help[/cyan]           Show this help message")
+    console.print("  [cyan]changelog[/cyan]      Show the full changelog")
     console.print("  [cyan]clear/cls[/cyan]      Clear the screen")
     console.print("  [cyan]exit/quit[/cyan]      Exit the shell")
     console.print(
