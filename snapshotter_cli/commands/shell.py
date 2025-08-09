@@ -163,17 +163,19 @@ def get_missing_parameters(
                         )
                     elif param_name == "chain":
                         # Get available chains from CLI context
-                        available_chains = ["DEVNET", "MAINNET"]
+                        available_chains = ["MAINNET", "DEVNET"]
                         if parent_ctx and hasattr(parent_ctx, "obj") and parent_ctx.obj:
                             cli_context = parent_ctx.obj
                             if hasattr(cli_context, "available_environments"):
+                                # Sort chains to prioritize MAINNET first
                                 available_chains = sorted(
-                                    cli_context.available_environments
+                                    cli_context.available_environments,
+                                    key=lambda x: (x.upper() != "MAINNET", x.upper()),
                                 )
 
                         # Show available chains
                         console.print(
-                            f"\nAvailable chains: {', '.join(available_chains)}"
+                            f"\nAvailable chains: {', '.join([c.title() for c in available_chains])}"
                         )
 
                         while True:
@@ -188,7 +190,7 @@ def get_missing_parameters(
                                 break
 
                             console.print(
-                                f"❌ Invalid selection. Please choose from: {', '.join(available_chains)}",
+                                f"❌ Invalid selection. Please choose from: {', '.join([c.title() for c in available_chains])}",
                                 style="red",
                             )
                     elif param_name == "market":

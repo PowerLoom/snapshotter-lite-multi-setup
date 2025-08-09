@@ -259,7 +259,14 @@ def deploy(
                 )
                 raise typer.Exit(1)
         else:
-            all_powerloom_chains_from_config = cli_context.markets_config
+            # Sort chains to prioritize MAINNET first
+            all_powerloom_chains_from_config = sorted(
+                cli_context.markets_config,
+                key=lambda x: (
+                    x.powerloomChain.name.upper() != "MAINNET",
+                    x.powerloomChain.name.upper(),
+                ),
+            )
             if not all_powerloom_chains_from_config:
                 console.print(
                     "❌ No Powerloom chains found in the remote configuration. Cannot proceed.",
@@ -268,7 +275,7 @@ def deploy(
                 raise typer.Exit(1)
 
             chain_list_display = "\n".join(
-                f"[bold green]{i+1}.[/] [cyan]{chain.powerloomChain.name}[/]"
+                f"[bold green]{i+1}.[/] [cyan]{chain.powerloomChain.name.title()}[/]"
                 for i, chain in enumerate(all_powerloom_chains_from_config)
             )
             panel = Panel(

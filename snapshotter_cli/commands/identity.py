@@ -75,7 +75,7 @@ def list_identities(ctx: typer.Context):
         header_style="bold blue",
         title_style="bold cyan",
     )
-    table.add_column("Chain", style="magenta")
+    table.add_column("Powerloom Chain", style="magenta")
     table.add_column("Market", style="cyan")
     table.add_column("Source Chain", style="green")
     table.add_column("Status", style="yellow")
